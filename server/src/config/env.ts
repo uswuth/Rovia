@@ -40,6 +40,8 @@ const resolveSecret = (name: string): string | undefined =>
 const rawMongoUri = resolveSecret('MONGO_URI') ?? resolveSecret('MONGODB_URI');
 const accessSecret = resolveSecret('JWT_ACCESS_SECRET');
 const refreshSecret = resolveSecret('JWT_REFRESH_SECRET');
+const s3AccessKeyId = resolveSecret('AWS_ACCESS_KEY_ID');
+const s3SecretKey = resolveSecret('AWS_SECRET_ACCESS_KEY');
 
 // Non-secret settings are the only ones allowed a default value.
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -59,6 +61,16 @@ const validateEnv = (): void => {
     );
     process.exit(1);
   }
+
+  // Object-storage credentials are only fatal in production. In development the
+  // storage spike is opt-in, so a missing key must not stop the whole server.
+  if (isProduction && (!s3AccessKeyId || !s3SecretKey)) {
+    console.error(
+      '[CONFIG ERROR] Missing required configuration:\n  - AWS_ACCESS_KEY_ID (or AWS_ACCESS_KEY_ID_FILE)\n' +
+        '  - AWS_SECRET_ACCESS_KEY (or AWS_SECRET_ACCESS_KEY_FILE)'
+    );
+    process.exit(1);
+  }
 };
 
 validateEnv();
@@ -72,9 +84,30 @@ export const env: Readonly<EnvConfig> = Object.freeze({
   JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY || '15m',
   JWT_REFRESH_SECRET: refreshSecret as string,
   JWT_REFRESH_EXPIRY: process.env.JWT_REFRESH_EXPIRY || '7d',
+  // Non-secret S3 settings may have defaults. The credentials may not: they go
+  // through resolveSecret so a missing value fails loudly instead of signing
+  // with a publicly known key.
+  // Internal endpoint: used by the server for HeadObject/Delete/reads. In Docker
+  // this must be the Compose-internal hostname.
   AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL || 'http://localhost:4566',
+  // Host-reachable endpoint: only used when presigning URLs a browser will call.
+  AWS_PUBLIC_ENDPOINT_URL: process.env.AWS_PUBLIC_ENDPOINT_URL || 'http://localhost:4566',
   AWS_REGION: process.env.AWS_REGION || 'us-east-1',
-  AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || 'test',
-  AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || 'test',
-  AWS_S3_BUCKET: process.env.AWS_S3_BUCKET || 'intellmeet-bucket'
+  AWS_ACCESS_KEY_ID: s3AccessKeyId,
+  AWS_SECRET_ACCESS_KEY: s3SecretKey,
+  AWS_S3_BUCKET: process.env.AWS_S3_BUCKET || 'intellmeet-bucket',
+
+  // ── Local AI pipeline (self-hosted, no third-party API keys) ──────────────
+  // Defaults are deliberately the smallest useful models so the pipeline runs
+  // on a modest laptop CPU. Raise these only on a machine with headroom.
+  FFMPEG_PATH: process.env.FFMPEG_PATH || 'ffmpeg',
+  // Internal URL used by the server itself.
+  WHISPER_BASE_URL: process.env.WHISPER_BASE_URL || 'http://whisper:9000',
+  // "tiny" ~75 MB, "base" ~145 MB. "small" and above are not laptop-friendly.
+  WHISPER_MODEL: process.env.WHISPER_MODEL || 'tiny',
+  WHISPER_TIMEOUT_MS: parseInt(process.env.WHISPER_TIMEOUT_MS || '300000', 10),
+  OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || 'http://ollama:11434',
+  // 0.5b ~400 MB. 3b is ~2 GB and noticeably slower on CPU.
+  OLLAMA_MODEL: process.env.OLLAMA_MODEL || 'qwen2.5:0.5b-instruct',
+  OLLAMA_TIMEOUT_MS: parseInt(process.env.OLLAMA_TIMEOUT_MS || '180000', 10)
 });

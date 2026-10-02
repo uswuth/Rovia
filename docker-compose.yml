@@ -5,8 +5,10 @@
 services:
   client:
     build:
-      context: ./client
-      dockerfile: Dockerfile
+      # Root context: the pnpm workspace lockfile lives at the repo root, so a
+      # ./client context cannot resolve dependencies.
+      context: .
+      dockerfile: client/Dockerfile
       args:
         # Same-origin /api path, proxied by nginx to the server container
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
@@ -22,8 +24,9 @@ services:
 
   server:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      # Root context: the pnpm workspace lockfile lives at the repo root.
+      context: .
+      dockerfile: server/Dockerfile
     container_name: intellmeet-server
     restart: unless-stopped
     ports:
@@ -34,7 +37,11 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
-      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://localhost:4566}
+      # Server's own S3 calls (HeadObject/Delete): must be the in-network name.
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://floci-aws:4566}
+      # Only used when presigning URLs the BROWSER will call: must be
+      # host-reachable, because a browser cannot resolve a Compose hostname.
+      AWS_PUBLIC_ENDPOINT_URL: ${AWS_PUBLIC_ENDPOINT_URL:-http://localhost:4566}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
@@ -47,14 +54,19 @@ services:
       - jwt_access_secret
       - jwt_refresh_secret
     depends_on:
-      mongodb:
-        condition: service_healthy
+      # MongoDB is Atlas (see server/secrets/mongo_uri.txt), so there is no
+      # local mongo service to wait for.
+      floci-init:
+        condition: service_completed_successfully
     networks:
       - intellmeet-network
 
+  # Optional local MongoDB. Not started by default because the project points at
+  # an Atlas cluster. Start it with: docker compose --profile localmongo up -d
   mongodb:
     image: mongo:7
     container_name: intellmeet-mongodb
+    profiles: ["localmongo"]
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-intellmeet}
@@ -70,22 +82,119 @@ services:
     networks:
       - intellmeet-network
 
-  # Optional dev tooling: docker compose --profile tools up -d
-  mongo-express:
-    image: mongo-express:1
-    container_name: intellmeet-mongo-ui
+  # S3-compatible object storage emulator. Published on the host port because
+  # the BROWSER consumes the presigned URL, not the server: a Compose-internal
+  # hostname such as floci-aws:4566 is unresolvable from the browser.
+  #
+  # NOTE: this image is an S3 API only (it exposes 4566 and nothing else). There
+  # is no web console. Use the AWS CLI against :4566 to inspect objects, or the
+  # optional `s3browser` service below for a clickable UI.
+  floci-aws:
+    image: floci/floci:latest
+    container_name: intellmeet-floci-aws
     restart: unless-stopped
-    profiles: ["tools"]
     ports:
-      - "${MONGO_EXPRESS_PORT:-8081}:8081"
-    environment:
-      ME_CONFIG_MONGODB_SERVER: mongodb
-      ME_CONFIG_MONGODB_PORT: 27017
-      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USER:-intellmeet}
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-intellmeet_dev_password}
+      - "${S3_PORT:-4566}:4566"
+    networks:
+      - intellmeet-network
+
+  # Minimal S3 object browser (local development only). Static nginx page that
+  # talks to Floci through the S3 API using the emulator's well-known test
+  # credentials. Private, throwaway bucket credentials: never do this in prod.
+  #   docker compose --profile s3ui up -d s3browser   -> http://localhost:9000
+  s3browser:
+    image: nginx:1.27-alpine
+    container_name: intellmeet-s3-browser
+    profiles: ["s3ui"]
+    restart: unless-stopped
+    ports:
+      - "${S3_BROWSER_PORT:-9000}:80"
+    volumes:
+      - ./server/floci/browser:/usr/share/nginx/html:ro
+    networks:
+      - intellmeet-network
+
+  # One-shot: create the bucket and apply CORS. Without CORS the browser
+  # preflight fails and the upload silently hangs.
+  # Uses amazon/aws-cli rather than minio/mc: the mc image is not pullable in
+  # this environment, and the AWS CLI is already cached locally.
+  floci-init:
+    image: amazon/aws-cli:latest
+    container_name: intellmeet-floci-init
+    restart: "no"
     depends_on:
-      mongodb:
-        condition: service_healthy
+      floci-aws:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      export AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID};
+      export AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY};
+      export AWS_DEFAULT_REGION=$${AWS_REGION};
+      i=0;
+      until aws --endpoint-url http://floci-aws:4566 s3api list-buckets >/dev/null 2>&1; do
+        i=$$((i+1));
+        if [ $$i -gt 60 ]; then echo 'floci did not become ready'; exit 1; fi;
+        sleep 2;
+      done;
+      aws --endpoint-url http://floci-aws:4566 s3api create-bucket --bucket $${AWS_S3_BUCKET} >/dev/null 2>&1 || true;
+      aws --endpoint-url http://floci-aws:4566 s3api put-bucket-cors --bucket $${AWS_S3_BUCKET} --cors-configuration file:///config/cors.json;
+      aws --endpoint-url http://floci-aws:4566 s3api get-bucket-cors --bucket $${AWS_S3_BUCKET} >/dev/null;
+      echo 'floci bucket + CORS ready';
+      "
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-intellmeet-bucket}
+    volumes:
+      - ./server/floci/cors.json:/config/cors.json:ro
+    networks:
+      - intellmeet-network
+
+  # ── Local AI pipeline ─────────────────────────────────────────────────────
+  # Both run entirely on the developer machine: no API keys, no per-minute
+  # billing, and no meeting audio leaves the host.
+  whisper:
+    build:
+      context: ./docker/whisper
+      dockerfile: Dockerfile
+    container_name: intellmeet-whisper
+    restart: unless-stopped
+    profiles: ["ai"]
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-tiny}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+    volumes:
+      - whisper-model:/root/.cache
+    networks:
+      - intellmeet-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: intellmeet-ollama
+    restart: unless-stopped
+    profiles: ["ai"]
+    volumes:
+      - ollama-models:/root/.ollama
+    networks:
+      - intellmeet-network
+
+  # Optional MongoDB web UI, connects to the Atlas cluster over the SRV URI.
+  #   docker compose --profile tools run --rm mongosh
+  #
+  # NOTE: a self-hosted web UI is deliberately NOT provided. mongo-express cannot
+  # resolve mongodb+srv hostnames in this network, and mounting the Atlas data as a
+  # second database is a footgun. Use the Atlas UI (Data Explorer) instead:
+  #   https://cloud.mongodb.com  -> your cluster -> Data Explorer
+  mongosh:
+    image: mongodb/mongodb-community-server:latest
+    container_name: intellmeet-mongosh
+    profiles: ["tools"]
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["mongosh \"$$MONGODB_URI\" --quiet --eval 'print(\"collections: \" + db.getCollectionNames().join(\", \"))'"]
+    environment:
+      MONGODB_URI: ${MONGODB_URI_ATLAS:-}
     networks:
       - intellmeet-network
 

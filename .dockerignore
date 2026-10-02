@@ -18,3 +18,9 @@ secrets
 README.md
 AGENTS.md
 graph.mmd
+
+# Stale npm lockfiles: this is a pnpm workspace, the root pnpm-lock.yaml is
+# authoritative. Shipping these only confuses tooling.
+**/package-lock.json
+**/docs
+**/*.md

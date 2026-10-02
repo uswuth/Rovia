@@ -21,8 +21,9 @@ AI-Powered Enterprise Meeting & Collaboration Platform
 ## Current Progress — ~35%
 
 Weeks 1–2 of the 4-week plan are largely done on the **backend foundation** side.
-Auth, org/team management and project management are live. Real-time video/chat and
-AI meeting intelligence are the remaining bulk of the work.
+Auth, org/team management, project management, and the recording upload path are live.
+Meeting infrastructure (WebRTC signaling, transcription, AI summaries) is the
+remaining bulk of the work.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -34,6 +35,9 @@ AI meeting intelligence are the remaining bulk of the work.
 | Projects (F06) | ✅ | CRUD, project members, role update, remove member |
 | Socket.io bootstrap | 🟡 | Typed Socket.io server attached; only connect/disconnect handled |
 | WebRTC video meetings (F02) | ⬜ | No signaling or peer logic yet |
+| Screen recording capture | ✅ | Browser capture contract measured and documented ([client/docs/SCREEN_RECORDING_CAPTURE.md](./client/docs/SCREEN_RECORDING_CAPTURE.md)) |
+| Recording upload + storage (F08) | ✅ | Org-scoped recording API, browser uploads direct to S3-compatible storage via presigned URLs; metadata in MongoDB only ([client/docs/SCREEN_RECORDING_CAPTURE.md](./client/docs/SCREEN_RECORDING_CAPTURE.md)) |
+| Transcription / AI summary (F03) | ⬜ | `runPostProcessing` seam is in place; no STT provider selected yet |
 | In-meeting chat (F04) | ⬜ | Page shell only |
 | AI intelligence (F03) | ⬜ | Transcription, summary, action items not started |
 | Post-meeting dashboard (F05) | 🟡 | UI page exists, no recordings/summaries data |

@@ -9,22 +9,25 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
 
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+# The pnpm workspace lockfile lives at the repository root, so the build context
+# must be the root (see docker-compose.yml).
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY client/package.json ./client/
+RUN pnpm install --frozen-lockfile --filter ./client...
 
-COPY tsconfig*.json vite.config.ts index.html ./
-COPY src ./src
+COPY client/tsconfig*.json client/vite.config.ts client/index.html ./client/
+COPY client/src ./client/src
 
 # Baked at build time (public config, never a secret)
-ARG VITE_API_BASE_URL=http://localhost:5000/api/v1
+ARG VITE_API_BASE_URL=/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-RUN pnpm run build
+RUN pnpm --filter ./client run build
 
 # ---------- Stage 2: static runtime ----------
 FROM nginx:1.27-alpine AS runner
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY client/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/client/dist /usr/share/nginx/html
 
 EXPOSE 80
 

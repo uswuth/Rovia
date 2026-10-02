@@ -15,8 +15,25 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, '../..');
 const secretsDir = path.resolve(__dirname, '../secrets');
 const force = process.argv.includes('--force');
+
+// Compose reads the root .env for MONGO_ROOT_USER / MONGO_ROOT_PASSWORD, but a
+// bare `node` process does not. Without this the URI is built from `undefined`
+// and every container fails Mongo auth. Explicit process env still wins.
+const loadDotEnv = () => {
+  const envPath = path.join(repoRoot, '.env');
+  if (!fs.existsSync(envPath)) return;
+  for (const line of fs.readFileSync(envPath, 'utf-8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!match) continue;
+    const [, key, rawValue] = match;
+    if (process.env[key] !== undefined) continue;
+    process.env[key] = rawValue.replace(/^["']|["']$/g, '');
+  }
+};
+loadDotEnv();
 
 fs.mkdirSync(secretsDir, { recursive: true });
 

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Floci S3 Browser (local dev)</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+         background:#0b0f14; color:#e6edf3; padding:24px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p.sub { margin:0 0 20px; color:#8b949e; font-size:13px; }
+  .bar { display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  input, button { font:inherit; padding:7px 10px; border-radius:6px; border:1px solid #30363d;
+                  background:#161b22; color:#e6edf3; }
+  input { min-width:340px; }
+  button { cursor:pointer; }
+  button:hover { border-color:#58a6ff; }
+  button.danger:hover { border-color:#f85149; color:#f85149; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid #21262d; font-size:13px; }
+  th { color:#8b949e; font-weight:600; }
+  code { background:#161b22; padding:2px 6px; border-radius:4px; font-size:12px; }
+  .err { color:#f85149; margin-bottom:12px; }
+  .empty { color:#8b949e; padding:16px 0; }
+</style>
+</head>
+<body>
+<h1>Floci S3 Browser</h1>
+<p class="sub">Local development only. Lists objects in the emulator bucket via the S3 REST API.</p>
+
+<div class="bar">
+  <input id="prefix" placeholder="key prefix, e.g. recordings/" />
+  <button onclick="load()">List</button>
+  <button onclick="location.reload()">Reset</button>
+</div>
+<div id="err" class="err"></div>
+<div id="out"></div>
+
+<script>
+// Emulator-only throwaway credentials. This page must never be deployed.
+const ENDPOINT = 'http://localhost:4566';
+const BUCKET = 'intellmeet-bucket';
+const ACCESS_KEY = 'test';
+const SECRET_KEY = 'test';
+const REGION = 'us-east-1';
+
+const enc = new TextEncoder();
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+async function sha256Hex(str) {
+  return hex(await crypto.subtle.digest('SHA-256', enc.encode(str)));
+}
+
+async function hmac(key, msg) {
+  const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(msg)));
+}
+
+async function signRequest(method, canonicalUri, queryParams) {
+  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+
+  const canonicalQuery = Object.keys(queryParams)
+    .sort()
+    .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(queryParams[k])}`)
+    .join('&');
+
+  const payloadHash = 'UNSIGNED-PAYLOAD';
+  const canonicalRequest = [
+    method,
+    canonicalUri,
+    canonicalQuery,
+    `host:${ENDPOINT}`,
+    '',
+    'host',
+    payloadHash,
+  ].join('\n');
+
+  const scope = `${dateStamp}/${REGION}/s3/aws4_request`;
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, await sha256Hex(canonicalRequest)].join('\n');
+
+  const kDate = await hmac(enc.encode('AWS4' + SECRET_KEY), dateStamp);
+  const kRegion = await hmac(kDate, REGION);
+  const kService = await hmac(kRegion, 's3');
+  const kSigning = await hmac(kService, 'aws4_request');
+  const signature = hex(await hmac(kSigning, stringToSign));
+
+  const query = canonicalQuery ? `?${canonicalQuery}` : '';
+  return { url: `${ENDPOINT}${canonicalUri}${query}`, amzDate, scope, signature };
+}
+
+async function send(method, canonicalUri, queryParams) {
+  const { url, amzDate, scope, signature } = await signRequest(method, canonicalUri, queryParams);
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization:
+        `AWS4-HMAC-SHA256 Credential=${ACCESS_KEY}/${scope}, SignedHeaders=host, Signature=${signature}`,
+      'x-amz-date': amzDate,
+      'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+    },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res;
+}
+
+async function listObjects(prefix) {
+  const params = { 'list-type': '2' };
+  if (prefix) params.prefix = prefix;
+  const res = await send('GET', `/${BUCKET}`, params);
+  const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
+  return [...xml.getElementsByTagName('Contents')].map((c) => ({
+    key: c.getElementsByTagName('Key')[0]?.textContent,
+    size: Number(c.getElementsByTagName('Size')[0]?.textContent || 0),
+    modified: c.getElementsByTagName('LastModified')[0]?.textContent,
+  }));
+}
+
+async function removeKey(key) {
+  await send('DELETE', `/${BUCKET}/${encodeURIComponent(key)}`, {});
+  load();
+}
+
+function human(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(2) + ' MB';
+}
+
+async function load() {
+  document.getElementById('err').textContent = '';
+  const out = document.getElementById('out');
+  out.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const objects = await listObjects(document.getElementById('prefix').value.trim());
+    if (!objects.length) { out.innerHTML = '<div class="empty">No objects match this prefix.</div>'; return; }
+    out.innerHTML = '<table><thead><tr><th>Key</th><th>Size</th><th>Last modified</th><th></th></tr></thead><tbody>' +
+      objects.map(o => `<tr><td><code>${o.key}</code></td><td>${human(o.size)}</td><td>${o.modified || ''}</td>` +
+        `<td><button class="danger" onclick="removeKey('${o.key}')">Delete</button></td></tr>`).join('') +
+      '</tbody></table>';
+  } catch (e) {
+    out.innerHTML = '';
+    document.getElementById('err').textContent = e.message;
+  }
+}
+load();
+</script>
+</body>
+</html>
