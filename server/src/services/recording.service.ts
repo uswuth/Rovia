@@ -7,7 +7,7 @@ import { logger } from '../utils/logger.js';
 import { assertObjectId, toObjectIdString } from '../utils/objectId.js';
 import { requireOrganizationId } from '../utils/scope.js';
 import { findPaginated } from '../utils/paginatedFind.js';
-import { USER_POPULATE, USER_SELECT } from '../utils/projections.js';
+import { USER_SELECT } from '../utils/projections.js';
 import {
   MAX_PENDING_RECORDINGS_PER_ORG,
   MAX_RECORDING_DURATION_MS,

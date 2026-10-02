@@ -268,6 +268,73 @@ function DropdownMenuShortcut({
   )
 }
 
+interface RadioGroupContextType {
+  value?: string
+  onValueChange?: (value: string) => void
+}
+
+const RadioGroupContext = React.createContext<RadioGroupContextType>({})
+
+function DropdownMenuRadioGroup({
+  value,
+  onValueChange,
+  children,
+  className,
+  ...props
+}: React.ComponentProps<"div"> & {
+  value?: string
+  onValueChange?: (value: string) => void
+}) {
+  return (
+    <RadioGroupContext.Provider value={{ value, onValueChange }}>
+      <div data-slot="dropdown-menu-radio-group" className={cn("space-y-0.5", className)} {...props}>
+        {children}
+      </div>
+    </RadioGroupContext.Provider>
+  )
+}
+
+function DropdownMenuRadioItem({
+  value,
+  children,
+  className,
+  onClick,
+  ...props
+}: React.ComponentProps<"button"> & { value: string }) {
+  const { setOpen } = React.useContext(DropdownMenuContext)
+  const { value: selectedValue, onValueChange } = React.useContext(RadioGroupContext)
+  const isChecked = selectedValue === value
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    onValueChange?.(value)
+    onClick?.(e)
+    setOpen(false)
+  }
+
+  return (
+    <button
+      type="button"
+      data-slot="dropdown-menu-radio-item"
+      role="menuitemradio"
+      aria-checked={isChecked}
+      className={cn(
+        "relative flex w-full select-none items-center rounded-md py-1.5 pl-7 pr-2 text-xs text-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground cursor-pointer disabled:pointer-events-none disabled:opacity-50",
+        isChecked && "font-semibold bg-emerald-500/10 text-emerald-500",
+        className
+      )}
+      onClick={handleClick}
+      {...props}
+    >
+      <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+        {isChecked && (
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        )}
+      </span>
+      {children}
+    </button>
+  )
+}
+
 export {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -275,7 +342,10 @@ export {
   DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuPortal,
   DropdownMenuShortcut,
 }
+

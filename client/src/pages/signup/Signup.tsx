@@ -126,6 +126,7 @@ export const Signup = () => {
   return (
     <Box
       component="main"
+      className="bg-dots-pattern"
       sx={{
         minHeight: '100vh',
         width: '100%',
@@ -177,10 +178,8 @@ export const Signup = () => {
 
             {/* Top Brand Mark */}
             <Box sx={{ position: 'relative', zIndex: 10 }}>
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-500/15 border border-emerald-500/30 shadow-xs">
-                  <IntellMeetLogo size={20} />
-                </div>
+              <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                <IntellMeetLogo size={26} />
                 <Typography
                   sx={{
                     color: '#ffffff',
@@ -241,7 +240,7 @@ export const Signup = () => {
                   <Grid key={step.n} size={{ xs: 4 }}>
                     <Box
                       sx={{
-                        p: { xs: 1.75, xl: 2 },
+                        p: { lg: 1.25, xl: 1.75 },
                         height: '100%',
                         borderRadius: '12px',
                         transition: 'all 0.2s ease',
@@ -262,7 +261,7 @@ export const Signup = () => {
                           justifyContent: 'center',
                           fontSize: '0.75rem',
                           fontWeight: 700,
-                          mb: 1.5,
+                          mb: 1.25,
                           bgcolor: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.2)',
                           color: '#ffffff',
                         }}
@@ -271,7 +270,7 @@ export const Signup = () => {
                       </Box>
                       <Typography
                         sx={{
-                          fontSize: '0.75rem',
+                          fontSize: { lg: '0.72rem', xl: '0.75rem' },
                           fontWeight: 600,
                           lineHeight: 1.35,
                           whiteSpace: 'pre-line',
@@ -298,9 +297,9 @@ export const Signup = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            px: { xs: 3, sm: 6, lg: 8 },
+            px: { xs: 2, sm: 6, lg: 8 },
             py: { xs: 2.5, sm: 3, lg: 1.5 },
-            bgcolor: 'var(--background)',
+            bgcolor: { xs: 'transparent', lg: 'var(--background)' },
             '&::-webkit-scrollbar': {
               width: '6px',
             },
@@ -318,6 +317,24 @@ export const Signup = () => {
         >
           <Box sx={{ width: '100%', maxWidth: 440, mx: 'auto', my: 'auto' }}>
             <Stack spacing={1.5}>
+              {/* Brand Logo Header for Small Screens (< 1200px) */}
+              <Box sx={{ display: { xs: 'flex', lg: 'none' }, justifyContent: { xs: 'center', sm: 'flex-start' }, mb: 0.5 }}>
+                <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                  <IntellMeetLogo size={26} />
+                  <Typography
+                    sx={{
+                      color: 'var(--foreground)',
+                      fontWeight: 700,
+                      fontSize: '1.2rem',
+                      letterSpacing: '-0.025em',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                  >
+                    Intell<span className="text-emerald-600 dark:text-emerald-400">Meet</span>
+                  </Typography>
+                </Stack>
+              </Box>
+
               {/* Header */}
               <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
                 <Typography
@@ -329,10 +346,10 @@ export const Signup = () => {
                     color: 'var(--foreground)',
                   }}
                 >
-                  Sign Up Account
+                  Create Your Account
                 </Typography>
                 <Typography sx={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', mt: 0.25 }}>
-                  Enter your personal data to create your account.
+                  Get started with your IntellMeet workspace in seconds.
                 </Typography>
               </Box>
 

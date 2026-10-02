@@ -1,0 +1,27 @@
+meta {
+  name: Create Project
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/projects
+  body: json
+}
+
+body {
+  {
+    "projectName": "Mobile App v2",
+    "projectDescription": "Next generation mobile app"
+  }
+}
+
+script:post-response {
+  const data = res.getBody()?.data ?? {};
+  if (data.projectId) bru.setVar("projectId", data.projectId);
+}
+
+docs {
+  Meetings require projectId, because the project roster is the only set of
+  people who can be assigned to a meeting.
+}

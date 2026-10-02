@@ -1,0 +1,15 @@
+meta {
+  name: Get Download URL
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/recordings/{{recordingId}}/download-url
+  body: none
+}
+
+docs {
+  The bucket is private. This 300s signed GET is the only way to read the
+  object. Requires status READY.
+}

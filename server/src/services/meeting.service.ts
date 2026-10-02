@@ -17,8 +17,7 @@ import {
   ICreateMeetingInput,
   IMeetingListQuery,
   IMeetingPermissions,
-  MeetingJoinMode,
-  MeetingStatus
+  MeetingJoinMode
 } from '../types/index.js';
 
 /**
@@ -131,9 +130,11 @@ export const createMeetingService = async (
   }
 
   const roster = await loadProjectRoster(input.projectId, organizationId);
+  const creator = await User.findById(userId).lean();
+  const isSuperAdmin = creator?.user_role === 'SuperAdmin' || creator?.is_super_admin === true;
 
-  // The creator must belong to the project, so the host is always a member.
-  if (!roster.has(userId)) {
+  // The creator must belong to the project as a member/host, unless they are a SuperAdmin.
+  if (!isSuperAdmin && !roster.has(userId)) {
     throw ApiError.forbidden('Only project members or hosts can create a meeting for this project');
   }
 
@@ -141,9 +142,8 @@ export const createMeetingService = async (
     ? await assertUsersInOrganization(input.participantIds, organizationId)
     : [];
   const outsiders = requested.filter((id) => !roster.has(id));
-  if (outsiders.length > 0) {
-    // An organization invite code does not bypass this: org membership admits
-    // you to the org, project membership admits you onto this roster.
+  if (!isSuperAdmin && outsiders.length > 0) {
+    // An organization invite code does not bypass this for ordinary members.
     throw ApiError.badRequest('Participants must be members or hosts of the selected project', [
       { field: 'participantIds', message: `Not a project member: ${outsiders.join(', ')}` }
     ]);
@@ -186,6 +186,28 @@ const assertCanManageMeeting = (meeting: MeetingDocument, userId: string): void 
     isCreator || participant?.participant_role === 'HOST' || participant?.participant_role === 'MODERATOR';
   if (!isManager) {
     throw ApiError.forbidden('Only a meeting host or moderator can do that');
+  }
+};
+
+/**
+ * Every in-meeting feature (chat, Q&A, polls) needs the same two checks, so
+ * they live here rather than being re-declared per feature.
+ */
+
+/** Loads a meeting and confirms the caller is on its roster. */
+export const assertMeetingParticipant = (meeting: MeetingDocument, userId: string): MeetingParticipantClass => {
+  const participant = findParticipant(meeting, userId);
+  if (!participant) {
+    throw ApiError.forbidden('You are not a participant in this meeting');
+  }
+  return participant;
+};
+
+/** Loads a meeting and confirms the caller is on its roster AND may chat. */
+export const assertMeetingCanChat = (meeting: MeetingDocument, userId: string): void => {
+  const participant = assertMeetingParticipant(meeting, userId);
+  if (!participant.can_use_chat) {
+    throw ApiError.forbidden('Chat is disabled for you in this meeting');
   }
 };
 

@@ -1,0 +1,16 @@
+meta {
+  name: Get Recording
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/recordings/{{recordingId}}
+  body: none
+}
+
+docs {
+  Includes transcriptionStatus and summaryStatus alongside recordingStatus.
+  With the local AI services not running these come back FAILED while the
+  recording itself stays READY.
+}

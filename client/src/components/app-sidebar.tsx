@@ -59,6 +59,16 @@ export function AppSidebar({
       title: "Meetings",
       url: "/meetings",
       icon: <Video size={18} />,
+      items: [
+        {
+          title: "All Meetings",
+          url: "/meetings",
+        },
+        {
+          title: "Schedule Meeting",
+          url: "/meetings/new",
+        },
+      ],
     },
     {
       title: "Tasks",

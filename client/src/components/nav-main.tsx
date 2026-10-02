@@ -56,6 +56,9 @@ export function NavMain({
     if (url === "/projects") {
       return location.pathname === "/projects" && (!location.search || !location.search.includes("status="))
     }
+    if (url === "/meetings") {
+      return location.pathname === "/meetings"
+    }
     if (url === "/dashboard") {
       return location.pathname === "/dashboard"
     }
@@ -68,13 +71,14 @@ export function NavMain({
         {items.map((item) => {
           const isItemDirectlyActive = isCurrentActive(item.url)
           const itemHasActiveChild = item.items?.some((sub) => isCurrentActive(sub.url))
+          const isParentRouteActive = isItemDirectlyActive || itemHasActiveChild || (item.url !== "/dashboard" && location.pathname.startsWith(item.url))
 
           if (!item.items || item.items.length === 0) {
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   tooltip={item.title}
-                  isActive={isItemDirectlyActive}
+                  isActive={isParentRouteActive}
                   render={<Link to={item.url} onClick={handleNavClick} />}
                 >
                   {item.icon}
@@ -89,7 +93,7 @@ export function NavMain({
               <SidebarMenuItem key={item.title} className="w-full">
                 <DropdownMenu>
                   <DropdownMenuTrigger render={
-                    <SidebarMenuButton tooltip={item.title} isActive={isItemDirectlyActive && !itemHasActiveChild}>
+                    <SidebarMenuButton tooltip={item.title} isActive={isParentRouteActive}>
                       {item.icon}
                     </SidebarMenuButton>
                   } />
@@ -118,7 +122,7 @@ export function NavMain({
           return (
             <Collapsible
               key={item.title}
-              defaultOpen={isItemDirectlyActive || itemHasActiveChild || item.isActive}
+              defaultOpen={isParentRouteActive || item.isActive}
               className="group/collapsible w-full"
             >
               <SidebarMenuItem className="w-full">
@@ -127,7 +131,7 @@ export function NavMain({
                   render={
                     <SidebarMenuButton
                       tooltip={item.title}
-                      isActive={isItemDirectlyActive && !itemHasActiveChild}
+                      isActive={isParentRouteActive}
                     >
                       {item.icon}
                       <span className="flex-1 text-left">{item.title}</span>

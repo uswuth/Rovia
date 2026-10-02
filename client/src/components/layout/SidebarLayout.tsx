@@ -1,19 +1,10 @@
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import {
-  FolderGit2,
-  ChevronDown,
-} from 'lucide-react';
+import { Bell, CheckCheck, Video, Sparkles } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useAuth } from '@/context/AuthContext';
-import {
-  getProjectName,
-  getProjectCode,
-  getProjectStatus,
-  getProjectId,
-  type Project,
-} from '@/types/project.types';
+import { type Project } from '@/types/project.types';
 import { InviteCodeModal } from '@/components/dashboard/InviteCodeModal';
 import { CreateProjectModal } from '@/components/dashboard/CreateProjectModal';
 import { AppSidebar } from '@/components/app-sidebar';
@@ -37,7 +28,7 @@ interface SidebarLayoutProps {
 }
 
 export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
-  const { projects, selectedProject, setSelectedProject, addProject } = useProject();
+  const { addProject } = useProject();
   const { org } = useOrganization();
   const { refreshProfile } = useAuth();
   const location = useLocation();
@@ -45,18 +36,47 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   // Modals state
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
+
+  // Notifications state (Ready for future endpoint wiring)
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(3);
+  const [notificationsList, setNotificationsList] = useState([
+    {
+      id: '1',
+      title: 'Meeting Scheduled',
+      message: 'Sprint Planning meeting scheduled for 3:00 PM.',
+      time: '10m ago',
+      type: 'meeting',
+      unread: true,
+    },
+    {
+      id: '2',
+      title: 'Workspace Update',
+      message: 'You were added to the Acme Corp workspace.',
+      time: '1h ago',
+      type: 'system',
+      unread: true,
+    },
+    {
+      id: '3',
+      title: 'AI Summary Ready',
+      message: 'AI Meeting recap is available for review.',
+      time: '3h ago',
+      type: 'ai',
+      unread: true,
+    },
+  ]);
+
+  const handleMarkAllRead = () => {
+    setNotificationsList((prev) => prev.map((n) => ({ ...n, unread: false })));
+    setUnreadCount(0);
+  };
 
   // Regenerating the invite code changes the organization, which now comes from
   // the auth user rather than a separate fetch, so the profile must be re-read
   // for the new code to appear.
   const handleGenerateNewCode = async () => {
     await refreshProfile();
-  };
-
-  const handleSelectProject = (proj: Project) => {
-    setSelectedProject(proj);
-    setProjectDropdownOpen(false);
   };
 
   // `useMutation` invalidates the projects query and `addProject` seeds the
@@ -82,14 +102,15 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
         items.push({ name: 'Planning', path: '/projects?status=planning' });
       } else if (search.includes('status=archived')) {
         items.push({ name: 'Archived', path: '/projects?status=archived' });
-      } else {
-        items.push({ name: 'All Projects', path: '/projects' });
       }
-    } else if (path === '/meetings') {
+    } else if (path.startsWith('/meetings')) {
       items.push({ name: 'Meetings', path: '/meetings' });
-    } else if (path === '/tasks') {
+      if (path === '/meetings/new') {
+        items.push({ name: 'Schedule Meeting', path: '/meetings/new' });
+      }
+    } else if (path.startsWith('/tasks')) {
       items.push({ name: 'Tasks', path: '/tasks' });
-    } else if (path === '/settings') {
+    } else if (path.startsWith('/settings')) {
       items.push({ name: 'Settings', path: '/settings' });
     }
 
@@ -105,7 +126,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
       />
 
       <SidebarInset>
-        {/* Top App Header with Trigger, Vertical Separator, Breadcrumbs & Project Switcher */}
+        {/* Top App Header with Trigger, Vertical Separator, Breadcrumbs & Notifications Bell */}
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-card/85 dark:bg-card/75 backdrop-blur-xl px-4 transition-[width,height] ease-linear">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1 size-8 rounded-md text-foreground/70 hover:text-emerald-600 dark:hover:text-emerald-400 bg-transparent hover:bg-transparent border-none shadow-none transition-colors" />
@@ -117,7 +138,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                   return (
                     <React.Fragment key={crumb.path + idx}>
                       {idx > 0 && <BreadcrumbSeparator />}
-                      <BreadcrumbItem className={idx === 0 ? 'hidden md:inline-flex' : ''}>
+                      <BreadcrumbItem className={idx === 0 ? 'hidden sm:inline-flex' : ''}>
                         {isLast ? (
                           <BreadcrumbPage className="font-semibold text-foreground">{crumb.name}</BreadcrumbPage>
                         ) : (
@@ -131,70 +152,76 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
             </Breadcrumb>
           </div>
 
-          {/* Right: Active Project Switcher Dropdown */}
-          <div className="relative shrink-0">
-            {projects.length === 0 ? (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground font-medium select-none">
-                <FolderGit2 size={14} className="text-muted-foreground" />
-                <span>No active project</span>
-              </div>
-            ) : (
-              <>
-                <button
-                  onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
-                  className="flex w-[200px] items-center justify-between gap-2 rounded-md hover:bg-secondary/70 px-2.5 py-1.5 text-xs text-foreground transition-all cursor-pointer border border-border/60 hover:border-emerald-500/40 shadow-xs"
-                >
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
-                      {getProjectCode(selectedProject).substring(0, 3)}
-                    </div>
-                    <span className="hidden sm:inline font-semibold text-foreground truncate">
-                      {getProjectName(selectedProject)}
-                    </span>
-                    <span className="sm:hidden font-semibold text-foreground truncate">
-                      {getProjectCode(selectedProject)}
-                    </span>
-                  </div>
-                  <ChevronDown size={14} className="text-muted-foreground shrink-0" />
-                </button>
-
-                {projectDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-64 z-50 rounded-md border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-1.5 space-y-1 animate-in fade-in-0 zoom-in-95">
-                    <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
-                      Switch Project
-                    </div>
-                    {projects.map((proj) => {
-                      const pId = getProjectId(proj);
-                      const pName = getProjectName(proj);
-                      const pCode = getProjectCode(proj);
-                      const isSelected = selectedProject && getProjectId(selectedProject) === pId;
-
-                      return (
-                        <button
-                          key={pId || pName}
-                          onClick={() => handleSelectProject(proj)}
-                          className={`w-full flex items-center justify-between rounded-md px-2.5 py-2 text-xs text-left transition-colors cursor-pointer border-l-2 ${
-                            isSelected
-                              ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold'
-                              : 'border-transparent text-foreground hover:bg-secondary/70 hover:border-border'
-                          }`}
-                        >
-                          <div className="truncate">
-                            <div className="font-medium truncate">{pName}</div>
-                            <div className="text-[10px] text-muted-foreground font-mono">
-                              {pCode} • {getProjectStatus(proj)}
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+          {/* Right Header Controls: Notification Bell with Badge */}
+          <div className="relative flex items-center gap-2">
+            <div className="relative">
+              <button
+                onClick={() => setNotificationsOpen((prev) => !prev)}
+                aria-label="Notifications"
+                className="relative flex size-8 items-center justify-center rounded-md border border-border/60 bg-background text-foreground/70 hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer shadow-xs"
+              >
+                <Bell size={16} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-white shadow-xs animate-in zoom-in-50">
+                    {unreadCount}
+                  </span>
                 )}
-              </>
-            )}
+              </button>
+
+              {/* Notification Popover Dropdown */}
+              {notificationsOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50 rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-0 space-y-0 overflow-hidden animate-in fade-in-0 zoom-in-95">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
+                    <div className="flex items-center gap-2">
+                      <Bell size={15} className="text-emerald-500" />
+                      <span className="text-xs font-bold text-foreground">Notifications</span>
+                      {unreadCount > 0 && (
+                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <CheckCheck size={13} />
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto divide-y divide-border/60">
+                    {notificationsList.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`p-3.5 flex gap-3 transition-colors hover:bg-muted/50 ${
+                          item.unread ? 'bg-emerald-500/[0.03]' : ''
+                        }`}
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {item.type === 'meeting' ? <Video size={15} /> : item.type === 'ai' ? <Sparkles size={15} /> : <Bell size={15} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
+                            <span className="text-[10px] text-muted-foreground shrink-0">{item.time}</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{item.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="px-4 py-2 border-t border-border bg-muted/30 text-center">
+                    <span className="text-[10px] text-muted-foreground font-medium">
+                      Notification API integration ready
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

@@ -1,0 +1,23 @@
+meta {
+  name: Log In
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/login
+  body: json
+  auth: none
+}
+
+body {
+  {
+    "userEmail": "bruno.tester@example.com",
+    "password": "Passw0rd!23"
+  }
+}
+
+script:post-response {
+  const data = res.getBody()?.data ?? {};
+  if (data.accessToken) bru.setVar("accessToken", data.accessToken);
+}

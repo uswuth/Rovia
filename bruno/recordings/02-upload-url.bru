@@ -1,0 +1,21 @@
+meta {
+  name: Get Upload URL
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/recordings/{{recordingId}}/upload-url
+  body: none
+}
+
+script:post-response {
+  const data = res.getBody()?.data ?? {};
+  if (data.uploadUrl) bru.setEnvVar("uploadUrl", data.uploadUrl);
+}
+
+docs {
+  Returns a presigned PUT URL on http://localhost:4566 so the BROWSER can
+  reach it. Repeatable, so a failed upload can be retried. Rejected with 400
+  once the recording is no longer PENDING.
+}

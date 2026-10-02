@@ -13,6 +13,8 @@ export const IntellMeetLogo: React.FC<IntellMeetLogoProps> = ({
   className,
   ...props
 }) => {
+  const gradientId = React.useId();
+
   return (
     <svg
       width={size}
@@ -24,13 +26,13 @@ export const IntellMeetLogo: React.FC<IntellMeetLogoProps> = ({
       {...props}
     >
       <defs>
-        <linearGradient id="intellmeet-emerald-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#10b981" />
           <stop offset="100%" stopColor="#047857" />
         </linearGradient>
       </defs>
       <path
-        fill={color || (useGradient ? 'url(#intellmeet-emerald-gradient)' : '#10b981')}
+        fill={color || (useGradient ? `url(#${gradientId})` : '#10b981')}
         d="M25.592,15.313c-0.467-1.286-0.611-2.534-2.036-2.997c-0.979-0.319-3.732-1.246-5.354-1.793
 		c-0.038-0.15-0.093-0.304-0.157-0.463l3.619-0.135c0,0,2.464-0.248,1.317-1.464c-1.136-1.213-2.315-2.246-2.315-2.246
 		s-1.247-1.5-2.499-0.144c-0.751,0.817-1.297,1.477-1.611,1.874c-0.045-0.047-0.093-0.097-0.139-0.144

@@ -15,6 +15,8 @@ const Signup = lazy(() => import('@/pages/signup/Signup').then((m) => ({ default
 const Dashboard = lazy(() => import('@/pages/dashboard/Dashboard').then((m) => ({ default: m.Dashboard })));
 const Projects = lazy(() => import('@/pages/projects/Projects').then((m) => ({ default: m.Projects })));
 const Meetings = lazy(() => import('@/pages/meetings/Meetings').then((m) => ({ default: m.Meetings })));
+const MeetingRoom = lazy(() => import('@/pages/meetings/MeetingRoom').then((m) => ({ default: m.MeetingRoom })));
+const CreateMeeting = lazy(() => import('@/pages/meetings/CreateMeeting').then((m) => ({ default: m.CreateMeeting })));
 const Tasks = lazy(() => import('@/pages/tasks/Tasks').then((m) => ({ default: m.Tasks })));
 const SettingsPage = lazy(() => import('@/pages/settings/Settings').then((m) => ({ default: m.SettingsPage })));
 
@@ -56,6 +58,24 @@ const GuestRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+/**
+ * Authenticates without SidebarLayout, for routes that own the whole viewport
+ * (the meeting room). Reusing ProtectedRoute would force the sidebar frame onto
+ * a full-screen surface.
+ */
+const FullscreenRoute = () => {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <span className="text-xs text-muted-foreground">Loading…</span>
+      </div>
+    );
+  }
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <Outlet />;
+};
+
 const queryClient = createQueryClient();
 
 const App = () => (
@@ -86,11 +106,17 @@ const App = () => (
                       }
                     />
 
+                    {/* Full-screen routes: authenticated, but no sidebar frame. */}
+                    <Route element={<FullscreenRoute />}>
+                      <Route path="/meetings/:id/room" element={<MeetingRoom />} />
+                    </Route>
+
                     {/* Protected Dashboard Routes with SidebarLayout */}
                     <Route element={<ProtectedRoute />}>
                       <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/projects" element={<Projects />} />
                       <Route path="/meetings" element={<Meetings />} />
+                      <Route path="/meetings/new" element={<CreateMeeting />} />
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Route>

@@ -1,190 +1,217 @@
 import React, { useState } from 'react';
-import { Video, Calendar, Clock, Users, Play } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Video, Calendar, Clock, Users, Play, Plus } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
 import { getProjectName } from '@/types/project.types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { getMeetingStatusTone } from '@/lib/status-tone';
+import { useQuery, useMutation } from '@/hooks/useApi';
+import { queryKeys } from '@/api/queryClient';
+import { getMeetings, createMeeting } from '@/api/meeting/meeting.api';
+import type { Meeting } from '@/api/meeting/meeting.types';
 import { Modal, ModalFooterCancel } from '@/components/ui/modal';
 import { FormField } from '@/components/ui/form-field';
-import { getMeetingStatusTone } from '@/lib/status-tone';
-
-type TimeFilter = 'all' | '1h' | '24h' | '7d' | '30d';
-
-const TIME_FILTER_OPTIONS = [
-  { value: '1h', label: 'Last 1 Hour' },
-  { value: '24h', label: 'Last 24 Hours' },
-  { value: '7d', label: 'Last 7 Days' },
-  { value: '30d', label: 'Last 30 Days' },
-  { value: 'all', label: 'All Time' },
-];
-
-const DURATION_OPTIONS = [
-  { value: '15 mins', label: '15 mins' },
-  { value: '30 mins', label: '30 mins' },
-  { value: '45 mins', label: '45 mins' },
-  { value: '60 mins', label: '60 mins' },
-];
-
-interface MeetingItem {
-  id: string;
-  title: string;
-  projectName: string;
-  time: string;
-  duration: string;
-  participants: number;
-  status: 'Live Now' | 'Scheduled' | 'Completed';
-  host: string;
-}
+import { Input } from '@/components/ui/input';
 
 export const Meetings: React.FC = () => {
-  const { selectedProject } = useProject();
-  const [meetings, setMeetings] = useState<MeetingItem[]>([]);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { selectedProject, projects } = useProject();
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
-
-  const [title, setTitle] = useState('');
-  const [duration, setDuration] = useState('30 mins');
+  const [instantTitle, setInstantTitle] = useState('');
 
   const activeProjectName = getProjectName(selectedProject);
+  const activeProjectId = selectedProject?.id || projects[0]?.id;
 
-  const displayedMeetings = meetings;
+  const { data: meetings, loading } = useQuery<Meeting[]>(
+    queryKeys.meetings.list(selectedProject?.id),
+    () => getMeetings(selectedProject?.id ? { projectId: selectedProject.id } : undefined),
+    { enabled: isAuthenticated, list: true }
+  );
 
-  const handleCloseModal = () => {
-    setTitle('');
-    setDuration('30 mins');
-    setCreateModalOpen(false);
-  };
+  const startInstantMeeting = useMutation<Meeting, { title: string }>({
+    invalidates: [queryKeys.meetings.all],
+    mutationFn: async ({ title }) => {
+      const targetProjectId = activeProjectId;
+      if (!targetProjectId) {
+        throw new Error('Please create or select a project first.');
+      }
+      return createMeeting({
+        projectId: targetProjectId,
+        meetingTitle: title,
+        meetingScheduledAt: new Date().toISOString(),
+        meetingDurationMinutes: 30,
+        meetingJoinMode: 'OPEN_LINK',
+      });
+    },
+    onSuccess: () => {
+      setCreateModalOpen(false);
+      setInstantTitle('');
+    },
+  });
 
-  const handleCreateMeeting = (e: React.FormEvent) => {
+  const handleInstantSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
-
-    const newMeeting: MeetingItem = {
-      id: `MEET-${Date.now().toString().slice(-4)}`,
-      title: title.trim(),
-      projectName: activeProjectName,
-      time: 'Today, 04:00 PM',
-      duration,
-      participants: 1,
-      status: 'Live Now',
-      host: 'arlo',
-    };
-
-    setMeetings((prev) => [newMeeting, ...prev]);
-    handleCloseModal();
+    if (!instantTitle.trim()) return;
+    startInstantMeeting.mutate({ title: instantTitle.trim() });
   };
+
+  const displayedMeetings = meetings ?? [];
 
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
-      {/* Header Row: Heading & Time Filter */}
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-          <Video size={24} className="text-emerald-500 dark:text-emerald-400" />
-          <span>Meetings</span>
-        </h1>
+      {/* Header Row: Heading & Action Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <Video size={24} className="text-emerald-500 dark:text-emerald-400" />
+            <span>Meetings</span>
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            {selectedProject
+              ? `Showing meetings scheduled under project '${activeProjectName}'.`
+              : 'Showing all active and scheduled meetings in your organization.'}
+          </p>
+        </div>
 
-        <Select
-          aria-label="Filter meetings by time"
-          value={timeFilter}
-          onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
-          options={TIME_FILTER_OPTIONS}
-          wrapperClassName="w-auto"
-          className="w-auto pl-3 pr-8 text-xs font-medium"
-        />
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCreateModalOpen(true)}
+            className="gap-1.5"
+          >
+            <Play size={14} className="text-emerald-500" />
+            <span>Instant Room</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => navigate(selectedProject?.id ? `/meetings/new?projectId=${selectedProject.id}` : '/meetings/new')}
+            className="gap-1.5"
+          >
+            <Plus size={15} />
+            <span>Schedule Meeting</span>
+          </Button>
+        </div>
       </div>
 
       {/* Content Area */}
-      {displayedMeetings.length === 0 ? (
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-md" />
+          ))}
+        </div>
+      ) : displayedMeetings.length === 0 ? (
         <EmptyState
           icon={Video}
           title="No meetings scheduled yet"
           description={
             selectedProject
-              ? `There are no video conferencing rooms scheduled for '${activeProjectName}'. Click below to launch an instant meeting.`
-              : 'There are no active or scheduled meetings in your workspace yet. Click below to start an instant video room.'
+              ? `There are no video conferencing rooms scheduled for '${activeProjectName}'. Click below to schedule a meeting.`
+              : 'There are no active or scheduled meetings in your workspace yet. Click below to schedule a meeting.'
           }
-          actionLabel="Start Instant Meeting"
-          onAction={() => setCreateModalOpen(true)}
+          actionLabel="Schedule Meeting"
+          onAction={() => navigate(selectedProject?.id ? `/meetings/new?projectId=${selectedProject.id}` : '/meetings/new')}
           accentColor="emerald"
         />
       ) : (
         <div className="space-y-3">
-          {displayedMeetings.map((m) => (
-            <div
-              key={m.id}
-              className={`rounded-md border p-5 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs ${
-                m.projectName === activeProjectName
-                  ? 'border-emerald-500/40 bg-emerald-500/5'
-                  : 'border-border bg-card hover:border-emerald-500/30'
-              }`}
-            >
-              <div className="space-y-1.5 flex-1">
-                <div className="flex items-center gap-2">
-                  <Badge tone="success">{m.projectName}</Badge>
-                  <Badge tone={getMeetingStatusTone(m.status)}>{m.status}</Badge>
+          {displayedMeetings.map((m) => {
+            const scheduledDate = new Date(m.meetingScheduledAt);
+            const scheduledMs = scheduledDate.getTime();
+            const dateStr = !isNaN(scheduledMs)
+              ? scheduledDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : m.meetingScheduledAt;
+            const participantCount = m.participants?.length || 1;
+
+            const durationMinutes = m.meetingDurationMinutes || 30;
+            const endMs = !isNaN(scheduledMs) ? scheduledMs + durationMinutes * 60 * 1000 : Infinity;
+            const isPastDuration = !isNaN(scheduledMs) && Date.now() > endMs;
+
+            const isEndedOrCancelled = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED' || isPastDuration;
+            const canJoin = !isEndedOrCancelled;
+            const statusLabel = isPastDuration && m.meetingStatus !== 'CANCELLED' ? 'ENDED' : m.meetingStatus;
+
+            return (
+              <div
+                key={m.meetingId}
+                className="rounded-md border border-border bg-card hover:border-emerald-500/30 p-5 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs"
+              >
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge tone={getMeetingStatusTone(statusLabel)}>{statusLabel}</Badge>
+                    <Badge tone="neutral">{m.meetingJoinMode === 'INVITE_ONLY' ? 'Invite Only' : 'Open Link'}</Badge>
+                  </div>
+
+                  <h3 className="text-base font-bold text-foreground">{m.meetingTitle}</h3>
+                  {m.meetingDescription && (
+                    <p className="text-xs text-muted-foreground line-clamp-1">{m.meetingDescription}</p>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1">
+                    <span className="flex items-center gap-1">
+                      <Calendar size={13} className="text-muted-foreground" />
+                      {dateStr}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={13} className="text-muted-foreground" />
+                      {durationMinutes} mins
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users size={13} className="text-muted-foreground" />
+                      {participantCount} Participant{participantCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
                 </div>
 
-                <h3 className="text-base font-bold text-foreground">{m.title}</h3>
-
-                <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1">
-                  <span className="flex items-center gap-1">
-                    <Calendar size={13} className="text-muted-foreground" />
-                    {m.time}
+                <Button
+                  disabled={!canJoin}
+                  onClick={() => navigate(`/meetings/${m.meetingId}/room`)}
+                  className="self-stretch justify-center sm:self-auto gap-1.5 disabled:opacity-50"
+                >
+                  <Play size={14} fill="currentColor" />
+                  <span>
+                    {isEndedOrCancelled ? 'Meeting Ended' : 'Join Room'}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Clock size={13} className="text-muted-foreground" />
-                    {m.duration}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Users size={13} className="text-muted-foreground" />
-                    {m.participants} Members
-                  </span>
-                </div>
+                </Button>
               </div>
-
-              <Button className="self-stretch justify-center sm:self-auto">
-                <Play size={14} fill="currentColor" />
-                <span>Join Room</span>
-              </Button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
+      {/* Instant Meeting Modal */}
       <Modal
         open={createModalOpen}
-        onClose={handleCloseModal}
+        onClose={() => setCreateModalOpen(false)}
         title="Start Instant Meeting"
-        description="Launch a live video room for your team."
+        description="Launch an immediate live room for your active project."
         footer={
           <>
-            <ModalFooterCancel onClick={handleCloseModal} />
-            <Button type="submit" form="create-meeting-form">
-              Start Meeting
+            <ModalFooterCancel onClick={() => setCreateModalOpen(false)} />
+            <Button
+              type="submit"
+              form="instant-meeting-form"
+              disabled={startInstantMeeting.pending}
+            >
+              {startInstantMeeting.pending ? 'Starting…' : 'Start Room'}
             </Button>
           </>
         }
       >
-        <form id="create-meeting-form" onSubmit={handleCreateMeeting} className="space-y-4">
-          <FormField label="Meeting Subject" htmlFor="meeting-subject" required>
+        <form id="instant-meeting-form" onSubmit={handleInstantSubmit} className="space-y-4">
+          <FormField label="Meeting Subject" htmlFor="instant-subject" required>
             <Input
-              id="meeting-subject"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Architecture Sync, Sprint Planning"
+              id="instant-subject"
+              value={instantTitle}
+              onChange={(e) => setInstantTitle(e.target.value)}
+              placeholder="e.g. Architecture Sync, Quick Huddle"
               required
-            />
-          </FormField>
-
-          <FormField label="Duration" htmlFor="meeting-duration">
-            <Select
-              id="meeting-duration"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              options={DURATION_OPTIONS}
             />
           </FormField>
         </form>
@@ -192,3 +219,6 @@ export const Meetings: React.FC = () => {
     </div>
   );
 };
+
+export default Meetings;
+

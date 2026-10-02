@@ -1,0 +1,16 @@
+meta {
+  name: Get Transcript
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/recordings/{{recordingId}}/transcript
+  body: none
+}
+
+docs {
+  404 until the local STT service has processed the recording. The stored
+  transcript always comes from the server-side local model, never from
+  browser SpeechRecognition.
+}

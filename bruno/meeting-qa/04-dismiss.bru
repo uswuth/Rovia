@@ -1,0 +1,14 @@
+meta {
+  name: Dismiss Question
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/meetings/{{meetingId}}/questions/{{questionId}}/dismiss
+  body: none
+}
+
+docs {
+  Allowed for the person who asked the question, or a host/moderator.
+}

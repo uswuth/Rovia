@@ -12,6 +12,14 @@ export const queryKeys = {
     all: ['organization'] as const,
     members: ['organization', 'members'] as const,
   },
+  meetings: {
+    all: ['meetings'] as const,
+    list: (projectId?: string) => ['meetings', 'list', projectId] as const,
+    detail: (id: string) => ['meetings', 'detail', id] as const,
+    preview: (code: string) => ['meetings', 'preview', code] as const,
+    questions: (meetingId: string) => ['meetings', 'questions', meetingId] as const,
+    polls: (meetingId: string) => ['meetings', 'polls', meetingId] as const,
+  },
 };
 
 export const createQueryClient = (): QueryClient =>

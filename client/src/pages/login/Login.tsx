@@ -52,6 +52,7 @@ export const Login = () => {
   return (
     <Box
       component="main"
+      className="bg-dots-pattern"
       sx={{
         minHeight: '100vh',
         width: '100%',
@@ -107,126 +108,124 @@ export const Login = () => {
               boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
             }}
           >
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              pointerEvents: 'none',
-              opacity: 0.5,
-              background: 'radial-gradient(circle at 65% 40%, rgba(16, 185, 129, 0.45) 0%, transparent 65%)',
-            }}
-          />
-
-          {/* Top Brand Mark */}
-          <Box sx={{ position: 'relative', zIndex: 10 }}>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-500/15 border border-emerald-500/30 shadow-xs">
-                <IntellMeetLogo size={20} />
-              </div>
-              <Typography
-                sx={{
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '1.05rem',
-                  letterSpacing: '-0.025em',
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                }}
-              >
-                Intell<span style={{ color: '#34d399' }}>Meet</span>
-              </Typography>
-            </Stack>
-          </Box>
-
-          {/* Bottom Hero & Steps */}
-          <Stack spacing={4} sx={{ position: 'relative', zIndex: 10, width: '100%' }}>
-            <Stack
-              direction={{ xs: 'column', xl: 'row' }}
-              spacing={2}
+            <Box
               sx={{
-                justifyContent: 'space-between',
-                alignItems: { xs: 'flex-start', xl: 'flex-end' },
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                opacity: 0.5,
+                background: 'radial-gradient(circle at 65% 40%, rgba(16, 185, 129, 0.45) 0%, transparent 65%)',
               }}
-            >
-              <Typography
-                component="h1"
-                sx={{
-                  fontSize: { xs: '2rem', xl: '2.5rem' },
-                  fontWeight: 700,
-                  lineHeight: 1.15,
-                  color: '#ffffff',
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                Welcome<br />Back
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '0.875rem',
-                  color: 'rgba(167, 243, 208, 0.75)',
-                  maxWidth: 240,
-                  lineHeight: 1.5,
-                  pb: { xl: 0.5 },
-                }}
-              >
-                Sign in to manage your meetings and collaborate with your team.
-              </Typography>
-            </Stack>
+            />
 
-            <Grid container spacing={1.75}>
-              {[
-                { n: '1', label: 'Sign in to\nyour account', active: true },
-                { n: '2', label: 'Select your\nworkspace', active: false },
-                { n: '3', label: 'Access your\nmeetings', active: false },
-              ].map((step) => (
-                <Grid key={step.n} size={{ xs: 4 }}>
-                  <Box
-                    sx={{
-                      p: { xs: 1.75, xl: 2 },
-                      height: '100%',
-                      borderRadius: '12px',
-                      transition: 'all 0.2s ease',
-                      border: step.active ? '1px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
-                      bgcolor: step.active ? '#ffffff' : 'rgba(255, 255, 255, 0.07)',
-                      color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.8)',
-                      backdropFilter: step.active ? 'none' : 'blur(4px)',
-                      boxShadow: step.active ? '0 10px 25px -5px rgba(0, 0, 0, 0.4)' : 'none',
-                    }}
-                  >
+            {/* Top Brand Mark */}
+            <Box sx={{ position: 'relative', zIndex: 10 }}>
+              <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                <IntellMeetLogo size={26} />
+                <Typography
+                  sx={{
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '1.05rem',
+                    letterSpacing: '-0.025em',
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  }}
+                >
+                  Intell<span style={{ color: '#34d399' }}>Meet</span>
+                </Typography>
+              </Stack>
+            </Box>
+
+            {/* Bottom Hero & Steps */}
+            <Stack spacing={4} sx={{ position: 'relative', zIndex: 10, width: '100%' }}>
+              <Stack
+                direction={{ xs: 'column', xl: 'row' }}
+                spacing={2}
+                sx={{
+                  justifyContent: 'space-between',
+                  alignItems: { xs: 'flex-start', xl: 'flex-end' },
+                }}
+              >
+                <Typography
+                  component="h1"
+                  sx={{
+                    fontSize: { xs: '2rem', xl: '2.5rem' },
+                    fontWeight: 700,
+                    lineHeight: 1.15,
+                    color: '#ffffff',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  Welcome<br />Back
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.875rem',
+                    color: 'rgba(167, 243, 208, 0.75)',
+                    maxWidth: 240,
+                    lineHeight: 1.5,
+                    pb: { xl: 0.5 },
+                  }}
+                >
+                  Sign in to manage your meetings and collaborate with your team.
+                </Typography>
+              </Stack>
+
+              <Grid container spacing={1.75}>
+                {[
+                  { n: '1', label: 'Sign in to\nyour account', active: true },
+                  { n: '2', label: 'Select your\nworkspace', active: false },
+                  { n: '3', label: 'Access your\nmeetings', active: false },
+                ].map((step) => (
+                  <Grid key={step.n} size={{ xs: 4 }}>
                     <Box
                       sx={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        mb: 1.5,
-                        bgcolor: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.2)',
-                        color: '#ffffff',
+                        p: { lg: 1.25, xl: 1.75 },
+                        height: '100%',
+                        borderRadius: '12px',
+                        transition: 'all 0.2s ease',
+                        border: step.active ? '1px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
+                        bgcolor: step.active ? '#ffffff' : 'rgba(255, 255, 255, 0.07)',
+                        color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: step.active ? 'none' : 'blur(4px)',
+                        boxShadow: step.active ? '0 10px 25px -5px rgba(0, 0, 0, 0.4)' : 'none',
                       }}
                     >
-                      {step.n}
+                      <Box
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          mb: 1.25,
+                          bgcolor: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.2)',
+                          color: '#ffffff',
+                        }}
+                      >
+                        {step.n}
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontSize: { lg: '0.72rem', xl: '0.75rem' },
+                          fontWeight: 600,
+                          lineHeight: 1.35,
+                          whiteSpace: 'pre-line',
+                          color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.85)',
+                        }}
+                      >
+                        {step.label}
+                      </Typography>
                     </Box>
-                    <Typography
-                      sx={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        lineHeight: 1.35,
-                        whiteSpace: 'pre-line',
-                        color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.85)',
-                      }}
-                    >
-                      {step.label}
-                    </Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </Stack>
-        </Box>
-      </Grid>
+                  </Grid>
+                ))}
+              </Grid>
+            </Stack>
+          </Box>
+        </Grid>
 
         {/* ── Right Form Panel (MUI Layout) ── */}
         <Grid
@@ -238,9 +237,9 @@ export const Login = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            px: { xs: 3, sm: 6, lg: 8 },
+            px: { xs: 2, sm: 6, lg: 8 },
             py: { xs: 3, sm: 4, lg: 2.5 },
-            bgcolor: 'var(--background)',
+            bgcolor: { xs: 'transparent', lg: 'var(--background)' },
             '&::-webkit-scrollbar': {
               width: '6px',
             },
@@ -258,6 +257,24 @@ export const Login = () => {
         >
           <Box sx={{ width: '100%', maxWidth: 440, mx: 'auto', my: 'auto' }}>
             <Stack spacing={2.5}>
+              {/* Brand Logo Header for Small Screens (< 1200px) */}
+              <Box sx={{ display: { xs: 'flex', lg: 'none' }, justifyContent: { xs: 'center', sm: 'flex-start' }, mb: 0.5 }}>
+                <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                  <IntellMeetLogo size={26} />
+                  <Typography
+                    sx={{
+                      color: 'var(--foreground)',
+                      fontWeight: 700,
+                      fontSize: '1.2rem',
+                      letterSpacing: '-0.025em',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                  >
+                    Intell<span className="text-emerald-600 dark:text-emerald-400">Meet</span>
+                  </Typography>
+                </Stack>
+              </Box>
+
               <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
                 <Typography
                   component="h2"
@@ -268,10 +285,10 @@ export const Login = () => {
                     color: 'var(--foreground)',
                   }}
                 >
-                  Login Account
+                  Welcome Back
                 </Typography>
                 <Typography sx={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', mt: 0.25 }}>
-                  Enter your personal data to access your account.
+                  Sign in to access your meetings and workspace.
                 </Typography>
               </Box>
 

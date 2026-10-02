@@ -36,8 +36,37 @@ export const getTaskStatusTone = (status: string): BadgeTone =>
 const meetingStatusTones: Record<string, BadgeTone> = {
   live: 'success',
   scheduled: 'info',
+  // The server uses ENDED/CANCELLED; both read as neutral, non-actionable.
+  ended: 'neutral',
+  cancelled: 'danger',
   completed: 'neutral',
 };
 
 export const getMeetingStatusTone = (status: string): BadgeTone =>
   meetingStatusTones[status.toLowerCase()] ?? 'neutral';
+
+const meetingJoinModeLabels: Record<string, string> = {
+  invite_only: 'Invite only',
+  open_link: 'Open link',
+};
+
+/** Display label for a join mode, used wherever the mode is shown as text. */
+export const getMeetingJoinModeLabel = (mode: string): string =>
+  meetingJoinModeLabels[mode.toLowerCase()] ?? mode;
+
+const questionStatusTones: Record<string, BadgeTone> = {
+  open: 'info',
+  answered: 'success',
+  dismissed: 'neutral',
+};
+
+export const getQuestionStatusTone = (status: string): BadgeTone =>
+  questionStatusTones[status.toLowerCase()] ?? 'neutral';
+
+const pollStatusTones: Record<string, BadgeTone> = {
+  open: 'info',
+  closed: 'neutral',
+};
+
+export const getPollStatusTone = (status: string): BadgeTone =>
+  pollStatusTones[status.toLowerCase()] ?? 'neutral';
