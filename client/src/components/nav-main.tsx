@@ -51,13 +51,29 @@ export function NavMain({
   const isCurrentActive = (url: string) => {
     if (url.includes("?")) {
       const [path, search] = url.split("?")
-      return location.pathname === path && location.search.toLowerCase().includes(search.toLowerCase())
+      if (location.pathname !== path) return false
+      const searchParams = new URLSearchParams(location.search)
+      const urlSearchParams = new URLSearchParams(search)
+
+      const tabParam = urlSearchParams.get("tab")
+      if (tabParam) {
+        const currentTab = searchParams.get("tab") || "upcoming"
+        return currentTab === tabParam
+      }
+
+      const statusParam = urlSearchParams.get("status")
+      if (statusParam) {
+        const currentStatus = searchParams.get("status")
+        return currentStatus === statusParam
+      }
+
+      return location.search.toLowerCase().includes(search.toLowerCase())
     }
     if (url === "/projects") {
       return location.pathname === "/projects" && (!location.search || !location.search.includes("status="))
     }
     if (url === "/meetings") {
-      return location.pathname === "/meetings"
+      return location.pathname === "/meetings" && (!location.search || !location.search.includes("tab="))
     }
     if (url === "/dashboard") {
       return location.pathname === "/dashboard"

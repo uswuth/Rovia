@@ -1,4 +1,4 @@
-export type MemberRole = 'SuperAdmin' | 'Admin' | 'Host' | 'Member';
+export type MemberRole = 'SuperAdmin' | 'Admin' | 'Host' | 'Member' | 'Visitor';
 export type MemberStatus = 'Active' | 'Pending' | 'Suspended';
 
 export interface Member {
@@ -15,6 +15,9 @@ export interface Member {
   userEmail?: string;
   userRole?: MemberRole;
   createdAt?: string;
+  isSuperAdmin?: boolean;
+  jobTitle?: string;
+  userCode?: string;
 }
 
 export interface UpdateMemberDTO {

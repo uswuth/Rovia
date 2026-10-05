@@ -29,7 +29,10 @@ import { OrganizationClass } from './organization.model.js';
           userEmail: ret.user_email as string,
           userRole: ret.user_role as string,
           isSuperAdmin: Boolean(ret.is_super_admin),
+          userCode: (ret.user_code ?? '') as string,
           avatarUrl: (ret.avatar_url ?? '') as string,
+          jobTitle: (ret.job_title ?? '') as string,
+          isDeleted: Boolean(ret.is_deleted),
           organizationId: ret.organization_id,
           createdAt: ret.created_at,
           updatedAt: ret.updated_at
@@ -126,6 +129,36 @@ export class UserClass {
   }
   public set avatarUrl(val: string | undefined) {
     this.avatar_url = val;
+  }
+
+  @prop({ type: () => String, default: '', trim: true, alias: 'jobTitle' })
+  public job_title?: string;
+
+  public get jobTitle(): string | undefined {
+    return this.job_title;
+  }
+  public set jobTitle(val: string | undefined) {
+    this.job_title = val;
+  }
+
+  @prop({ type: () => String, default: '', index: true, alias: 'userCode' })
+  public user_code?: string;
+
+  public get userCode(): string | undefined {
+    return this.user_code;
+  }
+  public set userCode(val: string | undefined) {
+    this.user_code = val;
+  }
+
+  @prop({ type: () => Boolean, default: false, index: true, alias: 'isDeleted' })
+  public is_deleted?: boolean;
+
+  public get isDeleted(): boolean | undefined {
+    return this.is_deleted;
+  }
+  public set isDeleted(val: boolean | undefined) {
+    this.is_deleted = val;
   }
 
   @prop({ type: () => String, select: false, alias: 'refreshToken' })

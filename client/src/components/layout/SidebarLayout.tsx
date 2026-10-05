@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Bell, CheckCheck, Video, Sparkles } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
@@ -37,7 +37,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  // Notifications state (Ready for future endpoint wiring)
+  // Notifications state & click-outside ref
+  const notificationRef = useRef<HTMLDivElement>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(3);
   const [notificationsList, setNotificationsList] = useState([
@@ -66,6 +67,25 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
       unread: true,
     },
   ]);
+
+  // Click outside to close notifications popover
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target as Node)
+      ) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    if (notificationsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [notificationsOpen]);
 
   const handleMarkAllRead = () => {
     setNotificationsList((prev) => prev.map((n) => ({ ...n, unread: false })));
@@ -98,8 +118,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
       const search = location.search.toLowerCase();
       if (search.includes('status=active')) {
         items.push({ name: 'Active', path: '/projects?status=active' });
-      } else if (search.includes('status=planning')) {
-        items.push({ name: 'Planning', path: '/projects?status=planning' });
+      } else if (search.includes('status=completed')) {
+        items.push({ name: 'Completed', path: '/projects?status=completed' });
       } else if (search.includes('status=archived')) {
         items.push({ name: 'Archived', path: '/projects?status=archived' });
       }
@@ -153,16 +173,16 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
           </div>
 
           {/* Right Header Controls: Notification Bell with Badge */}
-          <div className="relative flex items-center gap-2">
+          <div className="relative flex items-center gap-2" ref={notificationRef}>
             <div className="relative">
               <button
                 onClick={() => setNotificationsOpen((prev) => !prev)}
                 aria-label="Notifications"
-                className="relative flex size-8 items-center justify-center rounded-md border border-border/60 bg-background text-foreground/70 hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer shadow-xs"
+                className="relative flex items-center justify-center p-1.5 bg-transparent text-foreground/70 hover:text-foreground transition-colors cursor-pointer border-none shadow-none"
               >
-                <Bell size={16} />
+                <Bell size={18} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-white shadow-xs animate-in zoom-in-50">
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white shadow-none">
                     {unreadCount}
                   </span>
                 )}
@@ -200,8 +220,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                           item.unread ? 'bg-emerald-500/[0.03]' : ''
                         }`}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          {item.type === 'meeting' ? <Video size={15} /> : item.type === 'ai' ? <Sparkles size={15} /> : <Bell size={15} />}
+                        <div className="flex shrink-0 items-center justify-center text-emerald-600 dark:text-emerald-400 pt-0.5">
+                          {item.type === 'meeting' ? <Video size={16} /> : item.type === 'ai' ? <Sparkles size={16} /> : <Bell size={16} />}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">

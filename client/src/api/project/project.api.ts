@@ -1,8 +1,14 @@
 import client from '../client';
 import type { Project, CreateProjectDTO } from '@/types/project.types';
 
-export const getProjects = () =>
-  client.get<{ data: Project[] }>('/projects');
+export interface ProjectQueryParams {
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const getProjects = (params?: ProjectQueryParams) =>
+  client.get<{ data: Project[] }>('/projects', { params });
 
 export const getProjectById = (id: string) =>
   client.get<{ data: Project }>(`/projects/${id}`);

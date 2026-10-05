@@ -18,60 +18,34 @@ export interface DateTimePickerProps {
 }
 
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"))
-const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"))
+const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"))
 
-interface InfiniteScrollColumnProps {
+interface TimeScrollColumnProps {
   items: string[]
   selected: string
   onSelect: (value: string) => void
   label: string
 }
 
-const ITEM_HEIGHT = 32 // h-8 = 32px
-
-const InfiniteScrollColumn: React.FC<InfiniteScrollColumnProps> = ({
+const TimeScrollColumn: React.FC<TimeScrollColumnProps> = ({
   items,
   selected,
   onSelect,
   label,
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null)
-  const isSelfScrolling = React.useRef(false)
 
-  const setHeight = items.length * ITEM_HEIGHT
-  const tripledItems = React.useMemo(() => [...items, ...items, ...items], [items])
-
-  // Scroll to selected item in middle set when value changes or popover opens
   React.useEffect(() => {
     const container = containerRef.current
     if (!container) return
-
-    const index = items.indexOf(selected)
-    if (index === -1) return
-
-    const targetTop = setHeight + index * ITEM_HEIGHT - (144 / 2 - ITEM_HEIGHT / 2)
-    container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' })
-  }, [selected, items, setHeight])
-
-  const handleScroll = () => {
-    const container = containerRef.current
-    if (!container || isSelfScrolling.current) return
-
-    const top = container.scrollTop
-    if (top < setHeight * 0.4) {
-      isSelfScrolling.current = true
-      container.scrollTop = top + setHeight
-      setTimeout(() => {
-        isSelfScrolling.current = false
-      }, 50)
-    } else if (top > setHeight * 1.6) {
-      isSelfScrolling.current = true
-      container.scrollTop = top - setHeight
-      setTimeout(() => {
-        isSelfScrolling.current = false
-      }, 50)
+    const selectedEl = container.querySelector('[data-selected="true"]') as HTMLElement
+    if (selectedEl) {
+      container.scrollTo({
+        top: selectedEl.offsetTop - container.clientHeight / 2 + selectedEl.clientHeight / 2,
+        behavior: 'smooth',
+      })
     }
-  }
+  }, [selected])
 
   return (
     <div className="space-y-1 flex-1 min-w-0">
@@ -80,29 +54,22 @@ const InfiniteScrollColumn: React.FC<InfiniteScrollColumnProps> = ({
       </span>
       <div
         ref={containerRef}
-        onScroll={handleScroll}
-        className="h-36 overflow-y-auto space-y-1 pr-1 border-r border-border snap-y snap-mandatory scroll-smooth relative no-scrollbar"
-        style={{ scrollbarWidth: 'none' }}
+        className="h-44 overflow-y-auto space-y-1 pr-1 border-r border-border scroll-smooth relative"
+        style={{ scrollbarWidth: 'thin' }}
       >
-        {tripledItems.map((item, idx) => {
+        {items.map((item) => {
           const isSelected = item === selected
           return (
             <button
-              key={`${item}-${idx}`}
+              key={item}
               type="button"
-              onClick={() => {
-                onSelect(item)
-                const container = containerRef.current
-                if (container) {
-                  const targetTop = setHeight + (idx % items.length) * ITEM_HEIGHT - (144 / 2 - ITEM_HEIGHT / 2)
-                  container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' })
-                }
-              }}
+              data-selected={isSelected}
+              onClick={() => onSelect(item)}
               className={cn(
-                "w-full h-8 flex items-center justify-center rounded text-xs font-medium transition-all duration-150 snap-center shrink-0 cursor-pointer select-none",
+                "w-full h-8 flex items-center justify-center rounded-md text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
                 isSelected
-                  ? "bg-emerald-500 text-white font-bold shadow-xs scale-105 z-10"
-                  : "text-foreground hover:bg-secondary hover:text-emerald-500 opacity-80"
+                  ? "bg-emerald-500 text-white font-bold shadow-xs scale-102"
+                  : "text-foreground hover:bg-secondary hover:text-emerald-500"
               )}
             >
               {item}
@@ -123,67 +90,77 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
     const [dateOpen, setDateOpen] = React.useState(false)
     const [timeOpen, setTimeOpen] = React.useState(false)
 
-    // Parse incoming ISO value into Date, Hour (1-12), Minute (00-59), Period (AM/PM)
+    // Derive active Date object from value (or default to current local user time rounded to next 5 minutes)
     const dateObj = React.useMemo(() => {
-      if (!value) return new Date()
-      const d = new Date(value)
-      return isNaN(d.getTime()) ? new Date() : d
-    }, [value])
+      if (!value) {
+        const now = new Date();
+        const mins = now.getMinutes();
+        const roundedMins = Math.ceil(mins / 5) * 5;
+        if (roundedMins === 60) {
+          now.setHours(now.getHours() + 1, 0, 0, 0);
+        } else {
+          now.setMinutes(roundedMins, 0, 0);
+        }
+        return now;
+      }
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? new Date() : d;
+    }, [value]);
 
     const parsedTime = React.useMemo(() => {
-      if (!value) return { hour: "10", minute: "30", period: "AM" as const }
-      const d = new Date(value)
-      if (isNaN(d.getTime())) return { hour: "10", minute: "30", period: "AM" as const }
-      let h = d.getHours()
-      const period = h >= 12 ? ("PM" as const) : ("AM" as const)
-      h = h % 12 || 12
-      const pad = (n: number) => String(n).padStart(2, "0")
+      let h = dateObj.getHours();
+      const period = h >= 12 ? ("PM" as const) : ("AM" as const);
+      h = h % 12 || 12;
+      const pad = (n: number) => String(n).padStart(2, "0");
       return {
         hour: pad(h),
-        minute: pad(d.getMinutes()),
+        minute: pad(dateObj.getMinutes()),
         period,
-      }
-    }, [value])
+      };
+    }, [dateObj]);
 
-    const [selectedHour, setSelectedHour] = React.useState(parsedTime.hour)
-    const [selectedMinute, setSelectedMinute] = React.useState(parsedTime.minute)
-    const [selectedPeriod, setSelectedPeriod] = React.useState<"AM" | "PM">(parsedTime.period)
-
-    React.useEffect(() => {
-      setSelectedHour(parsedTime.hour)
-      setSelectedMinute(parsedTime.minute)
-      setSelectedPeriod(parsedTime.period)
-    }, [parsedTime])
+    const selectedHour = parsedTime.hour;
+    const selectedMinute = parsedTime.minute;
+    const selectedPeriod = parsedTime.period;
 
     const handleDateSelect = (selectedDate?: Date) => {
-      if (!selectedDate) return
-      setDateOpen(false)
-      const pad = (n: number) => String(n).padStart(2, "0")
-      const datePart = `${selectedDate.getFullYear()}-${pad(selectedDate.getMonth() + 1)}-${pad(selectedDate.getDate())}`
+      if (!selectedDate) return;
+      setDateOpen(false);
 
-      let h24 = parseInt(selectedHour, 10) % 12
-      if (selectedPeriod === "PM") h24 += 12
-      const timePart = `${pad(h24)}:${selectedMinute}`
+      let h24 = parseInt(selectedHour, 10) % 12;
+      if (selectedPeriod === "PM") h24 += 12;
+      const mins = parseInt(selectedMinute, 10) || 0;
 
-      onChange?.(`${datePart}T${timePart}`)
-    }
+      const updated = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        h24,
+        mins,
+        0,
+        0
+      );
+      onChange?.(updated.toISOString());
+    };
 
     const updateTime = (hStr: string, mStr: string, pStr: "AM" | "PM") => {
-      setSelectedHour(hStr)
-      setSelectedMinute(mStr)
-      setSelectedPeriod(pStr)
+      let h24 = parseInt(hStr, 10) % 12;
+      if (pStr === "PM") h24 += 12;
+      const mins = parseInt(mStr, 10) || 0;
 
-      const pad = (n: number) => String(n).padStart(2, "0")
-      const datePart = `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}`
+      const updated = new Date(
+        dateObj.getFullYear(),
+        dateObj.getMonth(),
+        dateObj.getDate(),
+        h24,
+        mins,
+        0,
+        0
+      );
+      onChange?.(updated.toISOString());
+    };
 
-      let h24 = parseInt(hStr, 10) % 12
-      if (pStr === "PM") h24 += 12
-      const timePart = `${pad(h24)}:${mStr}`
-
-      onChange?.(`${datePart}T${timePart}`)
-    }
-
-    const formattedTimeDisplay = `${selectedHour}:${selectedMinute} ${selectedPeriod}`
+    const formattedTimeDisplay = `${selectedHour}:${selectedMinute} ${selectedPeriod}`;
 
     return (
       <div className="grid grid-cols-2 gap-3 w-full">
@@ -198,7 +175,7 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
                 <Button
                   variant="outline"
                   disabled={disabled}
-                  className="w-full justify-between text-xs font-normal h-10 border-border bg-card text-foreground"
+                  className="w-full justify-between text-xs md:text-sm font-medium h-10 border-border bg-card text-foreground shadow-xs"
                 >
                   <span className="truncate">{dateObj ? format(dateObj, "PPP") : "Select date"}</span>
                   <ChevronDown size={14} className="opacity-50 shrink-0 ml-1" />
@@ -228,7 +205,7 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
                 <Button
                   variant="outline"
                   disabled={disabled}
-                  className="w-full justify-between text-xs font-normal h-10 border-border bg-card text-foreground"
+                  className="w-full justify-between text-xs md:text-sm font-medium h-10 border-border bg-card text-foreground shadow-xs"
                 >
                   <span className="truncate font-semibold">{formattedTimeDisplay}</span>
                   <Clock size={14} className="opacity-50 shrink-0 ml-1" />
@@ -245,15 +222,15 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
                 </div>
 
                 {/* 3 Column Selector: Hours | Minutes | AM/PM */}
-                <div className="grid grid-cols-3 gap-2 h-44 items-center">
-                  <InfiniteScrollColumn
+                <div className="grid grid-cols-3 gap-2 h-48 items-center">
+                  <TimeScrollColumn
                     label="Hour"
                     items={HOURS}
                     selected={selectedHour}
                     onSelect={(h) => updateTime(h, selectedMinute, selectedPeriod)}
                   />
 
-                  <InfiniteScrollColumn
+                  <TimeScrollColumn
                     label="Minute"
                     items={MINUTES}
                     selected={selectedMinute}

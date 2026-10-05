@@ -4,7 +4,7 @@ import { OrganizationClass } from './organization.model.js';
 
 export type MeetingStatus = 'SCHEDULED' | 'LIVE' | 'ENDED' | 'CANCELLED';
 export type MeetingJoinMode = 'INVITE_ONLY' | 'OPEN_LINK';
-export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER';
+export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER' | 'VISITOR';
 export type MeetingParticipantStatus = 'INVITED' | 'JOINED' | 'LEFT';
 
 /**
@@ -18,7 +18,7 @@ export class MeetingParticipantClass {
 
   @prop({
     type: () => String,
-    enum: ['HOST', 'MODERATOR', 'MEMBER'],
+    enum: ['HOST', 'MODERATOR', 'MEMBER', 'VISITOR'],
     default: 'MEMBER',
     alias: 'participantRole'
   })

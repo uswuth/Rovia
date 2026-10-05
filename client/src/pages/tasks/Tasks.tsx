@@ -49,6 +49,7 @@ export const Tasks: React.FC = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const [newTitle, setNewTitle] = useState('');
+  const [titleError, setTitleError] = useState('');
   const [newPriority, setNewPriority] = useState<TaskPriority>('Medium');
   const [newStatus, setNewStatus] = useState<TaskStatus>('To Do');
   const [newAssignee, setNewAssignee] = useState('arlo');
@@ -59,19 +60,31 @@ export const Tasks: React.FC = () => {
 
   const handleCloseModal = () => {
     setNewTitle('');
+    setTitleError('');
     setNewPriority('Medium');
     setNewStatus('To Do');
     setNewAssignee('arlo');
     setCreateModalOpen(false);
   };
 
+  const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
+
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle) {
+      setTitleError('Task title is required');
+      return;
+    }
+    if (!TITLE_REGEX.test(trimmedTitle)) {
+      setTitleError('Task title can only contain letters, numbers, spaces, -, _, and cannot start or end with a symbol');
+      return;
+    }
+    setTitleError('');
 
     const newTask: TaskItem = {
       id: `TASK-${Date.now().toString().slice(-4)}`,
-      title: newTitle.trim(),
+      title: trimmedTitle,
       projectName: activeProjectName,
       status: newStatus,
       priority: newPriority,
@@ -83,15 +96,47 @@ export const Tasks: React.FC = () => {
     handleCloseModal();
   };
 
+  const activeProjectStatus = (selectedProject?.projectStatus || selectedProject?.status || '').toLowerCase();
+  const isSelectedProjectReadOnly = activeProjectStatus === 'completed' || activeProjectStatus === 'archived';
+
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-          <CheckSquare className="text-emerald-500 dark:text-emerald-400" size={24} />
-          <span>Tasks</span>
-        </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <CheckSquare className="text-emerald-500 dark:text-emerald-400" size={24} />
+            <span>Tasks</span>
+          </h1>
+          {activeProjectName && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Showing sprint tasks for project '{activeProjectName}'.
+            </p>
+          )}
+        </div>
+
+        <Button
+          size="sm"
+          disabled={isSelectedProjectReadOnly}
+          onClick={() => !isSelectedProjectReadOnly && setCreateModalOpen(true)}
+          className="gap-1.5 self-start sm:self-auto cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title={isSelectedProjectReadOnly ? `Project '${activeProjectName}' is ${activeProjectStatus}. Set status to Active to create tasks.` : 'Create New Task'}
+        >
+          <span>+ Create Task</span>
+        </Button>
       </div>
+
+      {isSelectedProjectReadOnly && (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
+          <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-500" />
+          <div>
+            <p className="font-bold">Project is Read-Only ({activeProjectStatus.toUpperCase()})</p>
+            <p className="mt-0.5">
+              Selected project <strong>{activeProjectName}</strong> is currently marked as <strong>{activeProjectStatus}</strong>. New tasks cannot be created. Change project status to <strong>Active</strong> to enable task creation.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Content Area */}
       {tasks.length === 0 ? (
@@ -100,11 +145,11 @@ export const Tasks: React.FC = () => {
           title="No tasks created yet"
           description={
             selectedProject
-              ? `There are no active sprint tasks for '${activeProjectName}'. Click below to create your first task.`
-              : 'There are no active tasks created in your workspace yet. Click below to add a new task ticket.'
+              ? `There are no active sprint tasks for '${activeProjectName}'.`
+              : 'There are no active tasks created in your workspace yet.'
           }
-          actionLabel="Create First Task"
-          onAction={() => setCreateModalOpen(true)}
+          actionLabel={isSelectedProjectReadOnly ? undefined : "Create First Task"}
+          onAction={isSelectedProjectReadOnly ? undefined : () => setCreateModalOpen(true)}
           accentColor="emerald"
         />
       ) : (
@@ -162,12 +207,14 @@ export const Tasks: React.FC = () => {
         }
       >
         <form id="create-task-form" onSubmit={handleCreateTask} className="space-y-4">
-          <FormField label="Task Title" htmlFor="task-title" required>
+          <FormField label="Task Title" htmlFor="task-title" required error={titleError}>
             <Input
               id="task-title"
               value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="e.g. Implement WebSocket speech stream"
+              onChange={(e) => {
+                setNewTitle(e.target.value);
+                if (titleError) setTitleError('');
+              }}
               required
             />
           </FormField>
@@ -197,7 +244,6 @@ export const Tasks: React.FC = () => {
               id="task-assignee"
               value={newAssignee}
               onChange={(e) => setNewAssignee(e.target.value)}
-              placeholder="Team member name"
             />
           </FormField>
         </form>

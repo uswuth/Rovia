@@ -27,6 +27,28 @@ export const validateRequired = <T extends object>(data: T, fields: RequiredFiel
   }
 };
 
+export const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
+
+export const validateTitle = (title: string, fieldName = 'title'): void => {
+  const trimmed = (title || '').trim();
+  if (!trimmed) {
+    throw ApiError.badRequest(`${formatLabel(fieldName)} is required`, [
+      { field: fieldName, message: `${formatLabel(fieldName)} is required` }
+    ]);
+  }
+  if (!TITLE_REGEX.test(trimmed)) {
+    throw ApiError.badRequest(
+      `${formatLabel(fieldName)} can only contain letters, numbers, spaces, hyphens (-), and underscores (_), and cannot start or end with a symbol`,
+      [
+        {
+          field: fieldName,
+          message: 'Can only contain letters, numbers, spaces, -, _, and cannot start or end with a symbol'
+        }
+      ]
+    );
+  }
+};
+
 /**
  * Strips `//` and block comments from a JSON string while leaving comment-like
  * sequences inside string literals untouched (e.g. "https://example.com").
@@ -92,4 +114,3 @@ export const stripJsonComments = (input: string): string => {
 
   return output.replace(/,(\s*[}\]])/g, '$1');
 };
-

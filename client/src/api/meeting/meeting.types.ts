@@ -2,7 +2,7 @@
 
 export type MeetingStatus = 'SCHEDULED' | 'LIVE' | 'ENDED' | 'CANCELLED';
 export type MeetingJoinMode = 'INVITE_ONLY' | 'OPEN_LINK';
-export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER';
+export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER' | 'VISITOR';
 export type MeetingParticipantStatus = 'INVITED' | 'JOINED' | 'LEFT';
 
 export interface MeetingParticipant {
@@ -39,12 +39,15 @@ export interface Meeting {
 export interface MeetingPreview {
   meetingId: string;
   meetingTitle: string;
+  meetingDescription?: string;
   meetingStatus: MeetingStatus;
   meetingScheduledAt: string;
   meetingDurationMinutes: number;
   meetingJoinMode: MeetingJoinMode;
   meetingParticipantCount: number;
   meetingParticipantLimit: number;
+  meetingJoinCode?: string;
+  participants?: MeetingParticipant[];
 }
 
 export interface CreateMeetingDTO {

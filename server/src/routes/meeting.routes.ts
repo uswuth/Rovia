@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authenticateUser } from '../middlewares/auth.middleware.js';
+import { env } from '../config/env.js';
 import {
   createMeeting,
   getMeetings,
@@ -17,7 +18,24 @@ import {
 const router: Router = Router();
 
 /**
- * Every meeting route requires authentication. The organization always comes
+ * Public preview of a meeting from its shareable join link.
+ * Allows visitors and guests without an existing session to see meeting info in the lobby.
+ * Redirects direct browser navigations (Accept: text/html) to the client SPA route.
+ */
+router.get(
+  '/join/:code',
+  asyncHandler(async (req, res) => {
+    if (req.headers.accept?.includes('text/html')) {
+      const clientUrl = env.CLIENT_URL || 'http://localhost:5173';
+      return res.redirect(`${clientUrl}/meetings/join/${req.params.code}`);
+    }
+    const preview = await previewMeetingByJoinCode(req, res);
+    return preview;
+  })
+);
+
+/**
+ * Subsequent meeting routes require authentication. The organization always comes
  * from the verified JWT, so a join code alone never grants access to another
  * tenant's meeting.
  */
@@ -118,37 +136,6 @@ router.get(
   })
 );
 
-/**
- * @openapi
- * /api/v1/meetings/join/{code}:
- *   get:
- *     summary: Preview a meeting from its shareable link
- *     description: >
- *       Returns only summary fields so a recipient can see what they are joining.
- *       Tenant scoped: a join code from another organization resolves to 404.
- *     tags:
- *       - Meetings
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: code
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Meeting preview
- *       404:
- *         description: No such meeting in this organization
- */
-router.get(
-  '/join/:code',
-  asyncHandler(async (req, res) => {
-    const preview = await previewMeetingByJoinCode(req, res);
-    return preview;
-  })
-);
 
 /**
  * @openapi

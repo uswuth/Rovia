@@ -1,3 +1,21 @@
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { MessageCircleQuestion, Send, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { FormField } from '@/components/ui/form-field';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { getQuestionStatusTone } from '@/lib/status-tone';
+import { parseApiError } from '@/utils/apiError';
+import { askQuestionSchema, answerQuestionSchema } from '@/schemas/meeting.schema';
+import type { z } from 'zod';
+import type { MeetingQuestion } from '@/api/meeting/meeting-qa.api';
+
+type AskValues = z.infer<typeof askQuestionSchema>;
+type AnswerValues = z.infer<typeof answerQuestionSchema>;
 
 interface QuestionListProps {
   questions: MeetingQuestion[];
@@ -54,7 +72,6 @@ const QuestionList = ({
                 >
                   <Input
                     id={`answer-${question.questionId}`}
-                    placeholder="Type an answer"
                     {...answerForm.register('answerText')}
                   />
                 </FormField>
@@ -94,25 +111,6 @@ const QuestionList = ({
   </ul>
 );
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { MessageCircleQuestion, Send, X } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { FormField } from '@/components/ui/form-field';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Skeleton } from '@/components/ui/skeleton';
-import { getQuestionStatusTone } from '@/lib/status-tone';
-import { parseApiError } from '@/utils/apiError';
-import { askQuestionSchema, answerQuestionSchema } from '@/schemas/meeting.schema';
-import type { z } from 'zod';
-import type { MeetingQuestion } from '@/api/meeting/meeting-qa.api';
-
-type AskValues = z.infer<typeof askQuestionSchema>;
-type AnswerValues = z.infer<typeof answerQuestionSchema>;
-
 interface MeetingQuestionsProps {
   meetingId: string;
   questions: MeetingQuestion[] | undefined;
@@ -131,7 +129,7 @@ export const MeetingQuestions = ({
   questions,
   loading,
   error,
-  canPost,
+  canPost = true,
   onAsk,
   onAnswer,
   onDismiss,
@@ -160,64 +158,53 @@ export const MeetingQuestions = ({
       setAnswerFor(null);
     });
 
-  if (loading) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-14 w-full" />
-        <Skeleton className="h-14 w-full" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
-        {parseApiError(error).message}
-      </p>
-    );
-  }
-
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col h-full space-y-3">
+      <div className="flex-1 overflow-y-auto space-y-3 min-h-[260px]">
+        {loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+          </div>
+        ) : error ? (
+          <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+            {parseApiError(error).message}
+          </p>
+        ) : !questions?.length ? (
+          <EmptyState
+            icon={MessageCircleQuestion}
+            title="No questions yet"
+            description="Questions asked here are visible to everyone on the roster."
+          />
+        ) : (
+          <QuestionList
+            questions={questions}
+            canPost={canPost}
+            posting={posting}
+            answerFor={answerFor}
+            onStartAnswer={setAnswerFor}
+            onCancelAnswer={() => setAnswerFor(null)}
+            onSubmitAnswer={submitAnswer}
+            onDismiss={onDismiss}
+            answerForm={answerForm}
+          />
+        )}
+      </div>
+
       {canPost && (
-        <form onSubmit={submitQuestion} className="flex items-start gap-2">
-          <FormField
-            label="Ask a question"
-            htmlFor={`ask-${meetingId}`}
-            className="flex-1"
-            error={askForm.formState.errors.questionText?.message}
-          >
-            <Input
-              id={`ask-${meetingId}`}
-              placeholder="What should we cover first?"
-              {...askForm.register('questionText')}
-            />
-          </FormField>
-          <Button type="submit" size="icon" className="mt-[1.375rem]" disabled={posting} aria-label="Send question">
-            <Send size={14} />
+        <form onSubmit={submitQuestion} className="flex items-center gap-2 pt-2 border-t border-border">
+          <Input
+            id={`ask-${meetingId}`}
+            placeholder="Type your question or message..."
+            {...askForm.register('questionText')}
+            className="flex-1 text-xs"
+          />
+          <Button type="submit" size="sm" disabled={posting} className="gap-1 text-xs font-semibold px-3">
+            <Send size={13} />
+            <span>Send</span>
           </Button>
         </form>
       )}
-
-      {!questions?.length ? (
-        <EmptyState
-          icon={MessageCircleQuestion}
-          title="No questions yet"
-          description="Questions asked here are visible to everyone on the roster."
-        />
-      ) : (
-        <QuestionList
-          questions={questions}
-          canPost={canPost}
-          posting={posting}
-          answerFor={answerFor}
-          onStartAnswer={setAnswerFor}
-          onCancelAnswer={() => setAnswerFor(null)}
-          onSubmitAnswer={submitAnswer}
-          onDismiss={onDismiss}
-          answerForm={answerForm}
-        />
-      )}
     </div>
   );
-}
+};

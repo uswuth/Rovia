@@ -87,10 +87,12 @@ export function PopoverContent({
   className,
   children,
   align = "start",
+  side = "bottom",
   sideOffset = 4,
   ...props
 }: React.ComponentProps<"div"> & {
   align?: "start" | "center" | "end"
+  side?: "top" | "bottom" | "left" | "right"
   sideOffset?: number
 }) {
   const { open, setOpen } = React.useContext(PopoverContext)
@@ -124,13 +126,27 @@ export function PopoverContent({
     end: "right-0",
   }
 
+  const sideClasses = {
+    top: "bottom-full mb-2",
+    bottom: "top-full mt-2",
+    left: "right-full mr-2",
+    right: "left-full ml-2",
+  }
+
   return (
     <div
       ref={contentRef}
       data-slot="popover-content"
-      style={{ marginTop: `${sideOffset}px` }}
+      style={
+        side === "top"
+          ? { marginBottom: `${sideOffset}px` }
+          : side === "bottom"
+          ? { marginTop: `${sideOffset}px` }
+          : undefined
+      }
       className={cn(
         "absolute z-50 rounded-lg border border-border bg-card p-3 text-card-foreground shadow-xl outline-none animate-in fade-in-0 zoom-in-95",
+        sideClasses[side] || sideClasses.bottom,
         alignClasses[align],
         className
       )}

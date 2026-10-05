@@ -147,7 +147,6 @@ export const MeetingPolls = ({
               id="poll-question"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Which day should we ship?"
             />
           </FormField>
 
@@ -161,7 +160,6 @@ export const MeetingPolls = ({
                   onChange={(event) =>
                     setOptions((prev) => prev.map((o, i) => (i === index ? event.target.value : o)))
                   }
-                  placeholder={`Option ${index + 1}`}
                 />
                 {options.length > 2 && (
                   <Button

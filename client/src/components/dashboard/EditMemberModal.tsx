@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { User, Shield, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Shield, CheckCircle, Briefcase } from 'lucide-react';
 import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
+import { getJobTitles, assignJobTitle, type JobTitle } from '@/api/job-title/job-title.api';
 
 interface EditMemberModalProps {
   isOpen: boolean;
@@ -15,17 +16,61 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const [role, setRole] = useState<MemberRole>(member?.role ?? 'Member');
-  const [status, setStatus] = useState<MemberStatus>(member?.status ?? 'Active');
+  const [availableTitles, setAvailableTitles] = useState<JobTitle[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      getJobTitles()
+        .then((res) => setAvailableTitles(res.data?.data || []))
+        .catch(() => undefined);
+    }
+  }, [isOpen]);
 
   if (!isOpen || !member) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Remounting on member change re-initializes the form state from the new member
+  return (
+    <EditMemberForm
+      key={member.id}
+      member={member}
+      availableTitles={availableTitles}
+      onClose={onClose}
+      onSave={onSave}
+    />
+  );
+};
+
+interface EditMemberFormProps {
+  member: Member;
+  availableTitles: JobTitle[];
+  onClose: () => void;
+  onSave: (updatedMember: Member) => void;
+}
+
+const EditMemberForm: React.FC<EditMemberFormProps> = ({
+  member,
+  availableTitles,
+  onClose,
+  onSave,
+}) => {
+  const [role, setRole] = useState<MemberRole>(member.role ?? 'Member');
+  const [status, setStatus] = useState<MemberStatus>(member.status ?? 'Active');
+  const [jobTitle, setJobTitle] = useState<string>(member.jobTitle ?? '');
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (member && jobTitle !== (member.jobTitle ?? '')) {
+      try {
+        await assignJobTitle(member.id, jobTitle);
+      } catch {
+        // Ignore background assignment failure if offline
+      }
+    }
     onSave({
       ...member,
       role,
       status,
+      jobTitle,
     });
     onClose();
   };
@@ -46,7 +91,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-semibold text-foreground">Manage Member</h3>
-              <p className="text-xs text-muted-foreground">{member.email}</p>
+              <p className="text-xs text-muted-foreground">{member.email || member.role}</p>
             </div>
           </div>
         </div>
@@ -59,6 +104,28 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
             </label>
             <div className="h-10 w-full rounded-md border border-border bg-secondary/50 px-3.5 flex items-center text-sm font-medium text-foreground">
               {member.name}
+            </div>
+          </div>
+
+          {/* Job Title Selection */}
+          <div>
+            <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+              Job Title
+            </label>
+            <div className="relative">
+              <Briefcase size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <select
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                className="h-10 w-full rounded-md border border-border bg-card pl-10 pr-3.5 text-sm text-foreground focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/30 transition-colors cursor-pointer"
+              >
+                <option value="">No Title Assigned</option>
+                {availableTitles.map((t) => (
+                  <option key={t.id} value={t.title}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

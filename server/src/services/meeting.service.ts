@@ -9,6 +9,8 @@ import {
 import { Project } from '../models/project.model.js';
 import { User } from '../models/user.model.js';
 import { ApiError } from '../utils/apiError.js';
+import { validateTitle } from '../utils/validation.js';
+import { generateSessionCode } from '../utils/codeGenerator.js';
 import { assertObjectId, toObjectIdString } from '../utils/objectId.js';
 import { requireOrganizationId } from '../utils/scope.js';
 import { findPaginated } from '../utils/paginatedFind.js';
@@ -25,9 +27,17 @@ import {
  * grants access: the organization always comes from the authenticated JWT.
  */
 
-/** Tenant scoped, exactly like findScopedProject. An id alone never grants access. */
-export const findScopedMeeting = async (meetingId: string, organizationId: string): Promise<MeetingDocument> => {
-  const meeting = await Meeting.findOne({ _id: meetingId, organization_id: organizationId });
+import { Types } from 'mongoose';
+
+/** Tenant scoped lookup: supports Mongo ObjectId or MEET001 joinCode. */
+export const findScopedMeeting = async (meetingIdOrCode: string, organizationId: string): Promise<MeetingDocument> => {
+  const query: Record<string, unknown> = { organization_id: organizationId };
+  if (Types.ObjectId.isValid(meetingIdOrCode)) {
+    query.$or = [{ _id: meetingIdOrCode }, { meeting_join_code: meetingIdOrCode }];
+  } else {
+    query.meeting_join_code = meetingIdOrCode;
+  }
+  const meeting = await Meeting.findOne(query);
   if (!meeting) {
     throw ApiError.notFound('Meeting not found');
   }
@@ -40,9 +50,13 @@ export const findScopedMeeting = async (meetingId: string, organizationId: strin
  */
 export const findScopedMeetingByJoinCode = async (
   joinCode: string,
-  organizationId: string
+  organizationId?: string
 ): Promise<MeetingDocument> => {
-  const meeting = await Meeting.findOne({ meeting_join_code: joinCode, organization_id: organizationId });
+  const query: Record<string, unknown> = { meeting_join_code: joinCode };
+  if (organizationId) {
+    query.organization_id = organizationId;
+  }
+  const meeting = await Meeting.findOne(query);
   if (!meeting) {
     throw ApiError.notFound('Meeting not found');
   }
@@ -105,9 +119,7 @@ export const createMeetingService = async (
   assertObjectId(input.projectId, 'projectId');
 
   const title = (input.meetingTitle || '').trim();
-  if (!title) {
-    throw ApiError.badRequest('Meeting title is required', [{ field: 'meetingTitle', message: 'Required' }]);
-  }
+  validateTitle(title, 'meetingTitle');
 
   const scheduledAt = new Date(input.meetingScheduledAt);
   if (Number.isNaN(scheduledAt.getTime())) {
@@ -130,6 +142,13 @@ export const createMeetingService = async (
   }
 
   const roster = await loadProjectRoster(input.projectId, organizationId);
+  const project = await Project.findOne({ _id: input.projectId, organization_id: organizationId });
+  if (project) {
+    const projectStatus = (project.project_status || '').toLowerCase();
+    if (projectStatus === 'completed' || projectStatus === 'archived') {
+      throw ApiError.badRequest(`Cannot schedule meetings for a ${projectStatus} project. Change project status to active first.`);
+    }
+  }
   const creator = await User.findById(userId).lean();
   const isSuperAdmin = creator?.user_role === 'SuperAdmin' || creator?.is_super_admin === true;
 
@@ -156,13 +175,15 @@ export const createMeetingService = async (
     );
   }
 
+  const joinCode = await generateSessionCode(Meeting as any, organizationId);
+
   const meeting = new Meeting({
     organization_id: organizationId,
     project_id: input.projectId,
     created_by: userId,
     meeting_title: title,
     meeting_description: (input.meetingDescription || '').trim(),
-    meeting_join_code: crypto.randomUUID(),
+    meeting_join_code: joinCode,
     meeting_join_mode: (input.meetingJoinMode ?? 'INVITE_ONLY') as MeetingJoinMode,
     meeting_status: 'SCHEDULED',
     meeting_scheduled_at: scheduledAt,
@@ -217,7 +238,15 @@ export const getMeetingsService = async (organizationId: string, query: IMeeting
   if (query.projectId) filter.project_id = assertObjectId(query.projectId, 'projectId');
   if (query.status) filter.meeting_status = query.status;
   if (query.mine === 'true' && query.userId) filter['meeting_participants.userId'] = query.userId;
-  return findPaginated(Meeting, filter, query, { sort: { meeting_scheduled_at: 1 } });
+  if (query.search && typeof query.search === 'string' && query.search.trim().length > 0) {
+    const searchRegex = new RegExp(query.search.trim(), 'i');
+    filter.$or = [
+      { meeting_title: searchRegex },
+      { meeting_description: searchRegex },
+      { meeting_join_code: searchRegex }
+    ];
+  }
+  return findPaginated(Meeting, filter, query, { sort: { created_at: -1, _id: -1 } });
 };
 
 export const getMeetingByIdService = async (meetingId: string, organizationId: string) => {
@@ -227,18 +256,33 @@ export const getMeetingByIdService = async (meetingId: string, organizationId: s
 };
 
 /** Public preview from the link, shown before joining. */
-export const previewMeetingByJoinCodeService = async (joinCode: string, organizationId: string) => {
-  requireOrganizationId(organizationId, 'view a meeting');
+export const previewMeetingByJoinCodeService = async (joinCode: string, organizationId?: string) => {
+  if (organizationId) {
+    requireOrganizationId(organizationId, 'view a meeting');
+  }
   const meeting = await findScopedMeetingByJoinCode(joinCode, organizationId);
   return {
     meetingId: meeting.meetingId,
     meetingTitle: meeting.meeting_title,
+    meetingDescription: meeting.meeting_description || '',
     meetingStatus: meeting.meeting_status,
     meetingScheduledAt: meeting.meeting_scheduled_at,
     meetingDurationMinutes: meeting.meeting_duration_minutes,
     meetingJoinMode: meeting.meeting_join_mode,
     meetingParticipantCount: meeting.meeting_participants.length,
-    meetingParticipantLimit: meeting.meeting_participant_limit
+    meetingParticipantLimit: meeting.meeting_participant_limit,
+    meetingJoinCode: meeting.meeting_join_code,
+    participants: (meeting.meeting_participants || []).map((p) => ({
+      userId: p.userId,
+      participantRole: p.participant_role,
+      participantStatus: p.participant_status,
+      canSendAudio: p.can_send_audio,
+      canSendVideo: p.can_send_video,
+      canShareScreen: p.can_share_screen,
+      canUseChat: p.can_use_chat,
+      joinedAt: p.joined_at,
+      leftAt: p.left_at
+    }))
   };
 };
 

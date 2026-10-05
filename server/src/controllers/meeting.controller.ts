@@ -56,7 +56,7 @@ export const getMeetingById = async (req: Request, res: Response): Promise<Respo
 };
 
 export const previewMeetingByJoinCode = async (req: Request, res: Response): Promise<Response> => {
-  const { organizationId } = getRequestScope(req);
+  const organizationId = req.user?.organizationId;
   const preview = await previewMeetingByJoinCodeService(req.params.code, organizationId);
   return ApiResponse.success(res, 'Meeting preview retrieved successfully', preview, 200);
 };

@@ -56,8 +56,8 @@ const validateEnv = (): void => {
   if (missing.length > 0) {
     console.error(
       `[CONFIG ERROR] Missing required configuration:\n  - ${missing.join('\n  - ')}\n` +
-        'Set them in server/.env for local work, or mount Docker secrets from server/secrets/ ' +
-        '(node server/scripts/generate-secrets.mjs).'
+      'Set them in server/.env for local work, or mount Docker secrets from server/secrets/ ' +
+      '(node server/scripts/generate-secrets.mjs).'
     );
     process.exit(1);
   }
@@ -67,7 +67,7 @@ const validateEnv = (): void => {
   if (isProduction && (!s3AccessKeyId || !s3SecretKey)) {
     console.error(
       '[CONFIG ERROR] Missing required configuration:\n  - AWS_ACCESS_KEY_ID (or AWS_ACCESS_KEY_ID_FILE)\n' +
-        '  - AWS_SECRET_ACCESS_KEY (or AWS_SECRET_ACCESS_KEY_FILE)'
+      '  - AWS_SECRET_ACCESS_KEY (or AWS_SECRET_ACCESS_KEY_FILE)'
     );
     process.exit(1);
   }
@@ -80,8 +80,9 @@ export const env: Readonly<EnvConfig> = Object.freeze({
   PORT: parseInt(process.env.PORT || '5000', 10),
   MONGO_URI: rawMongoUri as string,
   CORS_ORIGIN: process.env.CORS_ORIGIN || (isProduction ? '' : '*'),
+  CLIENT_URL: process.env.CLIENT_URL,
   JWT_ACCESS_SECRET: accessSecret as string,
-  JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY || '15m',
+  JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY || '24h',
   JWT_REFRESH_SECRET: refreshSecret as string,
   JWT_REFRESH_EXPIRY: process.env.JWT_REFRESH_EXPIRY || '7d',
   // Non-secret S3 settings may have defaults. The credentials may not: they go

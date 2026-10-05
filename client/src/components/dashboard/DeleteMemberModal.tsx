@@ -40,7 +40,7 @@ export const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({
 
         <div className="py-4">
           <p className="text-sm text-foreground">
-            Are you sure you want to remove <strong className="text-foreground font-semibold">{member.name}</strong> ({member.email}) from the organization?
+            Are you sure you want to remove <strong className="text-foreground font-semibold">{member.name}</strong>{member.email ? ` (${member.email})` : ''} from the organization?
           </p>
           <p className="text-xs text-muted-foreground mt-2">
             This member will lose access to organization meetings, projects, and resources. They can re-join later using a valid invite code.

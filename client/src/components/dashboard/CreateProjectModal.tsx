@@ -65,10 +65,17 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     reset();
   };
 
+const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       setNameError('Project name is required');
+      return;
+    }
+    if (!TITLE_REGEX.test(trimmedName)) {
+      setNameError('Project name can only contain letters, numbers, spaces, -, _, and cannot start or end with a symbol');
       return;
     }
     setNameError('');
@@ -109,7 +116,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             name="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Mobile App v2, AI Summarizer"
             required
           />
         </FormField>
@@ -120,7 +126,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             name="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Brief summary of scope, objectives, or deliverables…"
           />
         </FormField>
 

@@ -2,6 +2,7 @@ import { Project } from '../models/project.model.js';
 import { User } from '../models/user.model.js';
 import { Organization } from '../models/organization.model.js';
 import { ApiError } from '../utils/apiError.js';
+import { validateTitle } from '../utils/validation.js';
 import {
   IAddProjectMembersInput,
   ICreateProjectInput,
@@ -20,15 +21,30 @@ import { USER_POPULATE, USER_SELECT } from '../utils/projections.js';
 export const PROJECT_MEMBER_LIMIT = 50;
 export const PROJECT_HOST_LIMIT = 3;
 
+export const isTopAdminUser = (user: { user_role?: string; is_super_admin?: boolean; role?: string } | null | undefined): boolean => {
+  if (!user) return false;
+  if (user.is_super_admin) return true;
+  const role = (user.user_role || user.role || '').toUpperCase();
+  return role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN';
+};
+
 const PROJECT_POPULATE = [
   { path: 'project_hosts', select: USER_POPULATE },
   { path: 'project_members', select: USER_POPULATE },
   { path: 'created_by', select: USER_POPULATE }
 ];
 
-/** Every project lookup is tenant-scoped: an id alone never grants access. */
-const findScopedProject = async (projectId: string, organizationId: string) => {
-  const project = await Project.findOne({ _id: projectId, organization_id: organizationId });
+import { Types } from 'mongoose';
+
+/** Every project lookup is tenant-scoped: supports lookup by Mongo ObjectId or PRJT001 project_code. */
+const findScopedProject = async (projectIdOrCode: string, organizationId: string) => {
+  const query: Record<string, unknown> = { organization_id: organizationId };
+  if (Types.ObjectId.isValid(projectIdOrCode)) {
+    query.$or = [{ _id: projectIdOrCode }, { project_code: projectIdOrCode }];
+  } else {
+    query.project_code = projectIdOrCode;
+  }
+  const project = await Project.findOne(query);
   if (!project) {
     throw ApiError.notFound('Project not found');
   }
@@ -62,18 +78,28 @@ const assertProjectRole = (role: string): void => {
   }
 };
 
-/** Guards the per-project roster caps. Demotions are always allowed; only growth is blocked. */
-const assertRosterLimits = (memberIds: string[], hostIds: string[]) => {
+/** Guards the per-project roster caps. Admin and SuperAdmin roles skip the host limit restriction. */
+const assertRosterLimits = async (memberIds: string[], hostIds: string[]) => {
   if (memberIds.length > PROJECT_MEMBER_LIMIT) {
     throw ApiError.badRequest(
       `A project can have at most ${PROJECT_MEMBER_LIMIT} members. This request would result in ${memberIds.length}.`,
       [{ field: 'userIds', message: `Member limit of ${PROJECT_MEMBER_LIMIT} exceeded` }]
     );
   }
-  if (hostIds.length > PROJECT_HOST_LIMIT) {
+
+  // Admin and SuperAdmin roles bypass the host limit restriction.
+  const hostUsers = await User.find({ _id: { $in: hostIds } })
+    .select('user_role is_super_admin')
+    .lean();
+
+  const regularMemberHostIds = hostUsers
+    .filter((u) => !isTopAdminUser(u))
+    .map((u) => u._id.toString());
+
+  if (regularMemberHostIds.length > PROJECT_HOST_LIMIT) {
     throw ApiError.badRequest(
-      `A project can have at most ${PROJECT_HOST_LIMIT} hosts. Demote an existing host to Member before promoting another.`,
-      [{ field: 'projectRole', message: `Host limit of ${PROJECT_HOST_LIMIT} exceeded` }]
+      `A project can have at most ${PROJECT_HOST_LIMIT} regular member hosts (Admins and SuperAdmins are exempt). Demote an existing host to Member before promoting another.`,
+      [{ field: 'projectRole', message: `Host limit of ${PROJECT_HOST_LIMIT} regular member hosts exceeded` }]
     );
   }
 };
@@ -147,21 +173,14 @@ export const createProjectService = async (
   }
 
   const projectName = (input.projectName || input.name || '').trim();
-  if (!projectName) {
-    throw ApiError.badRequest('Project name is required', [
-      { field: 'name', message: 'Project name is required' },
-      { field: 'projectName', message: 'Project name is required' }
-    ]);
-  }
+  validateTitle(projectName, 'name');
 
   const projectDesc = (input.projectDescription || input.description || '').trim();
   const projectStatus = input.projectStatus || input.status || 'active';
   const projectHosts = input.projectHosts || input.hosts;
   const projectMembers = input.projectMembers || input.members;
 
-  const org = await Organization.findById(organizationId);
-  const orgSlug = org?.organization_slug || 'ORG';
-  const generatedProjectCode = generateProjectCode(orgSlug, projectName);
+  const generatedProjectCode = await generateProjectCode(Project as any, organizationId);
 
   const projectData: Record<string, unknown> = {
     project_name: projectName,
@@ -172,25 +191,19 @@ export const createProjectService = async (
     created_by: userId
   };
 
-  if (projectHosts && Array.isArray(projectHosts) && projectHosts.length > 0) {
-    await assertProjectMemberUsers(projectHosts, organizationId);
-  }
+  // SuperAdmin creator is always the default host of the project, plus up to 3 member hosts
+  const hostIds = [
+    ...new Set([...(projectHosts ?? []).map(String), String(userId)])
+  ];
+  const memberIds = [
+    ...new Set([...hostIds, ...(projectMembers ?? []).map(String)])
+  ];
 
-  if (projectMembers && Array.isArray(projectMembers) && projectMembers.length > 0) {
-    await assertProjectMemberUsers(projectMembers, organizationId);
-  }
+  await assertProjectMemberUsers(memberIds, organizationId);
+  assertRosterLimits(memberIds, hostIds);
 
-  if (projectHosts && Array.isArray(projectHosts) && projectHosts.length > 0) {
-    const hostIds = [...new Set(projectHosts)];
-    const memberIds = new Set([...hostIds, ...(projectMembers ?? [])].map(String));
-    assertRosterLimits([...memberIds], hostIds);
-    projectData.project_hosts = hostIds;
-    projectData.project_members = [...memberIds];
-  } else if (projectMembers && Array.isArray(projectMembers) && projectMembers.length > 0) {
-    const memberIds = [...new Set(projectMembers.map(String))];
-    assertRosterLimits(memberIds, []);
-    projectData.project_members = memberIds;
-  }
+  projectData.project_hosts = hostIds;
+  projectData.project_members = memberIds;
 
   const project = await Project.create(projectData);
 
@@ -232,7 +245,10 @@ export const updateProjectService = async (
   const project = await findScopedProject(assertObjectId(projectId, 'id'), organizationId);
 
   const updatedName = input.projectName !== undefined ? input.projectName : input.name;
-  if (updatedName !== undefined) project.project_name = updatedName.trim();
+  if (updatedName !== undefined) {
+    validateTitle(updatedName, 'name');
+    project.project_name = updatedName.trim();
+  }
 
   const updatedDesc = input.projectDescription !== undefined ? input.projectDescription : input.description;
   if (updatedDesc !== undefined) project.project_description = updatedDesc.trim();
@@ -241,9 +257,15 @@ export const updateProjectService = async (
   if (updatedStatus !== undefined) project.project_status = updatedStatus;
 
   const updatedHosts = input.projectHosts !== undefined ? input.projectHosts : input.hosts;
-  if (updatedHosts !== undefined) project.project_hosts = updatedHosts as unknown as typeof project.project_hosts;
-
   const updatedMembers = input.projectMembers !== undefined ? input.projectMembers : input.members;
+
+  if (updatedHosts !== undefined) {
+    const hostIds = [...new Set(updatedHosts.map(String))];
+    const memberIds = [...new Set([...hostIds, ...(updatedMembers !== undefined ? updatedMembers.map(String) : project.project_members.map(toObjectIdString))])];
+    await assertRosterLimits(memberIds, hostIds);
+    project.project_hosts = hostIds as unknown as typeof project.project_hosts;
+  }
+
   if (updatedMembers !== undefined) project.project_members = updatedMembers as unknown as typeof project.project_members;
 
   await project.save();
@@ -251,8 +273,14 @@ export const updateProjectService = async (
   return findPopulatedProject(project._id.toString());
 };
 
-export const deleteProjectService = async (projectId: string, organizationId: string) => {
-  const project = await Project.findOneAndDelete({ _id: projectId, organization_id: organizationId });
+export const deleteProjectService = async (projectIdOrCode: string, organizationId: string) => {
+  const query: Record<string, unknown> = { organization_id: organizationId };
+  if (Types.ObjectId.isValid(projectIdOrCode)) {
+    query.$or = [{ _id: projectIdOrCode }, { project_code: projectIdOrCode }];
+  } else {
+    query.project_code = projectIdOrCode;
+  }
+  const project = await Project.findOneAndDelete(query);
   if (!project) {
     throw ApiError.notFound('Project not found');
   }
@@ -288,7 +316,7 @@ export const addProjectMembersService = async (
     if (projectRole === 'Host') hosts.add(userId);
   }
 
-  assertRosterLimits([...members], [...hosts]);
+  await assertRosterLimits([...members], [...hosts]);
 
   project.project_members = [...members] as unknown as typeof project.project_members;
   project.project_hosts = [...hosts] as unknown as typeof project.project_hosts;
@@ -329,7 +357,7 @@ export const updateProjectMemberRoleService = async (
     hosts.delete(userId);
   }
 
-  assertRosterLimits([...members], [...hosts]);
+  await assertRosterLimits([...members], [...hosts]);
 
   project.project_members = [...members] as unknown as typeof project.project_members;
   project.project_hosts = [...hosts] as unknown as typeof project.project_hosts;

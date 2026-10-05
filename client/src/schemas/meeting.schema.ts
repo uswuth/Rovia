@@ -1,10 +1,17 @@
 import { z } from 'zod';
 
+export const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
+const TITLE_ERROR_MSG = 'Title can only contain letters, numbers, spaces, -, _, and cannot start or end with a symbol';
+
 const MAX_PARTICIPANT_LIMIT = 50;
 
 export const createMeetingSchema = z.object({
   projectId: z.string().min(1, 'Choose a project'),
-  meetingTitle: z.string().trim().min(3, 'Title must be at least 3 characters'),
+  meetingTitle: z
+    .string()
+    .trim()
+    .min(2, 'Title must be at least 2 characters')
+    .regex(TITLE_REGEX, TITLE_ERROR_MSG),
   meetingDescription: z.string().trim().optional(),
   meetingScheduledAt: z
     .string()
@@ -13,8 +20,8 @@ export const createMeetingSchema = z.object({
       (val) => {
         const d = new Date(val);
         if (isNaN(d.getTime())) return false;
-        // Allow up to 5 minutes in the past to account for form fill time
-        return d.getTime() >= Date.now() - 5 * 60 * 1000;
+        // Allow up to 10 minutes in the past to account for form fill time
+        return d.getTime() >= Date.now() - 10 * 60 * 1000;
       },
       { message: 'Meeting start date cannot be in the past' }
     ),

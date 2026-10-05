@@ -95,6 +95,7 @@ io.on('connection', (socket: TypedSocket) => {
         }
 
         await socket.join(`meeting:${meetingId}`);
+        socket.data.meetingId = meetingId;
         const participants = meeting.meeting_participants.map((p) => p.userId);
         ack?.({ ok: true, peers: participants.filter((id) => id !== socket.data.userId) });
         socket.to(`meeting:${meetingId}`).emit('meeting:peer-joined', { userId });
@@ -106,6 +107,7 @@ io.on('connection', (socket: TypedSocket) => {
 
     socket.on('meeting:leave', (meetingId: string) => {
       void socket.leave(`meeting:${meetingId}`);
+      delete socket.data.meetingId;
       socket.to(`meeting:${meetingId}`).emit('meeting:peer-left', { userId: socket.data.userId ?? '' });
     });
 
@@ -134,6 +136,11 @@ io.on('connection', (socket: TypedSocket) => {
 
     socket.on('disconnect', (reason: string) => {
       logger.info(`Socket client disconnected: ${socket.id} (reason: ${reason})`);
+      const meetingId = socket.data.meetingId;
+      const userId = socket.data.userId;
+      if (meetingId && userId) {
+        socket.to(`meeting:${meetingId}`).emit('meeting:peer-left', { userId });
+      }
     });
   });
 

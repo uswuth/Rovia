@@ -7,6 +7,8 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -35,6 +37,8 @@
   --foreground: #0f172a;
   --card: #ffffff;
   --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
   --primary: #10b981;
   --primary-foreground: #ffffff;
   --secondary: #eef2f6;
@@ -63,6 +67,8 @@
   --foreground: #f8fafc;
   --card: #111317;
   --card-foreground: #f8fafc;
+  --popover: #111317;
+  --popover-foreground: #f8fafc;
   --primary: #10b981;
   --primary-foreground: #ffffff;
   --secondary: #1a1d24;
@@ -121,4 +127,27 @@ body {
     background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.25px, transparent 1.25px);
     background-size: 20px 20px;
   }
+}
+
+@keyframes ticker-bounce {
+  0%, 20% {
+    transform: translateX(0px);
+  }
+  55%, 75% {
+    transform: translateX(var(--scroll-offset, -80px));
+  }
+  95%, 100% {
+    transform: translateX(0px);
+  }
+}
+
+.animate-ticker {
+  display: inline-block;
+  white-space: nowrap;
+  animation: ticker-bounce var(--ticker-duration, 8s) cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  will-change: transform;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
 }

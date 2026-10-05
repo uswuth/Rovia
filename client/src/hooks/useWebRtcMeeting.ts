@@ -20,7 +20,11 @@ export interface PeerState {
  * peer offers to everyone already in the room, which avoids the "glare" of
  * both sides offering at once.
  */
-export const useWebRtcMeeting = (meetingId: string, enabled: boolean) => {
+export const useWebRtcMeeting = (
+  meetingId: string,
+  enabled: boolean,
+  options?: { onPeerLeft?: (userId: string) => void }
+) => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [peers, setPeers] = useState<Record<string, PeerState>>({});
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
@@ -31,6 +35,8 @@ export const useWebRtcMeeting = (meetingId: string, enabled: boolean) => {
   // Peer connections are kept in a ref, not state: they are mutable objects
   // and re-rendering on every change would thrash the video elements.
   const connections = useRef<Record<string, RTCPeerConnection>>({});
+  const onPeerLeftRef = useRef(options?.onPeerLeft);
+  onPeerLeftRef.current = options?.onPeerLeft;
 
   const upsertPeer = useCallback((userId: string, patch: Partial<PeerState>) => {
     setPeers((prev) => ({
@@ -136,6 +142,7 @@ export const useWebRtcMeeting = (meetingId: string, enabled: boolean) => {
           delete next[userId];
           return next;
         });
+        onPeerLeftRef.current?.(userId);
       });
 
       socket.on('meeting:state', ({ userId, state }) => {
@@ -193,6 +200,10 @@ export const useWebRtcMeeting = (meetingId: string, enabled: boolean) => {
       disconnectMeetingSocket();
     };
   }, [enabled, meetingId, createConnection, upsertPeer]);
+
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+
   /** Toggle a local track and tell the room. */
   const setTrackEnabled = useCallback(
     (kind: 'audio' | 'video', on: boolean) => {
@@ -210,19 +221,39 @@ export const useWebRtcMeeting = (meetingId: string, enabled: boolean) => {
     [meetingId]
   );
 
+  const stopScreenShare = useCallback(() => {
+    if (screenStream) {
+      screenStream.getTracks().forEach((t) => t.stop());
+      setScreenStream(null);
+      setIsScreenSharing(false);
+      const camera = localRef.current?.getVideoTracks()[0];
+      if (camera) {
+        Object.values(connections.current).forEach((pc) => {
+          const trackSender = pc.getSenders().find((s) => s.track?.kind === 'video');
+          void trackSender?.replaceTrack(camera);
+        });
+      }
+      socketRef.current?.emit('meeting:state', { meetingId, state: { screenSharing: false } });
+    }
+  }, [screenStream, meetingId]);
+
   const startScreenShare = useCallback(async (): Promise<MediaStream | null> => {
     try {
       const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-      const sender = display.getVideoTracks()[0];
-      if (!sender) return null;
+      const senderTrack = display.getVideoTracks()[0];
+      if (!senderTrack) return null;
+
+      setScreenStream(display);
+      setIsScreenSharing(true);
 
       Object.values(connections.current).forEach((pc) => {
         const trackSender = pc.getSenders().find((s) => s.track?.kind === 'video');
-        void trackSender?.replaceTrack(sender);
+        void trackSender?.replaceTrack(senderTrack);
       });
 
-      // Releasing the OS indicator ends the share from the browser side.
-      sender.addEventListener('ended', () => {
+      const handleEnded = () => {
+        setScreenStream(null);
+        setIsScreenSharing(false);
         const camera = localRef.current?.getVideoTracks()[0];
         if (camera) {
           Object.values(connections.current).forEach((pc) => {
@@ -231,7 +262,9 @@ export const useWebRtcMeeting = (meetingId: string, enabled: boolean) => {
           });
         }
         socketRef.current?.emit('meeting:state', { meetingId, state: { screenSharing: false } });
-      });
+      };
+
+      senderTrack.addEventListener('ended', handleEnded);
 
       socketRef.current?.emit('meeting:state', { meetingId, state: { screenSharing: true } });
       return display;
@@ -245,8 +278,11 @@ export const useWebRtcMeeting = (meetingId: string, enabled: boolean) => {
     peers,
     status,
     error,
+    screenStream,
+    isScreenSharing,
     setAudioEnabled: (on: boolean) => setTrackEnabled('audio', on),
     setVideoEnabled: (on: boolean) => setTrackEnabled('video', on),
-    startScreenShare
+    startScreenShare,
+    stopScreenShare,
   };
 };

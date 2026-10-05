@@ -46,8 +46,8 @@ export function AppSidebar({
           url: "/projects?status=active",
         },
         {
-          title: "Planning",
-          url: "/projects?status=planning",
+          title: "Completed",
+          url: "/projects?status=completed",
         },
         {
           title: "Archived",
@@ -57,16 +57,20 @@ export function AppSidebar({
     },
     {
       title: "Meetings",
-      url: "/meetings",
+      url: "/meetings?tab=upcoming",
       icon: <Video size={18} />,
       items: [
         {
-          title: "All Meetings",
-          url: "/meetings",
+          title: "Upcoming Sessions",
+          url: "/meetings?tab=upcoming",
         },
         {
-          title: "Schedule Meeting",
-          url: "/meetings/new",
+          title: "Meeting History",
+          url: "/meetings?tab=past",
+        },
+        {
+          title: "All Sessions",
+          url: "/meetings?tab=all",
         },
       ],
     },

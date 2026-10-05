@@ -3,7 +3,7 @@ import { User } from '../models/user.model.js';
 import { Organization } from '../models/organization.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { env } from '../config/env.js';
-import { generateOrgInviteCode } from '../utils/codeGenerator.js';
+import { generateOrgInviteCode, generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
 import { validateRequired } from '../utils/validation.js';
 import { ORGANIZATION_POPULATE } from '../utils/projections.js';
 import {
@@ -53,13 +53,14 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
 
     const generatedInvite = generateOrgInviteCode(finalSlug);
 
-    // 1. Create User as SuperAdmin
+    const userCode = await generateSequentialCode(ENTITY_PREFIXES.USER, User, 'user_code');
     const user = new User({
       user_name: userName,
       user_email: userEmail,
       password,
       user_role: 'SuperAdmin',
       is_super_admin: true,
+      user_code: userCode,
       avatar_url: avatarUrl
     });
 
@@ -111,12 +112,14 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
     assignedOrgId = org._id.toString();
   }
 
+  const userCode = await generateSequentialCode(ENTITY_PREFIXES.USER, User, 'user_code');
   const user = new User({
     user_name: userName,
     user_email: userEmail,
     password,
     user_role: 'Member',
     is_super_admin: false,
+    user_code: userCode,
     organization_id: assignedOrgId,
     avatar_url: avatarUrl
   });

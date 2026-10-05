@@ -57,10 +57,10 @@ The doc proposes some things this build does **not** use. Worth stating so the d
 The evaluation weighs a **live public demo (30%)**. That changes the order.
 
 ### P0 — without these, there is no demo
-- [ ] **Wire WebRTC into `MeetingRoom.tsx`** — two tabs, real video + audio
-- [ ] **Replace the `Meetings.tsx` mock** with real API data
-- [ ] **Link `/meetings/new`** from Meetings and Projects pages
-- [ ] **Wire Q&A + Poll mutations** (currently `async () => undefined` stubs)
+- [x] **Wire WebRTC into `MeetingRoom.tsx`** — two tabs, real video + audio
+- [x] **Replace the `Meetings.tsx` mock** with real API data
+- [x] **Link `/meetings/new`** from Meetings and Projects pages
+- [x] **Wire Q&A + Poll mutations** (real API mutations connected)
 - [ ] **Run the AI pipeline once** and confirm a real transcript + summary
 
 ### P1 — needed for the docs/score

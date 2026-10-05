@@ -50,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearedForError.current = true;
       setAccessToken(null);
       queryClient.clear();
+      setHasToken(false);
     }
     if (!error) {
       clearedForError.current = false;
@@ -68,6 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     async (dto: LoginDTO) => {
       const { data } = await authApi.login(dto);
       setAccessToken(data.data.accessToken);
+      queryClient.removeQueries({ queryKey: queryKeys.auth.me });
       queryClient.setQueryData(queryKeys.auth.me, data.data.user);
       setHasToken(true);
     },
@@ -78,6 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     async (dto: SignupDTO) => {
       const { data } = await authApi.register(dto);
       setAccessToken(data.data.accessToken);
+      queryClient.removeQueries({ queryKey: queryKeys.auth.me });
       queryClient.setQueryData(queryKeys.auth.me, data.data.user);
       setHasToken(true);
     },

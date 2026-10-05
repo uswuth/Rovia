@@ -6,7 +6,16 @@ import type {
   ParticipantPermissions,
 } from './meeting.types';
 
-export const getMeetings = (params?: { projectId?: string; status?: string; mine?: boolean }) =>
+export interface MeetingQueryParams {
+  projectId?: string;
+  status?: string;
+  search?: string;
+  mine?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export const getMeetings = (params?: MeetingQueryParams) =>
   client.get<{ data: Meeting[] }>('/meetings', { params });
 
 export const getMeetingById = (id: string) => client.get<{ data: Meeting }>(`/meetings/${id}`);

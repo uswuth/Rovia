@@ -35,6 +35,9 @@ export const getTaskStatusTone = (status: string): BadgeTone =>
 
 const meetingStatusTones: Record<string, BadgeTone> = {
   live: 'success',
+  // Client-side display state for a meeting inside its scheduled window but not
+  // yet marked LIVE by the server.
+  in_progress: 'success',
   scheduled: 'info',
   // The server uses ENDED/CANCELLED; both read as neutral, non-actionable.
   ended: 'neutral',

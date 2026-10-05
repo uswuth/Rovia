@@ -1,6 +1,6 @@
 export type MeetingStatus = 'SCHEDULED' | 'LIVE' | 'ENDED' | 'CANCELLED';
 export type MeetingJoinMode = 'INVITE_ONLY' | 'OPEN_LINK';
-export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER';
+export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER' | 'VISITOR';
 export type MeetingParticipantStatus = 'INVITED' | 'JOINED' | 'LEFT';
 
 /** Per-member capabilities a host can toggle for one participant. */
@@ -29,6 +29,7 @@ export interface IMeetingListQuery extends Record<string, unknown> {
   limit?: string | number;
   projectId?: string;
   status?: MeetingStatus;
+  search?: string;
   /** Meetings where this user is on the roster. */
   mine?: string;
 }
