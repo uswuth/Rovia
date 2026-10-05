@@ -895,7 +895,7 @@ export const MeetingRoom: React.FC = () => {
                   </button>
                 }
               />
-              <PopoverContent className="w-72 p-4 space-y-3 border-border bg-card shadow-xl" align="end">
+              <PopoverContent side="top" sideOffset={12} className="w-72 p-4 space-y-3 border-border bg-card shadow-xl" align="end">
                 <div className="font-bold text-xs text-foreground border-b border-border pb-2">
                   Appearance & Layout
                 </div>
