@@ -5,3 +5,6 @@ export * from './socket.types.js';
 export * from './user.types.js';
 export * from './organization.types.js';
 export * from './project.types.js';
+export * from './recording.types.js';
+export * from './ai.types.js';
+export * from './meeting.types.js';

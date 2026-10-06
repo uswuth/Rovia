@@ -2,9 +2,10 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model.js';
 import { Organization } from '../models/organization.model.js';
 import { ApiError } from '../utils/apiError.js';
-import { validateRequired } from '../utils/validation.js';
 import { env } from '../config/env.js';
-import { generateOrgInviteCode } from '../utils/codeGenerator.js';
+import { generateOrgInviteCode, generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
+import { validateRequired } from '../utils/validation.js';
+import { ORGANIZATION_POPULATE } from '../utils/projections.js';
 import {
   IUserRegisterInput,
   IUserLoginInput,
@@ -12,22 +13,16 @@ import {
 } from '../types/index.js';
 
 export const registerUserService = async (input: IUserRegisterInput): Promise<IAuthTokensResponse> => {
-  const userName = (input.userName || input.name || '').trim();
-  const userEmail = (input.userEmail || input.email || '').toLowerCase().trim();
-  const password = input.password;
+  validateRequired(input, ['userName', 'userEmail', 'password']);
 
-  if (!userName || !userEmail || !password) {
-    throw ApiError.badRequest('Name, email, and password are required', [
-      { field: 'name', message: 'Name is required' },
-      { field: 'email', message: 'Email is required' },
-      { field: 'password', message: 'Password is required' }
-    ]);
-  }
+  const userName = input.userName.trim();
+  const userEmail = input.userEmail.toLowerCase().trim();
+  const password = input.password;
 
   const existingUser = await User.findOne({ user_email: userEmail });
   if (existingUser) {
     throw ApiError.badRequest('User with this email already exists', [
-      { field: 'email', message: 'User with this email already exists' }
+      { field: 'userEmail', message: 'User with this email already exists' }
     ]);
   }
 
@@ -58,13 +53,14 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
 
     const generatedInvite = generateOrgInviteCode(finalSlug);
 
-    // 1. Create User as SuperAdmin
+    const userCode = await generateSequentialCode(ENTITY_PREFIXES.USER, User, 'user_code');
     const user = new User({
       user_name: userName,
       user_email: userEmail,
       password,
       user_role: 'SuperAdmin',
       is_super_admin: true,
+      user_code: userCode,
       avatar_url: avatarUrl
     });
 
@@ -88,10 +84,7 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
     // 4. Generate accessToken with organizationId included in the payload
     const accessToken = user.generateAccessToken();
 
-    const populatedUser = await User.findById(user._id).populate(
-      'organization_id',
-      'organization_name organization_slug organization_location organization_description organization_invite_code revoked_invite_codes organization_owner_id created_at updated_at'
-    );
+    const populatedUser = await User.findById(user._id).populate('organization_id', ORGANIZATION_POPULATE);
 
     return {
       user: populatedUser!.toJSON() as unknown as IAuthTokensResponse['user'],
@@ -119,12 +112,14 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
     assignedOrgId = org._id.toString();
   }
 
+  const userCode = await generateSequentialCode(ENTITY_PREFIXES.USER, User, 'user_code');
   const user = new User({
     user_name: userName,
     user_email: userEmail,
     password,
     user_role: 'Member',
     is_super_admin: false,
+    user_code: userCode,
     organization_id: assignedOrgId,
     avatar_url: avatarUrl
   });
@@ -135,10 +130,7 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
   user.refreshToken = refreshToken;
   await user.save();
 
-  const populatedUser = await User.findById(user._id).populate(
-    'organization_id',
-    'organization_name organization_slug organization_location organization_description organization_invite_code revoked_invite_codes organization_owner_id created_at updated_at'
-  );
+  const populatedUser = await User.findById(user._id).populate('organization_id', ORGANIZATION_POPULATE);
 
   return {
     user: populatedUser!.toJSON() as unknown as IAuthTokensResponse['user'],
@@ -147,11 +139,12 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
 };
 
 export const loginUserService = async (input: IUserLoginInput): Promise<IAuthTokensResponse & { refreshToken: string }> => {
-  const { email, password } = input;
+  validateRequired(input, ['userEmail', 'password']);
 
-  validateRequired(input, ['email', 'password']);
+  const userEmail = input.userEmail.toLowerCase().trim();
+  const { password } = input;
 
-  const user = await User.findOne({ user_email: email.toLowerCase().trim() }).select('+password +refreshToken');
+  const user = await User.findOne({ user_email: userEmail }).select('+password +refreshToken');
   if (!user) {
     throw ApiError.unauthorized('Invalid email or password');
   }
@@ -167,10 +160,7 @@ export const loginUserService = async (input: IUserLoginInput): Promise<IAuthTok
   user.refreshToken = refreshToken;
   await user.save();
 
-  const populatedUser = await User.findById(user._id).populate(
-    'organization_id',
-    'organization_name organization_slug organization_location organization_description organization_invite_code revoked_invite_codes organization_owner_id created_at updated_at'
-  );
+  const populatedUser = await User.findById(user._id).populate('organization_id', ORGANIZATION_POPULATE);
 
   return {
     user: populatedUser!.toJSON() as unknown as IAuthTokensResponse['user'],
@@ -215,10 +205,7 @@ export const logoutUserService = async (userId: string): Promise<void> => {
 };
 
 export const getCurrentUserService = async (userId: string): Promise<IAuthTokensResponse['user']> => {
-  const user = await User.findById(userId).populate(
-    'organization_id',
-    'organization_name organization_slug organization_location organization_description organization_invite_code revoked_invite_codes organization_owner_id created_at updated_at'
-  );
+  const user = await User.findById(userId).populate('organization_id', ORGANIZATION_POPULATE);
   if (!user) {
     throw ApiError.notFound('User not found');
   }

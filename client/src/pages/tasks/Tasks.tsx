@@ -1,41 +1,96 @@
 import React, { useState } from 'react';
-import { CheckSquare, Clock, AlertCircle, CheckCircle2, User, X } from 'lucide-react';
+import { CheckSquare, Clock, AlertCircle, CheckCircle2, User } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 import { getProjectName } from '@/types/project.types';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Modal, ModalFooterCancel } from '@/components/ui/modal';
+import { FormField } from '@/components/ui/form-field';
+import { getTaskPriorityTone } from '@/lib/status-tone';
+
+type TaskStatus = 'To Do' | 'In Progress' | 'Done';
+type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
+
+const PRIORITY_OPTIONS = [
+  { value: 'Low', label: 'Low' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'High', label: 'High' },
+  { value: 'Urgent', label: 'Urgent' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'To Do', label: 'To Do' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Done', label: 'Done' },
+];
 
 interface TaskItem {
   id: string;
   title: string;
   projectName: string;
-  status: 'To Do' | 'In Progress' | 'Done';
-  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
+  status: TaskStatus;
+  priority: TaskPriority;
   assignee: string;
   createdAt: string;
 }
+
+const statusIcon: Record<TaskStatus, React.ReactNode> = {
+  Done: <CheckCircle2 size={14} className="text-emerald-500 dark:text-emerald-400" />,
+  'In Progress': <Clock size={14} className="text-amber-500 dark:text-amber-400" />,
+  'To Do': <AlertCircle size={14} className="text-muted-foreground" />,
+};
 
 export const Tasks: React.FC = () => {
   const { selectedProject } = useProject();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  // New task form state
   const [newTitle, setNewTitle] = useState('');
-  const [newPriority, setNewPriority] = useState<'Low' | 'Medium' | 'High' | 'Urgent'>('Medium');
-  const [newStatus, setNewStatus] = useState<'To Do' | 'In Progress' | 'Done'>('To Do');
+  const [titleError, setTitleError] = useState('');
+  const [newPriority, setNewPriority] = useState<TaskPriority>('Medium');
+  const [newStatus, setNewStatus] = useState<TaskStatus>('To Do');
   const [newAssignee, setNewAssignee] = useState('arlo');
 
   const activeProjectName = getProjectName(selectedProject);
 
   const displayedTasks = tasks;
 
+  const handleCloseModal = () => {
+    setNewTitle('');
+    setTitleError('');
+    setNewPriority('Medium');
+    setNewStatus('To Do');
+    setNewAssignee('arlo');
+    setCreateModalOpen(false);
+  };
+
+  const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
+
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle) {
+      setTitleError('Task title is required');
+      return;
+    }
+    if (!TITLE_REGEX.test(trimmedTitle)) {
+      setTitleError('Task title can only contain letters, numbers, spaces, -, _, and cannot start or end with a symbol');
+      return;
+    }
+    setTitleError('');
 
     const newTask: TaskItem = {
       id: `TASK-${Date.now().toString().slice(-4)}`,
-      title: newTitle.trim(),
+      title: trimmedTitle,
       projectName: activeProjectName,
       status: newStatus,
       priority: newPriority,
@@ -44,43 +99,50 @@ export const Tasks: React.FC = () => {
     };
 
     setTasks((prev) => [newTask, ...prev]);
-    setNewTitle('');
-    setCreateModalOpen(false);
+    handleCloseModal();
   };
 
-  const getPriorityStyle = (priority: string) => {
-    switch (priority) {
-      case 'Urgent':
-        return 'bg-red-500/10 text-red-400 border-red-500/20';
-      case 'High':
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-      case 'Medium':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-      default:
-        return 'bg-zinc-800 text-zinc-300 border-zinc-700';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Done':
-        return <CheckCircle2 size={14} className="text-emerald-400" />;
-      case 'In Progress':
-        return <Clock size={14} className="text-amber-400" />;
-      default:
-        return <AlertCircle size={14} className="text-zinc-500" />;
-    }
-  };
+  const activeProjectStatus = (selectedProject?.projectStatus || selectedProject?.status || '').toLowerCase();
+  const isSelectedProjectReadOnly = activeProjectStatus === 'completed' || activeProjectStatus === 'archived';
 
   return (
-    <div className="min-h-screen w-full bg-[#0c0c0e] text-white p-6 lg:p-8 space-y-6 font-['Plus_Jakarta_Sans']">
+    <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
-          <CheckSquare className="text-emerald-400" size={24} />
-          <span>Tasks</span>
-        </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <CheckSquare className="text-emerald-500 dark:text-emerald-400" size={24} />
+            <span>Tasks</span>
+          </h1>
+          {activeProjectName && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Showing sprint tasks for project '{activeProjectName}'.
+            </p>
+          )}
+        </div>
+
+        <Button
+          size="sm"
+          disabled={isSelectedProjectReadOnly}
+          onClick={() => !isSelectedProjectReadOnly && setCreateModalOpen(true)}
+          className="gap-1.5 self-start sm:self-auto cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title={isSelectedProjectReadOnly ? `Project '${activeProjectName}' is ${activeProjectStatus}. Set status to Active to create tasks.` : 'Create New Task'}
+        >
+          <span>+ Create Task</span>
+        </Button>
       </div>
+
+      {isSelectedProjectReadOnly && (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
+          <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-500" />
+          <div>
+            <p className="font-bold">Project is Read-Only ({activeProjectStatus.toUpperCase()})</p>
+            <p className="mt-0.5">
+              Selected project <strong>{activeProjectName}</strong> is currently marked as <strong>{activeProjectStatus}</strong>. New tasks cannot be created. Change project status to <strong>Active</strong> to enable task creation.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Content Area */}
       {tasks.length === 0 ? (
@@ -89,52 +151,44 @@ export const Tasks: React.FC = () => {
           title="No tasks created yet"
           description={
             selectedProject
-              ? `There are no active sprint tasks for '${activeProjectName}'. Click below to create your first task.`
-              : 'There are no active tasks created in your workspace yet. Click below to add a new task ticket.'
+              ? `There are no active sprint tasks for '${activeProjectName}'.`
+              : 'There are no active tasks created in your workspace yet.'
           }
-          actionLabel="Create First Task"
-          onAction={() => setCreateModalOpen(true)}
+          actionLabel={isSelectedProjectReadOnly ? undefined : "Create First Task"}
+          onAction={isSelectedProjectReadOnly ? undefined : () => setCreateModalOpen(true)}
           accentColor="emerald"
         />
       ) : (
-        <div className="rounded-lg border border-zinc-800/80 bg-[#121214] overflow-hidden shadow-xl">
-          <div className="p-4 border-b border-zinc-800/80 font-bold text-xs uppercase tracking-wider text-zinc-400 flex items-center justify-between">
+        <div className="rounded-md border border-border bg-card text-card-foreground overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-border font-bold text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between">
             <span>Sprint Backlog & Deliverables</span>
-            <span className="text-emerald-400 font-mono text-[11px]">{displayedTasks.length} Tickets</span>
+            <span className="text-emerald-500 dark:text-emerald-400 font-mono text-[11px]">{displayedTasks.length} Tickets</span>
           </div>
 
-          <div className="divide-y divide-zinc-800/60">
+          <div className="divide-y divide-border">
             {displayedTasks.map((t) => (
               <div
                 key={t.id}
-                className="p-4 hover:bg-zinc-800/30 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                className="p-4 hover:bg-secondary/50 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] text-zinc-500">{t.id}</span>
-                    <span className="text-[11px] font-mono font-semibold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-sm border border-purple-500/20">
-                      {t.projectName}
-                    </span>
+                    <span className="font-mono text-[11px] text-muted-foreground">{t.id}</span>
+                    <Badge tone="accent">{t.projectName}</Badge>
                   </div>
-                  <h3 className="text-sm font-semibold text-white">{t.title}</h3>
+                  <h3 className="text-sm font-semibold text-foreground">{t.title}</h3>
                 </div>
 
                 <div className="flex items-center gap-3 self-end sm:self-auto">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-medium border ${getPriorityStyle(
-                      t.priority
-                    )}`}
-                  >
-                    {t.priority}
-                  </span>
+                  <Badge tone={getTaskPriorityTone(t.priority)}>{t.priority}</Badge>
 
-                  <span className="flex items-center gap-1.5 text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-sm">
-                    {getStatusIcon(t.status)}
+                  <span className="flex items-center gap-1.5 text-xs text-foreground bg-secondary/80 border border-border px-2.5 py-1 rounded-sm">
+                    {statusIcon[t.status]}
                     <span>{t.status}</span>
                   </span>
 
-                  <div className="flex items-center gap-1 text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded-sm border border-zinc-800">
-                    <User size={12} className="text-emerald-400" />
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground bg-secondary/80 px-2 py-1 rounded-sm border border-border">
+                    <User size={12} className="text-emerald-600 dark:text-emerald-400" />
                     <span>{t.assignee}</span>
                   </div>
                 </div>
@@ -144,100 +198,84 @@ export const Tasks: React.FC = () => {
         </div>
       )}
 
-      {/* Create Task Modal */}
-      {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-lg border border-zinc-800 bg-[#121214] p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  <CheckSquare size={18} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white leading-tight">Create New Task</h3>
-                  <p className="text-xs text-zinc-400">Add a ticket or deliverable for your team.</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setCreateModalOpen(false)}
-                className="rounded-sm p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+      <Modal
+        open={createModalOpen}
+        onClose={handleCloseModal}
+        title="Create New Task"
+        description="Add a ticket or deliverable for your team."
+        footer={
+          <>
+            <ModalFooterCancel onClick={handleCloseModal} />
+            <Button type="submit" form="create-task-form">
+              Create Task
+            </Button>
+          </>
+        }
+      >
+        <form id="create-task-form" onSubmit={handleCreateTask} className="space-y-4">
+          <FormField label="Task Title" htmlFor="task-title" required error={titleError}>
+            <Input
+              id="task-title"
+              value={newTitle}
+              onChange={(e) => {
+                setNewTitle(e.target.value);
+                if (titleError) setTitleError('');
+              }}
+              required
+            />
+          </FormField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Priority" htmlFor="task-priority">
+              <Select
+                value={newPriority}
+                onValueChange={(val) => {
+                  if (typeof val === 'string') setNewPriority(val as TaskPriority);
+                }}
               >
-                <X size={16} />
-              </button>
-            </div>
+                <SelectTrigger id="task-priority" className="w-full">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
 
-            <form onSubmit={handleCreateTask} className="space-y-4 text-xs">
-              <div>
-                <label className="text-zinc-400 font-medium block mb-1.5">Task Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Implement WebSocket speech stream"
-                  className="h-10 w-full rounded-sm border border-zinc-800 bg-[#161618] px-3 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500/80 transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-zinc-400 font-medium block mb-1.5">Priority</label>
-                  <select
-                    value={newPriority}
-                    onChange={(e) => setNewPriority(e.target.value as TaskItem['priority'])}
-                    className="h-10 w-full rounded-sm border border-zinc-800 bg-[#161618] px-3 text-zinc-300 focus:border-emerald-500/80 transition-colors"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Urgent">Urgent</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-zinc-400 font-medium block mb-1.5">Status</label>
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value as TaskItem['status'])}
-                    className="h-10 w-full rounded-sm border border-zinc-800 bg-[#161618] px-3 text-zinc-300 focus:border-emerald-500/80 transition-colors"
-                  >
-                    <option value="To Do">To Do</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Done">Done</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-zinc-400 font-medium block mb-1.5">Assignee</label>
-                <input
-                  type="text"
-                  value={newAssignee}
-                  onChange={(e) => setNewAssignee(e.target.value)}
-                  placeholder="Team member name"
-                  className="h-10 w-full rounded-sm border border-zinc-800 bg-[#161618] px-3 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500/80 transition-colors"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800/80">
-                <button
-                  type="button"
-                  onClick={() => setCreateModalOpen(false)}
-                  className="px-3.5 py-2 rounded-sm text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                >
-                  Create Task
-                </button>
-              </div>
-            </form>
+            <FormField label="Status" htmlFor="task-status">
+              <Select
+                value={newStatus}
+                onValueChange={(val) => {
+                  if (typeof val === 'string') setNewStatus(val as TaskStatus);
+                }}
+              >
+                <SelectTrigger id="task-status" className="w-full">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
           </div>
-        </div>
-      )}
+
+          <FormField label="Assignee" htmlFor="task-assignee">
+            <Input
+              id="task-assignee"
+              value={newAssignee}
+              onChange={(e) => setNewAssignee(e.target.value)}
+            />
+          </FormField>
+        </form>
+      </Modal>
     </div>
   );
 };

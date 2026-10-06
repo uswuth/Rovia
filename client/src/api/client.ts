@@ -22,7 +22,7 @@ export const getAccessToken = () => {
 };
 
 const client = axios.create({
-  baseURL: (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:5000/api/v1',
+  baseURL: (import.meta.env.VITE_API_BASE_URL as string) || '/api/v1',
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -71,10 +71,8 @@ client.interceptors.response.use(
         original.headers.Authorization = `Bearer ${newToken}`;
         return client(original);
       } catch (refreshErr) {
+        // The refresh token is spent or invalid; the session cannot be recovered.
         setAccessToken(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('intellmeet_user');
-        }
         refreshQueue = [];
         return Promise.reject(refreshErr);
       } finally {

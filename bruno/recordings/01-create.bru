@@ -1,0 +1,25 @@
+meta {
+  name: Create Recording
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/recordings
+  body: json
+}
+
+body {
+  {
+    "contentType": "video/webm;codecs=vp8,opus"
+  }
+}
+
+script:post-response {
+  const data = res.getBody()?.data ?? {};
+  if (data.recordingId) bru.setVar("recordingId", data.recordingId);
+}
+
+docs {
+  Status is PENDING. storageKey is generated server-side and is never returned.
+}

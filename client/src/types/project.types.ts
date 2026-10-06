@@ -1,4 +1,4 @@
-export type ProjectStatus = 'active' | 'archived' | 'completed' | 'planning';
+export type ProjectStatus = 'active' | 'archived' | 'completed';
 
 export interface Project {
   id?: string;
@@ -27,6 +27,8 @@ export interface CreateProjectDTO {
   projectDescription?: string;
   status?: string;
   projectStatus?: string;
+  hosts?: string[];
+  members?: string[];
 }
 
 export const getProjectName = (p?: Project | null): string => {

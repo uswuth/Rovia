@@ -1,0 +1,10 @@
+meta {
+  name: End Meeting
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/v1/meetings/{{meetingId}}/end
+  body: none
+}

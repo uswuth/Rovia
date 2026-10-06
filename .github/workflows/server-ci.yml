@@ -2,17 +2,19 @@ name: Server CI
 
 on:
   push:
-    branches: [main, master, dev, development, aswath]
+    branches: ['**']
     paths:
       - 'server/**'
       - '.github/workflows/server-ci.yml'
       - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
   pull_request:
-    branches: [main, master, dev, development, aswath]
+    branches: ['**']
     paths:
       - 'server/**'
       - '.github/workflows/server-ci.yml'
       - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
 
 jobs:
   server-lint-and-build:
@@ -25,15 +27,15 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        # Version comes from the `packageManager` field in the root package.json.
+        # Do not pass `version:` here — action-setup errors when both are set.
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-          cache-dependency-path: 'server/pnpm-lock.yaml'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install dependencies
         run: pnpm --filter server install

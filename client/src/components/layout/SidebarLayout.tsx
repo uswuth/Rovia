@@ -1,68 +1,112 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  FolderGit2,
-  Video,
-  CheckSquare,
-  ChevronDown,
-  ChevronRight,
-  LogOut,
-  Ticket,
-  Settings as SettingsIcon,
-  Menu,
-  Building2,
-  PanelLeftClose,
-  PanelLeftOpen,
-  ChevronRight as BreadcrumbSeparator,
-} from 'lucide-react';
-import { IntellMeetLogo } from '@/components/ui/IntellMeetLogo';
-import { useAuth } from '@/context/AuthContext';
+import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Bell, CheckCheck, Video, Sparkles } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
-import { maskEmail } from '@/utils/privacy';
-import {
-  getProjectName,
-  getProjectCode,
-  getProjectStatus,
-  getProjectId,
-  type Project,
-} from '@/types/project.types';
+import { useOrganization } from '@/context/OrganizationContext';
+import { useAuth } from '@/context/AuthContext';
+import { type Project } from '@/types/project.types';
 import { InviteCodeModal } from '@/components/dashboard/InviteCodeModal';
+import { CreateProjectModal } from '@/components/dashboard/CreateProjectModal';
+import { AppSidebar } from '@/components/app-sidebar';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import { Separator } from '@/components/ui/separator';
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
 }
 
 export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
-  const { user, logout } = useAuth();
-  const { projects, selectedProject, setSelectedProject } = useProject();
+  const { addProject } = useProject();
+  const { org } = useOrganization();
+  const { refreshProfile } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
 
-  // State
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
-  const [projectsMenuOpen, setProjectsMenuOpen] = useState(true);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  // Modals state
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [inviteCode, setInviteCode] = useState('');
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  const orgName = 'Acme Corp';
-  const maskedUserEmail = maskEmail(user?.userEmail || 'arlo@solution.com');
+  // Notifications state & click-outside ref
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(3);
+  const [notificationsList, setNotificationsList] = useState([
+    {
+      id: '1',
+      title: 'Meeting Scheduled',
+      message: 'Sprint Planning meeting scheduled for 3:00 PM.',
+      time: '10m ago',
+      type: 'meeting',
+      unread: true,
+    },
+    {
+      id: '2',
+      title: 'Workspace Update',
+      message: 'You were added to the Acme Corp workspace.',
+      time: '1h ago',
+      type: 'system',
+      unread: true,
+    },
+    {
+      id: '3',
+      title: 'AI Summary Ready',
+      message: 'AI Meeting recap is available for review.',
+      time: '3h ago',
+      type: 'ai',
+      unread: true,
+    },
+  ]);
 
-  const isActive = (path: string) => location.pathname === path;
+  // Click outside to close notifications popover
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target as Node)
+      ) {
+        setNotificationsOpen(false);
+      }
+    };
 
-  const handleSelectProject = (proj: Project) => {
-    setSelectedProject(proj);
-    setProjectDropdownOpen(false);
+    if (notificationsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [notificationsOpen]);
+
+  const handleMarkAllRead = () => {
+    setNotificationsList((prev) => prev.map((n) => ({ ...n, unread: false })));
+    setUnreadCount(0);
   };
 
-  const handleGenerateNewInviteCode = (newCode: string) => {
-    setInviteCode(newCode);
+  // Regenerating the invite code changes the organization, which now comes from
+  // the auth user rather than a separate fetch, so the profile must be re-read
+  // for the new code to appear.
+  const handleGenerateNewCode = async () => {
+    await refreshProfile();
   };
 
-  // Generate Breadcrumbs string based on current location
+  // `useMutation` invalidates the projects query and `addProject` seeds the
+  // cache, so calling `refreshProjects()` here would just be a second request.
+  const handleProjectCreated = (newProj: Project) => {
+    addProject(newProj);
+    setCreateModalOpen(false);
+  };
+
+  // Generate Breadcrumbs based on current route
   const getBreadcrumbs = () => {
     const path = location.pathname;
     const items = [{ name: 'IntellMeet', path: '/dashboard' }];
@@ -74,18 +118,19 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
       const search = location.search.toLowerCase();
       if (search.includes('status=active')) {
         items.push({ name: 'Active', path: '/projects?status=active' });
-      } else if (search.includes('status=planning')) {
-        items.push({ name: 'Planning', path: '/projects?status=planning' });
+      } else if (search.includes('status=completed')) {
+        items.push({ name: 'Completed', path: '/projects?status=completed' });
       } else if (search.includes('status=archived')) {
         items.push({ name: 'Archived', path: '/projects?status=archived' });
-      } else {
-        items.push({ name: 'All Projects', path: '/projects' });
       }
-    } else if (path === '/meetings') {
+    } else if (path.startsWith('/meetings')) {
       items.push({ name: 'Meetings', path: '/meetings' });
-    } else if (path === '/tasks') {
+      if (path === '/meetings/new') {
+        items.push({ name: 'Schedule Meeting', path: '/meetings/new' });
+      }
+    } else if (path.startsWith('/tasks')) {
       items.push({ name: 'Tasks', path: '/tasks' });
-    } else if (path === '/settings') {
+    } else if (path.startsWith('/settings')) {
       items.push({ name: 'Settings', path: '/settings' });
     }
 
@@ -95,364 +140,131 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   const breadcrumbs = getBreadcrumbs();
 
   return (
-    <div className="min-h-screen flex w-full bg-[#0c0c0e] text-white font-['Plus_Jakarta_Sans']">
-      {/* Backdrop overlay for mobile */}
-      {mobileSidebarOpen && (
-        <div
-          onClick={() => setMobileSidebarOpen(false)}
-          className="lg:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-xs"
-        />
-      )}
+    <SidebarProvider defaultOpen={true}>
+      <AppSidebar
+        onOpenInviteModal={() => setInviteModalOpen(true)}
+      />
 
-      {/* Persistent Collapsible Sidebar */}
-      <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col border-r border-zinc-800/80 bg-[#121214] transition-all duration-200 ${
-          sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'
-        } ${mobileSidebarOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-      >
-        {/* TOP BRAND MARK HEADER */}
-        <div className="h-14 flex items-center justify-between px-3.5 border-b border-zinc-800/80 shrink-0">
-          <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0">
-            <IntellMeetLogo size={24} color="#ffffff" />
-            {!sidebarCollapsed && (
-              <span className="text-base font-bold tracking-tight text-white leading-tight">
-                IntellMeet
-              </span>
-            )}
-          </Link>
-        </div>
-
-        {/* MAIN NAVIGATION MENU */}
-        <nav className="flex-1 overflow-y-auto px-2.5 py-4 space-y-1.5">
-          {!sidebarCollapsed && (
-            <div className="px-2 pb-1 text-[10px] font-semibold uppercase text-zinc-400 tracking-wider">
-              Main Navigation
-            </div>
-          )}
-
-          {/* 1. Dashboard Page Link */}
-          <Link
-            to="/dashboard"
-            onClick={() => setMobileSidebarOpen(false)}
-            title="Dashboard"
-            className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-xs font-semibold transition-all ${
-              isActive('/dashboard')
-                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shadow-xs'
-                : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-white'
-            }`}
-          >
-            <LayoutDashboard size={16} className="shrink-0" />
-            {!sidebarCollapsed && <span>Dashboard</span>}
-          </Link>
-
-          {/* 2. Projects Dropdown Menu */}
-          <div>
-            <button
-              onClick={() => setProjectsMenuOpen(!projectsMenuOpen)}
-              title="Projects"
-              className={`w-full flex items-center justify-between rounded-md px-3 py-2.5 text-xs font-semibold transition-all ${
-                isActive('/projects') || location.pathname.startsWith('/projects')
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
-                  : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <FolderGit2 size={16} className="shrink-0" />
-                {!sidebarCollapsed && <span>Projects</span>}
-              </div>
-              {!sidebarCollapsed &&
-                (projectsMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
-            </button>
-
-            {/* Sub-menu items for Projects */}
-            {projectsMenuOpen && !sidebarCollapsed && (
-              <div className="ml-4 mt-1 border-l border-zinc-800/80 pl-3 space-y-1">
-                <Link
-                  to="/projects"
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className={`block rounded-sm px-2.5 py-1.5 text-xs transition-colors ${
-                    isActive('/projects') && !location.search
-                      ? 'text-emerald-400 font-semibold bg-emerald-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  All Projects
-                </Link>
-                <Link
-                  to="/projects?status=active"
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className={`block rounded-sm px-2.5 py-1.5 text-xs transition-colors ${
-                    location.search.toLowerCase().includes('status=active')
-                      ? 'text-emerald-400 font-semibold bg-emerald-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  Active
-                </Link>
-                <Link
-                  to="/projects?status=planning"
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className={`block rounded-sm px-2.5 py-1.5 text-xs transition-colors ${
-                    location.search.toLowerCase().includes('status=planning')
-                      ? 'text-emerald-400 font-semibold bg-emerald-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  Planning
-                </Link>
-                <Link
-                  to="/projects?status=archived"
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className={`block rounded-sm px-2.5 py-1.5 text-xs transition-colors ${
-                    location.search.toLowerCase().includes('status=archived')
-                      ? 'text-emerald-400 font-semibold bg-emerald-500/10'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  Archived
-                </Link>
-              </div>
-            )}
+      <SidebarInset>
+        {/* Top App Header with Trigger, Vertical Separator, Breadcrumbs & Notifications Bell */}
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-card/85 dark:bg-card/75 backdrop-blur-xl px-4 transition-[width,height] ease-linear">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="-ml-1 size-8 rounded-md text-foreground/70 hover:text-emerald-600 dark:hover:text-emerald-400 bg-transparent hover:bg-transparent border-none shadow-none transition-colors" />
+            <Separator orientation="vertical" className="h-4 bg-border" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                {breadcrumbs.map((crumb, idx) => {
+                  const isLast = idx === breadcrumbs.length - 1;
+                  return (
+                    <React.Fragment key={crumb.path + idx}>
+                      {idx > 0 && <BreadcrumbSeparator />}
+                      <BreadcrumbItem className={idx === 0 ? 'hidden sm:inline-flex' : ''}>
+                        {isLast ? (
+                          <BreadcrumbPage className="font-semibold text-foreground">{crumb.name}</BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink href={crumb.path} className="text-muted-foreground hover:text-foreground">{crumb.name}</BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                    </React.Fragment>
+                  );
+                })}
+              </BreadcrumbList>
+            </Breadcrumb>
           </div>
 
-          {/* 3. Meetings Page Link */}
-          <Link
-            to="/meetings"
-            onClick={() => setMobileSidebarOpen(false)}
-            title="Meetings"
-            className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-xs font-semibold transition-all ${
-              isActive('/meetings')
-                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shadow-xs'
-                : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-white'
-            }`}
-          >
-            <Video size={16} className="shrink-0" />
-            {!sidebarCollapsed && <span>Meetings</span>}
-          </Link>
-
-          {/* 4. Tasks Page Link */}
-          <Link
-            to="/tasks"
-            onClick={() => setMobileSidebarOpen(false)}
-            title="Tasks"
-            className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-xs font-semibold transition-all ${
-              isActive('/tasks')
-                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shadow-xs'
-                : 'text-zinc-300 hover:bg-zinc-800/60 hover:text-white'
-            }`}
-          >
-            <CheckSquare size={16} className="shrink-0" />
-            {!sidebarCollapsed && <span>Tasks</span>}
-          </Link>
-        </nav>
-
-        {/* BOTTOM FOOTER: Profile Card & Popover Menu */}
-        <div className="p-2.5 border-t border-zinc-800/80 relative bg-[#0e0e10] shrink-0">
-          {/* User Account Popover Dropdown Menu */}
-          {userMenuOpen && (
-            <div
-              className={`absolute bottom-full mb-2 rounded-md border border-zinc-800 bg-[#161618] p-1.5 shadow-2xl space-y-1 z-50 ${
-                sidebarCollapsed ? 'left-2 w-56' : 'left-2.5 right-2.5'
-              }`}
-            >
-              <div className="px-2 py-1.5 border-b border-zinc-800/80">
-                <div className="text-xs font-bold text-white">{user?.userName || 'arlo'}</div>
-                <div className="text-[10px] text-zinc-400 font-mono">{maskedUserEmail}</div>
-              </div>
-
-              {/* 1. Settings */}
+          {/* Right Header Controls: Notification Bell with Badge */}
+          <div className="relative flex items-center gap-2" ref={notificationRef}>
+            <div className="relative">
               <button
-                onClick={() => {
-                  setUserMenuOpen(false);
-                  navigate('/settings');
-                }}
-                className="w-full flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-emerald-400 transition-colors cursor-pointer"
+                onClick={() => setNotificationsOpen((prev) => !prev)}
+                aria-label="Notifications"
+                className="relative flex items-center justify-center p-1.5 bg-transparent text-foreground/70 hover:text-foreground transition-colors cursor-pointer border-none shadow-none"
               >
-                <SettingsIcon size={14} />
-                <span>Settings</span>
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white shadow-none">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
 
-              {/* 2. Invitation Code */}
-              <button
-                onClick={() => {
-                  setUserMenuOpen(false);
-                  setInviteModalOpen(true);
-                }}
-                className="w-full flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-emerald-400 transition-colors cursor-pointer"
-              >
-                <Ticket size={14} />
-                <span>Invitation Code</span>
-              </button>
-
-              {/* 3. Logout */}
-              <button
-                onClick={() => {
-                  setUserMenuOpen(false);
-                  logout();
-                }}
-                className="w-full flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-              >
-                <LogOut size={14} />
-                <span>Log Out</span>
-              </button>
-            </div>
-          )}
-
-          {/* Profile Card Button */}
-          <button
-            onClick={() => setUserMenuOpen(!userMenuOpen)}
-            title={`${user?.userName || 'arlo'} (${orgName})`}
-            className={`w-full flex items-center rounded-md hover:bg-zinc-800/50 transition-colors cursor-pointer text-left ${
-              sidebarCollapsed ? 'justify-center p-1.5' : 'justify-between p-2'
-            }`}
-          >
-            <div className={`flex items-center min-w-0 ${sidebarCollapsed ? 'justify-center' : 'gap-2'}`}>
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs border border-emerald-500/30">
-                {(user?.userName || 'A').charAt(0).toUpperCase()}
-              </div>
-              {!sidebarCollapsed && (
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-white truncate">
-                    {user?.userName || 'arlo'}
+              {/* Notification Popover Dropdown */}
+              {notificationsOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50 rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-0 space-y-0 overflow-hidden animate-in fade-in-0 zoom-in-95">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
+                    <div className="flex items-center gap-2">
+                      <Bell size={15} className="text-emerald-500" />
+                      <span className="text-xs font-bold text-foreground">Notifications</span>
+                      {unreadCount > 0 && (
+                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <CheckCheck size={13} />
+                        Mark all read
+                      </button>
+                    )}
                   </div>
-                  <div className="text-[10px] text-zinc-400 flex items-center gap-1 truncate font-medium">
-                    <Building2 size={10} className="text-zinc-500 shrink-0" />
-                    <span className="truncate">{orgName}</span>
+
+                  <div className="max-h-80 overflow-y-auto divide-y divide-border/60">
+                    {notificationsList.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`p-3.5 flex gap-3 transition-colors hover:bg-muted/50 ${
+                          item.unread ? 'bg-emerald-500/[0.03]' : ''
+                        }`}
+                      >
+                        <div className="flex shrink-0 items-center justify-center text-emerald-600 dark:text-emerald-400 pt-0.5">
+                          {item.type === 'meeting' ? <Video size={16} /> : item.type === 'ai' ? <Sparkles size={16} /> : <Bell size={16} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
+                            <span className="text-[10px] text-muted-foreground shrink-0">{item.time}</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{item.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="px-4 py-2 border-t border-border bg-muted/30 text-center">
+                    <span className="text-[10px] text-muted-foreground font-medium">
+                      Notification API integration ready
+                    </span>
                   </div>
                 </div>
               )}
             </div>
-            {!sidebarCollapsed && <ChevronDown size={14} className="text-zinc-400 shrink-0 ml-1" />}
-          </button>
-        </div>
-      </aside>
-
-      {/* Invite Code Dialog Modal */}
-      <InviteCodeModal
-        isOpen={inviteModalOpen}
-        onClose={() => setInviteModalOpen(false)}
-        inviteCode={inviteCode}
-        onGenerateNewCode={handleGenerateNewInviteCode}
-      />
-
-      {/* Main Container Area with Top Header Bar */}
-      <div
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ${
-          sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'
-        }`}
-      >
-        {/* TOP NAVIGATION HEADER: Sidebar Toggle Button, Breadcrumbs, & Project Switcher Dropdown */}
-        <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-zinc-800/80 bg-[#0c0c0e]/90 backdrop-blur-md px-4 sm:px-6">
-          {/* Left: Sidebar Collapse/Expand Toggle + Breadcrumbs */}
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Desktop & Laptop Sidebar Toggle Button */}
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-              className="hidden lg:flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all cursor-pointer"
-            >
-              {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            </button>
-
-            {/* Mobile Sidebar Toggle Button */}
-            <button
-              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-              className="lg:hidden flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/50"
-            >
-              <Menu size={18} />
-            </button>
-
-            {/* Vertical Separator */}
-            <div className="h-4 w-px bg-zinc-800 shrink-0" />
-
-            {/* Breadcrumb Navigation Trail */}
-            <nav className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium truncate">
-              {breadcrumbs.map((crumb, idx) => (
-                <React.Fragment key={crumb.path + idx}>
-                  {idx > 0 && <BreadcrumbSeparator size={12} className="text-zinc-600 shrink-0" />}
-                  {idx === breadcrumbs.length - 1 ? (
-                    <span className="font-semibold text-white truncate">{crumb.name}</span>
-                  ) : (
-                    <Link
-                      to={crumb.path}
-                      className="hover:text-zinc-200 transition-colors truncate"
-                    >
-                      {crumb.name}
-                    </Link>
-                  )}
-                </React.Fragment>
-              ))}
-            </nav>
-          </div>
-
-          {/* Right: Active Project Switcher Dropdown in Top Navigation Bar */}
-          <div className="relative shrink-0">
-            {projects.length === 0 ? (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-zinc-500 font-medium select-none">
-                <FolderGit2 size={14} className="text-zinc-600" />
-                <span>No active project</span>
-              </div>
-            ) : (
-              <>
-                <button
-                  onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
-                  className="flex items-center gap-2 rounded-md hover:bg-zinc-800/50 px-2.5 py-1 text-xs text-zinc-300 hover:text-white transition-colors cursor-pointer"
-                >
-                  <div className="flex h-5 w-5 items-center justify-center rounded-xs bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
-                    {getProjectCode(selectedProject).substring(0, 3)}
-                  </div>
-                  <span className="hidden sm:inline font-semibold text-white max-w-[160px] truncate">
-                    {getProjectName(selectedProject)}
-                  </span>
-                  <span className="sm:hidden font-semibold text-white">
-                    {getProjectCode(selectedProject)}
-                  </span>
-                  <ChevronDown size={14} className="text-zinc-400 shrink-0" />
-                </button>
-
-                {projectDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-64 z-50 rounded-md border border-zinc-800 bg-[#161618] shadow-2xl p-1.5 space-y-1">
-                    <div className="px-2 py-1 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-zinc-800/80 mb-1">
-                      Switch Project
-                    </div>
-                    {projects.map((proj) => {
-                      const pId = getProjectId(proj);
-                      const pName = getProjectName(proj);
-                      const pCode = getProjectCode(proj);
-                      const isSelected = selectedProject && getProjectId(selectedProject) === pId;
-
-                      return (
-                        <button
-                          key={pId || pName}
-                          onClick={() => handleSelectProject(proj)}
-                          className={`w-full flex items-center justify-between rounded-sm px-2.5 py-2 text-xs text-left transition-colors cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/20'
-                              : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
-                          }`}
-                        >
-                          <div className="truncate">
-                            <div className="font-medium truncate">{pName}</div>
-                            <div className="text-[10px] text-zinc-400 font-mono">
-                              {pCode} • {getProjectStatus(proj)}
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
           </div>
         </header>
 
-        {/* Page Content View Area */}
-        <main className="flex-1">{children}</main>
-      </div>
-    </div>
+        {/* Main View Area */}
+        <main className="relative flex-1 w-full bg-background text-foreground overflow-hidden">
+          <div className="relative z-10">{children}</div>
+        </main>
+      </SidebarInset>
+
+      {/* Invite Code Modal */}
+      <InviteCodeModal
+        isOpen={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        inviteCode={org.inviteCode}
+        onGenerateNewCode={handleGenerateNewCode}
+      />
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreated={handleProjectCreated}
+      />
+    </SidebarProvider>
   );
 };

@@ -1,0 +1,16 @@
+meta {
+  name: Join Meeting
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/meetings/{{meetingId}}/join
+  body: none
+}
+
+docs {
+  INVITE_ONLY + not on roster = 403.
+  OPEN_LINK + same org, under the limit = allowed.
+  A different organization always gets 404.
+}

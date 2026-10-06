@@ -37,8 +37,8 @@ export const Signup = () => {
     resolver: zodResolver(signupSchema),
     mode: 'onTouched',
     defaultValues: {
-      name: '',
-      email: '',
+      userName: '',
+      userEmail: '',
       password: '',
       isCreatingOrg: true,
       organizationName: '',
@@ -61,29 +61,33 @@ export const Signup = () => {
 
   // Debounced invite code verification
   useEffect(() => {
-    if (isCreatingOrg || !inviteCode || inviteCode.trim().length < 4) {
-      setVerifiedOrg(null);
-      setCodeError('');
-      return;
-    }
-    const t = setTimeout(async () => {
+    const t = setTimeout(() => {
+      if (isCreatingOrg || !inviteCode || inviteCode.trim().length < 4) {
+        setVerifiedOrg(null);
+        setCodeError('');
+        return;
+      }
+
       setVerifyingCode(true);
       setCodeError('');
       setVerifiedOrg(null);
-      try {
-        const { data } = await verifyInviteCode(inviteCode.trim().toUpperCase());
-        if (data?.data?.valid) {
-          setVerifiedOrg(data.data);
-          clearErrors('inviteCode');
-        }
-      } catch (err) {
-        const { message } = parseApiError(err);
-        setCodeError(message);
-        setError('inviteCode', { message });
-      } finally {
-        setVerifyingCode(false);
-      }
+      verifyInviteCode(inviteCode.trim().toUpperCase())
+        .then(({ data }) => {
+          if (data?.data?.valid) {
+            setVerifiedOrg(data.data);
+            clearErrors('inviteCode');
+          }
+        })
+        .catch((err) => {
+          const { message } = parseApiError(err);
+          setCodeError(message);
+          setError('inviteCode', { message });
+        })
+        .finally(() => {
+          setVerifyingCode(false);
+        });
     }, 450);
+
     return () => clearTimeout(t);
   }, [inviteCode, isCreatingOrg, setError, clearErrors]);
 
@@ -91,8 +95,8 @@ export const Signup = () => {
     setServerError('');
     try {
       await signup({
-        name: values.name,
-        email: values.email,
+        userName: values.userName,
+        userEmail: values.userEmail,
         password: values.password,
         isCreatingOrg: values.isCreatingOrg,
         ...(values.isCreatingOrg
@@ -116,17 +120,18 @@ export const Signup = () => {
   };
 
   const inputCls =
-    'h-9 sm:h-9.5 rounded-sm border-zinc-800 bg-[#161616] px-3.5 text-sm text-zinc-100 placeholder:text-zinc-500 shadow-none transition-colors hover:border-zinc-700 focus-visible:border-emerald-500/80 focus-visible:ring-1 focus-visible:ring-emerald-500/30';
-  const labelCls = 'text-[11px] font-medium text-zinc-400';
+    'h-9 sm:h-9.5 rounded-md border-border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground shadow-none transition-colors hover:border-emerald-500/50 focus-visible:border-emerald-500/80 focus-visible:ring-1 focus-visible:ring-emerald-500/30';
+  const labelCls = 'text-[11px] font-medium text-muted-foreground';
 
   return (
     <Box
       component="main"
+      className="bg-dots-pattern"
       sx={{
         minHeight: '100vh',
         width: '100%',
-        bgcolor: '#0c0c0e',
-        color: '#ffffff',
+        bgcolor: 'var(--background)',
+        color: 'var(--foreground)',
         overflowX: 'hidden',
       }}
     >
@@ -160,127 +165,127 @@ export const Signup = () => {
               boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
             }}
           >
-          {/* Radial Ambient Glow */}
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              pointerEvents: 'none',
-              opacity: 0.4,
-              background: 'radial-gradient(circle at 65% 40%, rgba(16, 185, 129, 0.35) 0%, transparent 65%)',
-            }}
-          />
-
-          {/* Top Brand Mark */}
-          <Box sx={{ position: 'relative', zIndex: 10 }}>
-            <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-              <IntellMeetLogo size={26} color="#ffffff" />
-              <Typography
-                sx={{
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '1.05rem',
-                  letterSpacing: '-0.025em',
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                }}
-              >
-                IntellMeet
-              </Typography>
-            </Stack>
-          </Box>
-
-          {/* Bottom Hero & Step Indicator Cards */}
-          <Stack spacing={4} sx={{ position: 'relative', zIndex: 10, width: '100%' }}>
-            {/* Header: Title on Left, Subtitle on Right */}
-            <Stack
-              direction={{ xs: 'column', xl: 'row' }}
-              spacing={2}
+            {/* Radial Ambient Glow */}
+            <Box
               sx={{
-                justifyContent: 'space-between',
-                alignItems: { xs: 'flex-start', xl: 'flex-end' },
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                opacity: 0.4,
+                background: 'radial-gradient(circle at 65% 40%, rgba(16, 185, 129, 0.35) 0%, transparent 65%)',
               }}
-            >
-              <Typography
-                component="h1"
-                sx={{
-                  fontSize: { xs: '2rem', xl: '2.5rem' },
-                  fontWeight: 700,
-                  lineHeight: 1.15,
-                  color: '#ffffff',
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                Get Started<br />with Us
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '0.875rem',
-                  color: 'rgba(167, 243, 208, 0.75)',
-                  maxWidth: 240,
-                  lineHeight: 1.5,
-                  pb: { xl: 0.5 },
-                }}
-              >
-                Complete these easy steps to register your account.
-              </Typography>
-            </Stack>
+            />
 
-            {/* 3 Step Cards using MUI Grid */}
-            <Grid container spacing={1.75}>
-              {[
-                { n: '1', label: 'Sign up your\naccount', active: true },
-                { n: '2', label: 'Set up your\nworkspace', active: false },
-                { n: '3', label: 'Set up your\nprofile', active: false },
-              ].map((step) => (
-                <Grid key={step.n} size={{ xs: 4 }}>
-                  <Box
-                    sx={{
-                      p: { xs: 1.75, xl: 2 },
-                      height: '100%',
-                      borderRadius: '12px',
-                      transition: 'all 0.2s ease',
-                      border: step.active ? '1px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
-                      bgcolor: step.active ? '#ffffff' : 'rgba(255, 255, 255, 0.07)',
-                      color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.8)',
-                      backdropFilter: step.active ? 'none' : 'blur(4px)',
-                      boxShadow: step.active ? '0 10px 25px -5px rgba(0, 0, 0, 0.4)' : 'none',
-                    }}
-                  >
+            {/* Top Brand Mark */}
+            <Box sx={{ position: 'relative', zIndex: 10 }}>
+              <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                <IntellMeetLogo size={26} />
+                <Typography
+                  sx={{
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '1.05rem',
+                    letterSpacing: '-0.025em',
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  }}
+                >
+                  Intell<span style={{ color: '#34d399' }}>Meet</span>
+                </Typography>
+              </Stack>
+            </Box>
+
+            {/* Bottom Hero & Step Indicator Cards */}
+            <Stack spacing={4} sx={{ position: 'relative', zIndex: 10, width: '100%' }}>
+              {/* Header: Title on Left, Subtitle on Right */}
+              <Stack
+                direction={{ xs: 'column', xl: 'row' }}
+                spacing={2}
+                sx={{
+                  justifyContent: 'space-between',
+                  alignItems: { xs: 'flex-start', xl: 'flex-end' },
+                }}
+              >
+                <Typography
+                  component="h1"
+                  sx={{
+                    fontSize: { xs: '2rem', xl: '2.5rem' },
+                    fontWeight: 700,
+                    lineHeight: 1.15,
+                    color: '#ffffff',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  Get Started<br />with Us
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.875rem',
+                    color: 'rgba(167, 243, 208, 0.75)',
+                    maxWidth: 240,
+                    lineHeight: 1.5,
+                    pb: { xl: 0.5 },
+                  }}
+                >
+                  Complete these easy steps to register your account.
+                </Typography>
+              </Stack>
+
+              {/* 3 Step Cards using MUI Grid */}
+              <Grid container spacing={1.75}>
+                {[
+                  { n: '1', label: 'Sign up your\naccount', active: true },
+                  { n: '2', label: 'Set up your\nworkspace', active: false },
+                  { n: '3', label: 'Set up your\nprofile', active: false },
+                ].map((step) => (
+                  <Grid key={step.n} size={{ xs: 4 }}>
                     <Box
                       sx={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        mb: 1.5,
-                        bgcolor: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.2)',
-                        color: '#ffffff',
+                        p: { lg: 1.25, xl: 1.75 },
+                        height: '100%',
+                        borderRadius: '12px',
+                        transition: 'all 0.2s ease',
+                        border: step.active ? '1px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
+                        bgcolor: step.active ? '#ffffff' : 'rgba(255, 255, 255, 0.07)',
+                        color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: step.active ? 'none' : 'blur(4px)',
+                        boxShadow: step.active ? '0 10px 25px -5px rgba(0, 0, 0, 0.4)' : 'none',
                       }}
                     >
-                      {step.n}
+                      <Box
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          mb: 1.25,
+                          bgcolor: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.2)',
+                          color: '#ffffff',
+                        }}
+                      >
+                        {step.n}
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontSize: { lg: '0.72rem', xl: '0.75rem' },
+                          fontWeight: 600,
+                          lineHeight: 1.35,
+                          whiteSpace: 'pre-line',
+                          color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.85)',
+                        }}
+                      >
+                        {step.label}
+                      </Typography>
                     </Box>
-                    <Typography
-                      sx={{
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        lineHeight: 1.35,
-                        whiteSpace: 'pre-line',
-                        color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.85)',
-                      }}
-                    >
-                      {step.label}
-                    </Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </Stack>
-        </Box>
-      </Grid>
+                  </Grid>
+                ))}
+              </Grid>
+            </Stack>
+          </Box>
+        </Grid>
 
         {/* ── Right Form Panel (MUI Layout) ── */}
         <Grid
@@ -292,9 +297,9 @@ export const Signup = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            px: { xs: 3, sm: 6, lg: 8 },
+            px: { xs: 2, sm: 6, lg: 8 },
             py: { xs: 2.5, sm: 3, lg: 1.5 },
-            bgcolor: '#0c0c0e',
+            bgcolor: { xs: 'transparent', lg: 'var(--background)' },
             '&::-webkit-scrollbar': {
               width: '6px',
             },
@@ -302,16 +307,34 @@ export const Signup = () => {
               background: 'transparent',
             },
             '&::-webkit-scrollbar-thumb': {
-              background: '#27272a',
+              background: 'var(--border)',
               borderRadius: '3px',
             },
             '&::-webkit-scrollbar-thumb:hover': {
-              background: '#3f3f46',
+              background: 'var(--muted-foreground)',
             },
           }}
         >
           <Box sx={{ width: '100%', maxWidth: 440, mx: 'auto', my: 'auto' }}>
             <Stack spacing={1.5}>
+              {/* Brand Logo Header for Small Screens (< 1200px) */}
+              <Box sx={{ display: { xs: 'flex', lg: 'none' }, justifyContent: { xs: 'center', sm: 'flex-start' }, mb: 0.5 }}>
+                <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                  <IntellMeetLogo size={26} />
+                  <Typography
+                    sx={{
+                      color: 'var(--foreground)',
+                      fontWeight: 700,
+                      fontSize: '1.2rem',
+                      letterSpacing: '-0.025em',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                  >
+                    Intell<span className="text-emerald-600 dark:text-emerald-400">Meet</span>
+                  </Typography>
+                </Stack>
+              </Box>
+
               {/* Header */}
               <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
                 <Typography
@@ -320,25 +343,25 @@ export const Signup = () => {
                     fontSize: { xs: '1.35rem', sm: '1.55rem' },
                     fontWeight: 700,
                     letterSpacing: '-0.02em',
-                    color: '#ffffff',
+                    color: 'var(--foreground)',
                   }}
                 >
-                  Sign Up Account
+                  Create Your Account
                 </Typography>
-                <Typography sx={{ fontSize: '0.8rem', color: '#a1a1aa', mt: 0.25 }}>
-                  Enter your personal data to create your account.
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', mt: 0.25 }}>
+                  Get started with your IntellMeet workspace in seconds.
                 </Typography>
               </Box>
 
-              {/* Mode Toggle with clean borders & sharp corners */}
+              {/* Mode Toggle */}
               <Grid
                 container
                 spacing={0.75}
                 sx={{
                   p: 0.5,
-                  bgcolor: '#141416',
-                  border: '1px solid #27272a',
-                  borderRadius: '2px',
+                  bgcolor: 'var(--secondary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
                 }}
               >
                 <Grid size={{ xs: 6 }}>
@@ -346,9 +369,9 @@ export const Signup = () => {
                     type="button"
                     onClick={() => setValue('isCreatingOrg', true)}
                     aria-pressed={isCreatingOrg}
-                    className={`w-full py-1.5 px-3 rounded-sm text-xs font-semibold transition-all border ${isCreatingOrg
-                      ? 'bg-zinc-800 text-white border-zinc-700/80 shadow-sm'
-                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    className={`w-full py-1.5 px-3 rounded-md text-xs font-semibold transition-all border cursor-pointer ${isCreatingOrg
+                      ? 'bg-card text-foreground border-border shadow-xs'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                   >
                     Create Org
@@ -359,9 +382,9 @@ export const Signup = () => {
                     type="button"
                     onClick={() => setValue('isCreatingOrg', false)}
                     aria-pressed={!isCreatingOrg}
-                    className={`w-full py-1.5 px-3 rounded-sm text-xs font-semibold transition-all border ${!isCreatingOrg
-                      ? 'bg-zinc-800 text-white border-zinc-700/80 shadow-sm'
-                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    className={`w-full py-1.5 px-3 rounded-md text-xs font-semibold transition-all border cursor-pointer ${!isCreatingOrg
+                      ? 'bg-card text-foreground border-border shadow-xs'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                   >
                     Join via Invite
@@ -374,10 +397,10 @@ export const Signup = () => {
                   role="alert"
                   sx={{
                     p: 1.75,
-                    borderRadius: '2px',
-                    bgcolor: 'rgba(127, 29, 29, 0.4)',
-                    border: '1px solid rgba(153, 27, 27, 0.5)',
-                    color: '#fca5a5',
+                    borderRadius: '6px',
+                    bgcolor: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#ef4444',
                     fontSize: '0.75rem',
                     lineHeight: 1.5,
                   }}
@@ -390,48 +413,48 @@ export const Signup = () => {
                 <Stack spacing={1.25}>
                   {/* Full Name */}
                   <Stack spacing={0.5}>
-                    <Label htmlFor="name" className={labelCls}>
+                    <Label htmlFor="userName" className={labelCls}>
                       Full Name
                     </Label>
                     <Box sx={{ position: 'relative' }}>
-                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                       <Input
-                        id="name"
+                        id="userName"
                         type="text"
                         autoComplete="name"
-                        aria-invalid={!!errors.name}
-                        aria-describedby={errors.name ? 'name-err' : undefined}
+                        aria-invalid={!!errors.userName}
+                        aria-describedby={errors.userName ? 'userName-err' : undefined}
                         className={`${inputCls} pl-10`}
-                        {...register('name')}
+                        {...register('userName')}
                       />
                     </Box>
-                    {errors.name && (
-                      <p id="name-err" role="alert" className="text-[11px] leading-tight text-red-400 mt-0.5">
-                        {errors.name.message}
+                    {errors.userName && (
+                      <p id="userName-err" role="alert" className="text-[11px] leading-tight text-red-500 mt-0.5">
+                        {errors.userName.message}
                       </p>
                     )}
                   </Stack>
 
                   {/* Email */}
                   <Stack spacing={0.5}>
-                    <Label htmlFor="email" className={labelCls}>
+                    <Label htmlFor="userEmail" className={labelCls}>
                       Email
                     </Label>
                     <Box sx={{ position: 'relative' }}>
-                      <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                      <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                       <Input
-                        id="email"
+                        id="userEmail"
                         type="email"
                         autoComplete="email"
-                        aria-invalid={!!errors.email}
-                        aria-describedby={errors.email ? 'email-err' : undefined}
+                        aria-invalid={!!errors.userEmail}
+                        aria-describedby={errors.userEmail ? 'userEmail-err' : undefined}
                         className={`${inputCls} pl-10`}
-                        {...register('email')}
+                        {...register('userEmail')}
                       />
                     </Box>
-                    {errors.email && (
-                      <p id="email-err" role="alert" className="text-[11px] leading-tight text-red-400 mt-0.5">
-                        {errors.email.message}
+                    {errors.userEmail && (
+                      <p id="userEmail-err" role="alert" className="text-[11px] leading-tight text-red-500 mt-0.5">
+                        {errors.userEmail.message}
                       </p>
                     )}
                   </Stack>
@@ -442,7 +465,7 @@ export const Signup = () => {
                       Password
                     </Label>
                     <Box sx={{ position: 'relative' }}>
-                      <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                      <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                       <Input
                         id="password"
                         type={showPassword ? 'text' : 'password'}
@@ -456,20 +479,20 @@ export const Signup = () => {
                         type="button"
                         onClick={() => setShowPassword((p) => !p)}
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-200 transition-colors"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </Box>
                     {errors.password && (
-                      <p id="pass-err" role="alert" className="text-[11px] leading-tight text-red-400 mt-0.5">
+                      <p id="pass-err" role="alert" className="text-[11px] leading-tight text-red-500 mt-0.5">
                         {errors.password.message}
                       </p>
                     )}
                   </Stack>
 
                   {/* Conditional Organization / Invite Section */}
-                  <Box sx={{ pt: 1.5, borderTop: '1px solid rgba(39, 39, 42, 0.8)' }}>
+                  <Box sx={{ pt: 1.5, borderTop: '1px solid var(--border)' }}>
                     {isCreatingOrg ? (
                       <Stack spacing={1.5}>
                         <Stack spacing={0.5}>
@@ -477,7 +500,7 @@ export const Signup = () => {
                             Organization Name
                           </Label>
                           <Box sx={{ position: 'relative' }}>
-                            <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                            <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                             <Input
                               id="organizationName"
                               type="text"
@@ -488,7 +511,7 @@ export const Signup = () => {
                             />
                           </Box>
                           {errors.organizationName && (
-                            <p id="org-err" role="alert" className="text-[11px] leading-tight text-red-400 mt-0.5">
+                            <p id="org-err" role="alert" className="text-[11px] leading-tight text-red-500 mt-0.5">
                               {errors.organizationName.message}
                             </p>
                           )}
@@ -498,10 +521,10 @@ export const Signup = () => {
                           <Grid size={{ xs: 12, sm: 6 }}>
                             <Stack spacing={0.5}>
                               <Label htmlFor="organizationLocation" className={labelCls}>
-                                Location <span className="text-zinc-500 font-normal">(optional)</span>
+                                Location <span className="text-muted-foreground font-normal">(optional)</span>
                               </Label>
                               <Box sx={{ position: 'relative' }}>
-                                <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                                <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                                 <Input
                                   id="organizationLocation"
                                   type="text"
@@ -517,7 +540,7 @@ export const Signup = () => {
                                 URL Slug
                               </Label>
                               <Box sx={{ position: 'relative' }}>
-                                <Globe size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                                <Globe size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                                 <Input
                                   id="organizationSlug"
                                   type="text"
@@ -535,7 +558,7 @@ export const Signup = () => {
                           Invite Code
                         </Label>
                         <Box sx={{ position: 'relative' }}>
-                          <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                          <KeyRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                           <Input
                             id="inviteCode"
                             type="text"
@@ -557,17 +580,17 @@ export const Signup = () => {
                             }}
                             aria-live="polite"
                           >
-                            {verifyingCode && <Loader2 size={15} className="animate-spin text-emerald-400" />}
-                            {!verifyingCode && verifiedOrg && <CheckCircle2 size={15} className="text-emerald-400" />}
+                            {verifyingCode && <Loader2 size={15} className="animate-spin text-emerald-500" />}
+                            {!verifyingCode && verifiedOrg && <CheckCircle2 size={15} className="text-emerald-500" />}
                           </Box>
                         </Box>
                         {verifiedOrg && (
-                          <p id="invite-status" role="status" className="text-xs text-emerald-400 font-medium">
+                          <p id="invite-status" role="status" className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                             ✓ Joining <strong>{verifiedOrg.organizationName}</strong>
                           </p>
                         )}
                         {(errors.inviteCode || codeError) && (
-                          <p className="text-[11px] leading-tight text-red-400 mt-0.5" role="alert">
+                          <p className="text-[11px] leading-tight text-red-500 mt-0.5" role="alert">
                             {errors.inviteCode?.message || codeError}
                           </p>
                         )}
@@ -578,7 +601,7 @@ export const Signup = () => {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-9 mt-0.5 bg-white hover:bg-zinc-200 text-zinc-950 font-semibold text-sm rounded-sm transition-colors shadow-sm"
+                    className="w-full h-9.5 mt-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm rounded-md transition-colors shadow-sm cursor-pointer"
                   >
                     {isSubmitting ? (
                       <>
@@ -591,9 +614,9 @@ export const Signup = () => {
                 </Stack>
               </form>
 
-              <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: '#a1a1aa', pt: 0.5 }}>
+              <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--muted-foreground)', pt: 0.5 }}>
                 Already have an account?{' '}
-                <Link to="/login" className="text-white font-medium hover:underline">
+                <Link to="/login" className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline">
                   Log in
                 </Link>
               </Typography>
