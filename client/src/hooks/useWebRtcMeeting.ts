@@ -36,7 +36,9 @@ export const useWebRtcMeeting = (
   // and re-rendering on every change would thrash the video elements.
   const connections = useRef<Record<string, RTCPeerConnection>>({});
   const onPeerLeftRef = useRef(options?.onPeerLeft);
-  onPeerLeftRef.current = options?.onPeerLeft;
+  useEffect(() => {
+    onPeerLeftRef.current = options?.onPeerLeft;
+  }, [options?.onPeerLeft]);
 
   const upsertPeer = useCallback((userId: string, patch: Partial<PeerState>) => {
     setPeers((prev) => ({

@@ -51,8 +51,8 @@ export const MembersTable: React.FC<MembersTableProps> = ({
   // Active filter logic & normalization for any backend format (User or Member)
   const filteredData: Member[] = useMemo(() => {
     return initialMembers
-      .map((m: Member): Member => ({
-        id: m.id || m._id || m.userId || Math.random().toString(),
+      .map((m: Member, idx: number): Member => ({
+        id: m.id || m._id || m.userId || `member-${idx}`,
         name: m.name || m.userName || m.userEmail || 'Team Member',
         email: canSeeEmail ? (m.email || m.userEmail || '') : '',
         role: (m.role || m.userRole || 'Member') as MemberRole,

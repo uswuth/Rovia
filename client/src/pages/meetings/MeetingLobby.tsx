@@ -219,20 +219,29 @@ export const MeetingLobby: React.FC = () => {
     }
   };
 
+  const streamRef = useRef<MediaStream | null>(null);
   useEffect(() => {
-    void startMedia();
+    streamRef.current = stream;
+  }, [stream]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void startMedia();
+    }, 0);
 
     return () => {
+      clearTimeout(timer);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         void audioContextRef.current.close();
       }
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sync video element

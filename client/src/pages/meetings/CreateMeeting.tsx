@@ -138,10 +138,8 @@ export const CreateMeeting: React.FC = () => {
 
   const defaultEnd = useMemo(() => {
     const startDate = new Date(defaultStart);
-    if (!isNaN(startDate.getTime())) {
-      return new Date(startDate.getTime() + 30 * 60 * 1000).toISOString();
-    }
-    return new Date(Date.now() + 90 * 60 * 1000).toISOString();
+    const baseTime = !isNaN(startDate.getTime()) ? startDate.getTime() : 0;
+    return new Date(baseTime + 30 * 60 * 1000).toISOString();
   }, [defaultStart]);
 
   const [meetingEndAt, setMeetingEndAt] = useState<string>(defaultEnd);

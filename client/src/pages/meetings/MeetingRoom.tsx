@@ -2,12 +2,10 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Users, Copy, Check, Mic, MicOff, Video, VideoOff, MonitorUp,
-  PhoneOff, MessageSquare, BarChart3, Lock, Hand, Settings,
-  ChevronUp, AlertCircle, Shield, X, Radio, Sparkles, Maximize2, Minimize2
+  PhoneOff, MessageSquare, BarChart3, Hand, Settings,
+  ChevronUp, AlertCircle, Radio, Sparkles, Maximize2, Minimize2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -33,13 +31,13 @@ import { ParticipantSettingsModal, type ParticipantPermissions } from '@/compone
 import { MeetingQuestions } from '@/components/meetings/MeetingQuestions';
 import { MeetingPolls } from '@/components/meetings/MeetingPolls';
 import type { Meeting, MeetingParticipant } from '@/api/meeting/meeting.types';
-import { getMeetingQuestions, askQuestion, answerQuestion, dismissQuestion, type MeetingQuestion } from '@/api/meeting/meeting-qa.api';
-import { getMeetingPolls, createPoll, votePoll, closePoll, type MeetingPoll } from '@/api/meeting/meeting-poll.api';
+import { askQuestion, answerQuestion, dismissQuestion, type MeetingQuestion } from '@/api/meeting/meeting-qa.api';
+import { createPoll, votePoll, closePoll, type MeetingPoll } from '@/api/meeting/meeting-poll.api';
 import { useWebRtcMeeting } from '@/hooks/useWebRtcMeeting';
 
 /** One video tile. Hand raised indicator appears when hand is raised. */
 const VideoTile = ({
-  name, isYou, host, isVisitor, muted, cameraOn, stream, handRaised,
+  name, isYou, host, muted, cameraOn, stream, handRaised,
 }: {
   name: string; isYou: boolean; host: boolean; isVisitor?: boolean; muted: boolean; cameraOn: boolean; stream?: MediaStream | null; handRaised?: boolean;
 }) => {

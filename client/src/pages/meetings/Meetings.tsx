@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Video, Calendar, Clock, Users, Play, Plus, FolderGit2, Search, X } from 'lucide-react';
@@ -82,8 +83,6 @@ export const Meetings: React.FC = () => {
     { enabled: isAuthenticated, list: true }
   );
 
-  const rawMeetings = meetings ?? [];
-
   // Join-window status depends on the current time
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -93,6 +92,7 @@ export const Meetings: React.FC = () => {
 
   // Always sort meetings by last created first (newest creation date or ObjectId timestamp at top)
   const sortedMeetings = useMemo(() => {
+    const rawMeetings = meetings ?? [];
     return [...rawMeetings].sort((a, b) => {
       const timeA = new Date(a.createdAt || a.meetingScheduledAt || 0).getTime();
       const timeB = new Date(b.createdAt || b.meetingScheduledAt || 0).getTime();
@@ -101,7 +101,7 @@ export const Meetings: React.FC = () => {
       }
       return (b.meetingId || '').localeCompare(a.meetingId || '');
     });
-  }, [rawMeetings]);
+  }, [meetings]);
 
   // Filter meetings based on active search query and tab selection
   const displayedMeetings = useMemo(() => {

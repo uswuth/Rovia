@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 
 export type TimeFormat = '12h' | '24h';
 
@@ -39,22 +40,28 @@ export const TimeFormatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const formatTimeStr = (dateInput: string | Date | number): string => {
-    const d = new Date(dateInput);
-    if (isNaN(d.getTime())) return String(dateInput);
-    if (timeFormat === '24h') {
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    }
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
+  const formatTimeStr = useCallback(
+    (dateInput: string | Date | number): string => {
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) return String(dateInput);
+      if (timeFormat === '24h') {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      }
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    },
+    [timeFormat]
+  );
 
-  const formatDateTimeStr = (dateInput: string | Date | number): string => {
-    const d = new Date(dateInput);
-    if (isNaN(d.getTime())) return String(dateInput);
-    const datePart = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    const timePart = formatTimeStr(d);
-    return `${datePart}, ${timePart}`;
-  };
+  const formatDateTimeStr = useCallback(
+    (dateInput: string | Date | number): string => {
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) return String(dateInput);
+      const datePart = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const timePart = formatTimeStr(d);
+      return `${datePart}, ${timePart}`;
+    },
+    [formatTimeStr]
+  );
 
   const value = useMemo(
     () => ({
@@ -63,7 +70,7 @@ export const TimeFormatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       formatTimeStr,
       formatDateTimeStr,
     }),
-    [timeFormat]
+    [timeFormat, formatTimeStr, formatDateTimeStr]
   );
 
   return <TimeFormatContext.Provider value={value}>{children}</TimeFormatContext.Provider>;
