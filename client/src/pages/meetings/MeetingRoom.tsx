@@ -682,7 +682,7 @@ export const MeetingRoom: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                setMicOn((on) => {
+                setMicOn((on: boolean) => {
                   const next = !on;
                   rtc.setAudioEnabled(next);
                   return next;
@@ -712,7 +712,7 @@ export const MeetingRoom: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-muted-foreground block">Microphone</label>
-                  <Select value={selectedMic} onValueChange={setSelectedMic}>
+                  <Select value={selectedMic} onValueChange={(val) => { if (typeof val === 'string') setSelectedMic(val); }}>
                     <SelectTrigger className="w-full h-8 text-xs">
                       <SelectValue placeholder="Select Microphone" />
                     </SelectTrigger>
@@ -727,7 +727,7 @@ export const MeetingRoom: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-muted-foreground block">Speaker</label>
-                  <Select value={selectedSpeaker} onValueChange={setSelectedSpeaker}>
+                  <Select value={selectedSpeaker} onValueChange={(val) => { if (typeof val === 'string') setSelectedSpeaker(val); }}>
                     <SelectTrigger className="w-full h-8 text-xs">
                       <SelectValue placeholder="Select Speaker" />
                     </SelectTrigger>
@@ -749,7 +749,7 @@ export const MeetingRoom: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                setCameraOn((on) => {
+                setCameraOn((on: boolean) => {
                   const next = !on;
                   rtc.setVideoEnabled(next);
                   return next;
@@ -779,7 +779,7 @@ export const MeetingRoom: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-muted-foreground block">Camera</label>
-                  <Select value={selectedCamera} onValueChange={setSelectedCamera}>
+                  <Select value={selectedCamera} onValueChange={(val) => { if (typeof val === 'string') setSelectedCamera(val); }}>
                     <SelectTrigger className="w-full h-8 text-xs">
                       <SelectValue placeholder="Select Camera" />
                     </SelectTrigger>

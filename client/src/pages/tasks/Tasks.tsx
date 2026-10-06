@@ -5,7 +5,13 @@ import { getProjectName } from '@/types/project.types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Modal, ModalFooterCancel } from '@/components/ui/modal';
 import { FormField } from '@/components/ui/form-field';
@@ -222,20 +228,42 @@ export const Tasks: React.FC = () => {
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Priority" htmlFor="task-priority">
               <Select
-                id="task-priority"
                 value={newPriority}
-                onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
-                options={PRIORITY_OPTIONS}
-              />
+                onValueChange={(val) => {
+                  if (typeof val === 'string') setNewPriority(val as TaskPriority);
+                }}
+              >
+                <SelectTrigger id="task-priority" className="w-full">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FormField>
 
             <FormField label="Status" htmlFor="task-status">
               <Select
-                id="task-status"
                 value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value as TaskStatus)}
-                options={STATUS_OPTIONS}
-              />
+                onValueChange={(val) => {
+                  if (typeof val === 'string') setNewStatus(val as TaskStatus);
+                }}
+              >
+                <SelectTrigger id="task-status" className="w-full">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FormField>
           </div>
 

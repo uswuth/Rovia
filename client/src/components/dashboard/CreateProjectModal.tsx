@@ -8,7 +8,13 @@ import { queryKeys } from '@/api/queryClient';
 import { Modal, ModalFooterCancel } from '@/components/ui/modal';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 
 const STATUS_OPTIONS = [
@@ -131,12 +137,22 @@ const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
 
         <FormField label="Initial Status" htmlFor="project-status">
           <Select
-            id="project-status"
-            name="status"
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            options={STATUS_OPTIONS}
-          />
+            onValueChange={(val) => {
+              if (typeof val === 'string') setStatus(val);
+            }}
+          >
+            <SelectTrigger id="project-status" className="w-full">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </FormField>
       </form>
     </Modal>

@@ -180,6 +180,7 @@ export const Projects: React.FC = () => {
       width: '80px',
       cell: (project) => {
         const pId = getProjectId(project);
+        const pCode = getProjectCode(project);
         const pStatus = getProjectStatus(project).toLowerCase();
         const isReadOnly = pStatus === 'completed' || pStatus === 'archived';
 

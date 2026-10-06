@@ -544,9 +544,11 @@ export const MeetingLobby: React.FC = () => {
                       <label className="text-[11px] font-medium text-muted-foreground block">Camera</label>
                       <Select
                         value={selectedCamera}
-                        onValueChange={(val: string) => {
-                          setSelectedCamera(val);
-                          void startMedia(selectedMic, val);
+                        onValueChange={(val) => {
+                          if (typeof val === 'string') {
+                            setSelectedCamera(val);
+                            void startMedia(selectedMic, val);
+                          }
                         }}
                       >
                         <SelectTrigger className="w-full h-9 rounded-md border-border bg-background px-3 text-xs text-foreground min-w-0" title={cameraTriggerLabel}>
@@ -570,9 +572,11 @@ export const MeetingLobby: React.FC = () => {
                       <label className="text-[11px] font-medium text-muted-foreground block">Microphone</label>
                       <Select
                         value={selectedMic}
-                        onValueChange={(val: string) => {
-                          setSelectedMic(val);
-                          void startMedia(val, selectedCamera);
+                        onValueChange={(val) => {
+                          if (typeof val === 'string') {
+                            setSelectedMic(val);
+                            void startMedia(val, selectedCamera);
+                          }
                         }}
                       >
                         <SelectTrigger className="w-full h-9 rounded-md border-border bg-background px-3 text-xs text-foreground min-w-0" title={micTriggerLabel}>
@@ -596,7 +600,9 @@ export const MeetingLobby: React.FC = () => {
                       <label className="text-[11px] font-medium text-muted-foreground block">Speaker</label>
                       <Select
                         value={selectedSpeaker}
-                        onValueChange={(val: string) => setSelectedSpeaker(val)}
+                        onValueChange={(val) => {
+                          if (typeof val === 'string') setSelectedSpeaker(val);
+                        }}
                       >
                         <SelectTrigger className="w-full h-9 rounded-md border-border bg-background px-3 text-xs text-foreground min-w-0" title={speakerTriggerLabel}>
                           <span className="truncate flex-1 text-left">{speakerTriggerLabel}</span>
