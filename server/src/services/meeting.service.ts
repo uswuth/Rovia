@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import {
   Meeting,
   MeetingDocument,
@@ -10,7 +9,7 @@ import { Project } from '../models/project.model.js';
 import { User } from '../models/user.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { validateTitle } from '../utils/validation.js';
-import { generateSessionCode } from '../utils/codeGenerator.js';
+import { generateSessionCode, CodeGeneratorModel } from '../utils/codeGenerator.js';
 import { assertObjectId, toObjectIdString } from '../utils/objectId.js';
 import { requireOrganizationId } from '../utils/scope.js';
 import { findPaginated } from '../utils/paginatedFind.js';
@@ -175,7 +174,7 @@ export const createMeetingService = async (
     );
   }
 
-  const joinCode = await generateSessionCode(Meeting as any, organizationId);
+  const joinCode = await generateSessionCode(Meeting as unknown as CodeGeneratorModel, organizationId);
 
   const meeting = new Meeting({
     organization_id: organizationId,

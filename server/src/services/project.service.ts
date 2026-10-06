@@ -1,6 +1,5 @@
 import { Project } from '../models/project.model.js';
 import { User } from '../models/user.model.js';
-import { Organization } from '../models/organization.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { validateTitle } from '../utils/validation.js';
 import {
@@ -11,7 +10,7 @@ import {
   IUpdateProjectMemberRoleInput,
   ProjectRole
 } from '../types/index.js';
-import { generateProjectCode } from '../utils/codeGenerator.js';
+import { generateProjectCode, CodeGeneratorModel } from '../utils/codeGenerator.js';
 import { getPagination, buildPaginatedResult } from '../utils/pagination.js';
 import { findPaginated } from '../utils/paginatedFind.js';
 import { assertObjectId, toObjectIdString } from '../utils/objectId.js';
@@ -180,7 +179,7 @@ export const createProjectService = async (
   const projectHosts = input.projectHosts || input.hosts;
   const projectMembers = input.projectMembers || input.members;
 
-  const generatedProjectCode = await generateProjectCode(Project as any, organizationId);
+  const generatedProjectCode = await generateProjectCode(Project as unknown as CodeGeneratorModel, organizationId);
 
   const projectData: Record<string, unknown> = {
     project_name: projectName,

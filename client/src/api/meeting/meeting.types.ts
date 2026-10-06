@@ -30,6 +30,7 @@ export interface Meeting {
   organizationId: string;
   projectId: string;
   createdBy: string;
+  createdAt?: string;
   startedAt?: string | null;
   endedAt?: string | null;
   participants: MeetingParticipant[];
