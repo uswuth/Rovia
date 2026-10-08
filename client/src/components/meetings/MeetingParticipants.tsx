@@ -25,12 +25,6 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
 }) => {
   const { user } = useAuth();
   const { members: orgMembers } = useOrganization();
-  const isTopAdmin = Boolean(
-    user?.isSuperAdmin ||
-    ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes((user?.userRole || '').toUpperCase())
-  );
-  const isHost = canManage || (user?.userRole || '').toUpperCase() === 'HOST';
-  const canSeeVisitorRole = isTopAdmin || isHost;
 
   // Filter out participants who have left
   const activeParticipants = (participants ?? []).filter(
@@ -59,13 +53,10 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
 
         let avatarUrl = participant.avatarUrl || (participant as unknown as Record<string, string>)?.avatar || (isYou ? user?.avatarUrl : '');
         if (!displayName && orgMembers) {
-          const matched = orgMembers.find((m) => {
-            const mId = getMemberId(m);
-            return mId === uId || m.id === uId || (m as unknown as Record<string, string>)._id === uId;
-          });
+          const matched = orgMembers.find((m) => getMemberId(m) === uId);
           if (matched) {
-            displayName = matched.name || matched.userName || matched.email;
-            if (!avatarUrl) avatarUrl = (matched as unknown as Record<string, string>).avatarUrl || (matched as unknown as Record<string, string>).avatar || '';
+            displayName = matched.userName || matched.userEmail;
+            if (!avatarUrl) avatarUrl = matched.avatarUrl || '';
           }
         }
 
@@ -77,7 +68,7 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
 
         return (
           <li
-            key={uId}
+            key={`${uId}-${index}`}
             className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-xs"
           >
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -96,8 +87,8 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
                   {displayName} {isYou ? '(You)' : ''}
                 </p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                  {role !== 'MEMBER' && (role !== 'VISITOR' || canSeeVisitorRole) && (
-                    <Badge tone={role === 'VISITOR' ? 'warning' : 'accent'} className="text-[10px] py-0 px-1.5">
+                  {role !== 'MEMBER' && (
+                    <Badge tone="accent" className="text-[10px] py-0 px-1.5">
                       <Shield size={9} />
                       {(role || '').toLowerCase()}
                     </Badge>

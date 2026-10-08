@@ -3,7 +3,7 @@ export interface User {
   userId: string;
   userName: string;
   userEmail: string;
-  userRole: 'SuperAdmin' | 'Admin' | 'Member' | 'Visitor';
+  userRole: 'SuperAdmin' | 'Admin' | 'Member';
   isSuperAdmin: boolean;
   avatarUrl: string;
   organizationId?: string | OrganizationSummary;

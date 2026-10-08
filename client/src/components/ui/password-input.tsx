@@ -10,7 +10,7 @@ export interface PasswordInputProps extends React.ComponentProps<typeof Input> {
 }
 
 export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
-  ({ className, onGeneratePassword, showGenerateButton = true, type: _type, ...props }, ref) => {
+  ({ className, onGeneratePassword, showGenerateButton = true, ...props }, ref) => {
     const [showPassword, setShowPassword] = React.useState(false);
 
     return (

@@ -1,6 +1,6 @@
 import { Document, Types } from 'mongoose';
 
-export type UserRole = 'SuperAdmin' | 'Admin' | 'Member';
+export type UserRole = 'SuperAdmin' | 'Admin' | 'Member' | 'ServerAdmin';
 export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
 
 export interface IUser {

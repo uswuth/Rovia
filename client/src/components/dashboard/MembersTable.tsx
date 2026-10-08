@@ -32,10 +32,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
     user?.isSuperAdmin ||
     ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes((user?.userRole || '').toUpperCase())
   );
-  const isVisitor = (user?.userRole || '').toUpperCase() === 'VISITOR';
-
-  // Members, Hosts, Admins, and SuperAdmins CAN see emails; only Visitors CANNOT
-  const canSeeEmail = !isVisitor;
+  const canSeeEmail = true;
 
   const navigate = useNavigate();
   const [globalFilter, setGlobalFilter] = useState('');

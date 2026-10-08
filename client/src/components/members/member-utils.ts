@@ -14,19 +14,13 @@ export const isTopAdminRole = (member: Member): boolean => {
   );
 };
 
-export const getRoleCategory = (member: Member): 'SUPER_ADMIN' | 'ADMIN' | 'HOST' | 'MEMBERS' | 'VISITORS' => {
+export const getRoleCategory = (member: Member): 'SUPER_ADMIN' | 'ADMIN' | 'MEMBERS' => {
   const role = (member.userRole || '').toUpperCase();
   if (member.isSuperAdmin || role.includes('SUPER') || role === 'SUPERADMIN' || role === 'SUPER_ADMIN') {
     return 'SUPER_ADMIN';
   }
   if (role === 'ADMIN') {
     return 'ADMIN';
-  }
-  if (role.includes('HOST') || role === 'ORGANIZER' || role === 'OWNER') {
-    return 'HOST';
-  }
-  if (role === 'VISITOR') {
-    return 'VISITORS';
   }
   return 'MEMBERS';
 };

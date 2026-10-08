@@ -20,7 +20,7 @@ import { getProjectName, getProjectId } from '@/types/project.types';
 import { previewMeetingByJoinCode } from '@/api/meeting/meeting.api';
 import type { MeetingPreview } from '@/api/meeting/meeting.types';
 import { parseApiError } from '@/utils/apiError';
-import { formatCountdown } from '@/pages/meetings/Meetings';
+import { formatCountdown } from '@/lib/format-countdown';
 
 const getCleanDeviceLabel = (
   device: MediaDeviceInfo | undefined,

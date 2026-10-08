@@ -7,8 +7,8 @@ import {
   AvatarGroup,
   AvatarGroupCount,
   AvatarImage,
-  getAvatarColorByName,
 } from '@/components/ui/avatar';
+import { getAvatarColorByName } from '@/components/ui/avatar-colors';
 import { Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

@@ -30,17 +30,6 @@ type Fetcher = () => Promise<{ data: unknown }>;
 const unwrapOne = <T,>(response: unknown): T =>
   (response as { data: { data: T } }).data.data;
 
-const isPaginated = (value: unknown): value is { items?: unknown[]; members?: unknown[]; users?: unknown[]; data?: unknown[] } => {
-  if (typeof value !== 'object' || value === null) return false;
-  const val = value as Record<string, unknown>;
-  return (
-    Array.isArray(val.items) ||
-    Array.isArray(val.members) ||
-    Array.isArray(val.users) ||
-    Array.isArray(val.data)
-  );
-};
-
 /** Returns the array for a list endpoint, whether paginated or already flat. */
 const unwrapList = <T,>(response: unknown): T[] => extractApiItems<T>(response);
 
