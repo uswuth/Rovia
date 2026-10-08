@@ -15,8 +15,8 @@ router.use(authenticateUser);
 
 router.get('/', asyncHandler(getTasks));
 router.get('/:taskId', asyncHandler(getTaskById));
-router.post('/', authorizeRoles('SuperAdmin', 'Admin', 'Host'), asyncHandler(createTask));
-router.patch('/:taskId', authorizeRoles('SuperAdmin', 'Admin', 'Host'), asyncHandler(updateTask));
+router.post('/', authorizeRoles('SuperAdmin', 'Admin'), asyncHandler(createTask));
+router.patch('/:taskId', authorizeRoles('SuperAdmin', 'Admin'), asyncHandler(updateTask));
 router.delete('/:taskId', authorizeRoles('SuperAdmin', 'Admin'), asyncHandler(deleteTask));
 
 export default router;

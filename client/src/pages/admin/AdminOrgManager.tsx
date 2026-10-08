@@ -15,9 +15,7 @@ import {
   Building2,
   UserPlus,
   ShieldCheck,
-  Key,
-  Copy,
-  Check,
+  Key, Check,
   Search,
   RefreshCw,
   Users,
@@ -85,7 +83,6 @@ export default function AdminOrgManager() {
 
   // Feedback notifications & copy states
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   // Fetch initial data
   const loadOrgs = async () => {
@@ -233,12 +230,6 @@ export default function AdminOrgManager() {
     }
   };
 
-  // Copy code helper
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedCode(text);
-    setTimeout(() => setCopiedCode(null), 2000);
-  };
 
   if (!isOrgAdmin) {
     return (
@@ -311,11 +302,10 @@ export default function AdminOrgManager() {
       {/* Alert Notification */}
       {message && (
         <div
-          className={`p-4 rounded-xl flex items-center justify-between text-sm shadow-md transition-all ${
-            message.type === 'success'
+          className={`p-4 rounded-xl flex items-center justify-between text-sm shadow-md transition-all ${message.type === 'success'
               ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
               : 'bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300'
-          }`}
+            }`}
         >
           <div className="flex items-center gap-3">
             {message.type === 'success' ? (
@@ -339,11 +329,10 @@ export default function AdminOrgManager() {
         {isSuperAdmin && (
           <button
             onClick={() => setActiveTab('organizations')}
-            className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-colors ${
-              activeTab === 'organizations'
+            className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === 'organizations'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-semibold'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
-            }`}
+              }`}
           >
             <Building2 className="w-4 h-4" />
             Organizations ({organizations.length})
@@ -352,11 +341,10 @@ export default function AdminOrgManager() {
 
         <button
           onClick={() => setActiveTab('users')}
-          className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-colors ${
-            activeTab === 'users'
+          className={`flex items-center gap-2 px-5 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === 'users'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-semibold'
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
-          }`}
+            }`}
         >
           <UserPlus className="w-4 h-4" />
           IAM Users Table ({usersList.length})
@@ -729,13 +717,12 @@ export default function AdminOrgManager() {
                           </td>
                           <td className="p-3">
                             <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                                u.userRole === 'SuperAdmin' || u.isSuperAdmin
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${u.userRole === 'SuperAdmin' || u.isSuperAdmin
                                   ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
                                   : u.userRole === 'Admin'
-                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                                  : 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
-                              }`}
+                                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                    : 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
+                                }`}
                             >
                               <Key className="w-3 h-3" />
                               {u.userRole || 'Member'}
@@ -743,13 +730,12 @@ export default function AdminOrgManager() {
                           </td>
                           <td className="p-3">
                             <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                                currentStatus === 'ACTIVE'
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${currentStatus === 'ACTIVE'
                                   ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                                   : currentStatus === 'SUSPENDED'
-                                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                                  : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
-                              }`}
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                    : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
+                                }`}
                             >
                               <Activity className="w-3 h-3" />
                               {currentStatus}

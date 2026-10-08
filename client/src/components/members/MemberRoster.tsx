@@ -59,7 +59,8 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
     user?.isSuperAdmin ||
     ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes((user?.userRole || '').toUpperCase())
   );
-  const isHost = (user?.userRole || '').toUpperCase() === 'HOST';
+  const meId = user?.userId;
+  const isHost = Boolean(meId ? (value ?? {})[meId] : false);
   const isVisitor = (user?.userRole || '').toUpperCase() === 'VISITOR';
 
   // Members, Hosts, Admins, and SuperAdmins CAN see emails; only Visitors CANNOT
@@ -171,7 +172,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
 
   const selectedCount = Object.keys(value).length;
 
-  const toggleMemberSelection = (memberId: string, isSuperAdmin: boolean = false) => {
+  const toggleMemberSelection = (memberId: string) => {
     if (!canModifyRoster) return;
     if (topAdminIds.has(memberId) && lockSuperAdmin) return;
     if (!isTopAdmin && topAdminIds.has(memberId)) return;
@@ -504,7 +505,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                                   <TooltipTrigger asChild>
                                     <button
                                       type="button"
-                                      onClick={() => toggleMemberSelection(memberId, false)}
+                                      onClick={() => toggleMemberSelection(memberId)}
                                       className="w-7 h-7 rounded-full flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground hover:bg-emerald-500/20 transition-colors cursor-pointer"
                                     >
                                       <UserPlus size={14} />
