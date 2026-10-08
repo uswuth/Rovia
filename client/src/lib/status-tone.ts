@@ -73,3 +73,22 @@ const pollStatusTones: Record<string, BadgeTone> = {
 
 export const getPollStatusTone = (status: string): BadgeTone =>
   pollStatusTones[status.toLowerCase()] ?? 'neutral';
+
+const roleTones: Record<string, BadgeTone> = {
+  superadmin: 'accent',
+  admin: 'info',
+  host: 'warning',
+  member: 'neutral',
+};
+
+export const getRoleBadgeTone = (role: string): BadgeTone =>
+  roleTones[role.toLowerCase()] ?? 'neutral';
+
+const userStatusTones: Record<string, BadgeTone> = {
+  active: 'success',
+  suspended: 'danger',
+  deactivated: 'warning',
+};
+
+export const getUserStatusTone = (status: string): BadgeTone =>
+  userStatusTones[status.toLowerCase()] ?? 'neutral';

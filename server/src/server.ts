@@ -8,6 +8,8 @@ import { writeOpenApiFile } from './config/swagger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { seedInitialServerAdminService } from './services/server-admin.service.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -20,6 +22,7 @@ const startServer = async (): Promise<void> => {
   try {
     // Connect to MongoDB
     await connectDB();
+    await seedInitialServerAdminService();
 
     writeOpenApiFile(path.resolve(__dirname, '../openapi.json'));
 

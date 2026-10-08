@@ -1,6 +1,7 @@
 import { Document, Types } from 'mongoose';
 
 export type UserRole = 'SuperAdmin' | 'Admin' | 'Member';
+export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
 
 export interface IUser {
   _id: Types.ObjectId;
@@ -8,6 +9,7 @@ export interface IUser {
   email: string;
   password?: string;
   role: UserRole;
+  status?: UserStatus;
   avatarUrl?: string;
   refreshToken?: string;
   createdAt?: Date;
@@ -29,7 +31,7 @@ export interface IUserRegisterInput {
   organizationName?: string;
   organizationLocation?: string;
   organizationSlug?: string;
-  inviteCode?: string;
+  organizationId?: string;
   avatarUrl?: string;
   role?: UserRole;
   userRole?: UserRole;

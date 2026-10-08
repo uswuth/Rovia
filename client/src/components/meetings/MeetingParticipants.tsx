@@ -50,13 +50,14 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
       {activeParticipants.map((participant, index) => {
         const uId = participant?.userId || (participant as unknown as Record<string, string>)?.user_id || `User-${index}`;
         const role = participant?.participantRole || (participant as unknown as Record<string, string>)?.participant_role || 'MEMBER';
-        const isYou = uId === currentUserId || uId === 'visitor-me' || uId === user?.userId;
+        const isYou = uId === currentUserId || uId === user?.userId;
 
         // Resolve clean display name instead of raw Mongo/UUID hex string
         let displayName = (participant as unknown as Record<string, string>)?.userName ||
                           (participant as unknown as Record<string, string>)?.name ||
                           (isYou ? (currentUserName || user?.userName || 'You') : '');
 
+        let avatarUrl = participant.avatarUrl || (participant as unknown as Record<string, string>)?.avatar || (isYou ? user?.avatarUrl : '');
         if (!displayName && orgMembers) {
           const matched = orgMembers.find((m) => {
             const mId = getMemberId(m);
@@ -64,6 +65,7 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
           });
           if (matched) {
             displayName = matched.name || matched.userName || matched.email;
+            if (!avatarUrl) avatarUrl = (matched as unknown as Record<string, string>).avatarUrl || (matched as unknown as Record<string, string>).avatar || '';
           }
         }
 
@@ -79,11 +81,13 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
             className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-xs"
           >
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-                {role === 'HOST' ? (
-                  <Crown size={14} className="text-amber-500" />
+              <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-muted-foreground border border-border">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} className="size-full object-cover" />
+                ) : role === 'HOST' ? (
+                  <Crown size={15} className="text-amber-500" />
                 ) : (
-                  <User size={14} />
+                  <User size={15} />
                 )}
               </span>
 

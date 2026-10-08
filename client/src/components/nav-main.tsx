@@ -42,6 +42,28 @@ export function NavMain({
   const { isMobile, state, setOpenMobile } = useSidebar()
   const isCollapsed = state === "collapsed"
 
+  // Persisted collapsible menu open/close states
+  const [openStates, setOpenStates] = React.useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("sidebar_collapsible_menu_states")
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
+
+  const toggleItemOpen = (title: string, isOpen: boolean) => {
+    setOpenStates((prev) => {
+      const updated = { ...prev, [title]: isOpen }
+      try {
+        localStorage.setItem("sidebar_collapsible_menu_states", JSON.stringify(updated))
+      } catch {
+        // ignore storage errors
+      }
+      return updated
+    })
+  }
+
   const handleNavClick = () => {
     if (isMobile) {
       setOpenMobile(false)
@@ -135,10 +157,13 @@ export function NavMain({
             )
           }
 
+          const isMenuOpen = openStates[item.title] !== undefined ? openStates[item.title] : false
+
           return (
             <Collapsible
               key={item.title}
-              defaultOpen={isParentRouteActive || item.isActive}
+              open={isMenuOpen}
+              onOpenChange={(isOpen) => toggleItemOpen(item.title, isOpen)}
               className="group/collapsible w-full"
             >
               <SidebarMenuItem className="w-full">

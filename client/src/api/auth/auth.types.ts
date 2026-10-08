@@ -17,7 +17,6 @@ export interface OrganizationSummary {
   organizationSlug: string;
   organizationLocation?: string;
   organizationDescription?: string;
-  inviteCode: string;
   ownerId?: string;
 }
 
@@ -38,7 +37,6 @@ export interface SignupDTO {
   organizationName?: string;
   organizationLocation?: string;
   organizationSlug?: string;
-  inviteCode?: string;
   avatarUrl?: string;
 }
 

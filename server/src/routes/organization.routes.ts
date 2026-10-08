@@ -1,60 +1,24 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import {
-  verifyInviteCode,
   getMyOrganization,
   getOrganizationMembers,
-  regenerateInviteCode
+  getOrganizationMemberById,
+  createOrganization,
+  getAllOrganizations,
+  provisionUser,
+  updateUserAdmin,
+  getAllUsersAdmin
 } from '../controllers/organization.controller.js';
 import { authenticateUser, authorizeRoles } from '../middlewares/auth.middleware.js';
 
 const router: Router = Router();
 
-/**
- * @openapi
- * /api/v1/organizations/invite/{code}:
- *   get:
- *     summary: Verify Organization Invite Code Real-time
- *     description: Public endpoint used by the frontend signup toggle to verify invite codes in real-time and retrieve the organization name and location.
- *     tags:
- *       - Organizations
- *     parameters:
- *       - in: path
- *         name: code
- *         required: true
- *         schema:
- *           type: string
- *         description: The 6-character organization invite code
- *         example: ACME-4821
- *     responses:
- *       200:
- *         description: Invite code is valid and organization details returned
- *       400:
- *         description: Invite code has been revoked
- *       404:
- *         description: Invalid invite code. Organization not found
- */
-router.get('/invite/:code', asyncHandler(verifyInviteCode));
-
-/**
- * @openapi
- * /api/v1/organizations/invite/regenerate:
- *   post:
- *     summary: Regenerate Organization Invite Code (SuperAdmin Only)
- *     description: Generates a new random invite code for the organization and revokes the previous code so it can no longer be used.
- *     tags:
- *       - Organizations
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: New invite code generated successfully and previous code revoked
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden (SuperAdmin role required)
- */
-router.post('/invite/regenerate', authenticateUser, authorizeRoles('SuperAdmin'), asyncHandler(regenerateInviteCode));
+router.post('/', authenticateUser, authorizeRoles('SuperAdmin'), asyncHandler(createOrganization));
+router.get('/', authenticateUser, authorizeRoles('SuperAdmin'), asyncHandler(getAllOrganizations));
+router.post('/users/provision', authenticateUser, authorizeRoles('SuperAdmin', 'Admin'), asyncHandler(provisionUser));
+router.patch('/users/:userId', authenticateUser, authorizeRoles('SuperAdmin', 'Admin'), asyncHandler(updateUserAdmin));
+router.get('/users/all', authenticateUser, authorizeRoles('SuperAdmin', 'Admin'), asyncHandler(getAllUsersAdmin));
 
 /**
  * @openapi
@@ -95,7 +59,9 @@ router.get('/me', authenticateUser, asyncHandler(getMyOrganization));
  *         description: User does not belong to any organization
  */
 router.get('/members', authenticateUser, asyncHandler(getOrganizationMembers));
+router.get('/members/:memberId', authenticateUser, asyncHandler(getOrganizationMemberById));
 
 export default router;
+
 
 

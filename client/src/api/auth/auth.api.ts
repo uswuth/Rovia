@@ -15,3 +15,6 @@ export const refreshToken = () =>
 
 export const getMe = () =>
   client.get<{ data: User }>('/auth/me');
+
+export const changePasswordApi = (payload: { currentPassword: string; newPassword: string }) =>
+  client.post('/auth/change-password', payload);

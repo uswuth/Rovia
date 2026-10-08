@@ -36,7 +36,11 @@ client.interceptors.request.use((config) => {
 });
 
 let isRefreshing = false;
-let refreshQueue: Array<(token: string) => void> = [];
+type RefreshWaiter = {
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+};
+let refreshQueue: RefreshWaiter[] = [];
 
 client.interceptors.response.use(
   (response) => response,
@@ -52,10 +56,13 @@ client.interceptors.response.use(
       original._retry = true;
 
       if (isRefreshing) {
-        return new Promise((resolve) => {
-          refreshQueue.push((token) => {
-            original.headers.Authorization = `Bearer ${token}`;
-            resolve(client(original));
+        return new Promise((resolve, reject) => {
+          refreshQueue.push({
+            resolve: (token) => {
+              original.headers.Authorization = `Bearer ${token}`;
+              resolve(client(original));
+            },
+            reject,
           });
         });
       }
@@ -66,14 +73,19 @@ client.interceptors.response.use(
         const { data } = await client.post<{ data: { accessToken: string } }>('/auth/refresh-token');
         const newToken = data.data.accessToken;
         setAccessToken(newToken);
-        refreshQueue.forEach((cb) => cb(newToken));
+        const queued = refreshQueue;
         refreshQueue = [];
+        queued.forEach((waiter) => waiter.resolve(newToken));
         original.headers.Authorization = `Bearer ${newToken}`;
         return client(original);
       } catch (refreshErr) {
         // The refresh token is spent or invalid; the session cannot be recovered.
+        // Every parked request must also settle — dropping the queue would leave
+        // its callers pending forever (silent spinner hang).
         setAccessToken(null);
+        const queued = refreshQueue;
         refreshQueue = [];
+        queued.forEach((waiter) => waiter.reject(refreshErr));
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
@@ -84,4 +96,5 @@ client.interceptors.response.use(
   },
 );
 
+export const api = client;
 export default client;

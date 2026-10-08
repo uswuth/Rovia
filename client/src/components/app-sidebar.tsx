@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { LayoutDashboard, FolderGit2, Video, CheckSquare } from "lucide-react"
+import { LayoutDashboard, FolderGit2, Video, CheckSquare, Building2, Users } from "lucide-react"
 
 import { useAuth } from "@/context/AuthContext"
 import { maskEmail } from "@/utils/privacy"
@@ -17,25 +17,43 @@ import {
 import { useSidebar } from "@/components/ui/sidebar-context"
 
 export function AppSidebar({
-  onOpenInviteModal,
   ...props
-}: React.ComponentProps<typeof Sidebar> & {
-  onOpenInviteModal?: () => void
-}) {
+}: React.ComponentProps<typeof Sidebar>) {
   const { user, logout } = useAuth()
   const { state } = useSidebar()
+  const isSuperAdmin = user?.userRole === 'SuperAdmin' || user?.isSuperAdmin
+  const isAdmin = isSuperAdmin || user?.userRole === 'Admin'
 
   const navMain = [
     {
       title: "Dashboard",
       url: "/dashboard",
       icon: <LayoutDashboard size={18} />,
+      isActive: true,
     },
+    ...(isAdmin
+      ? [
+        {
+          title: "Organization",
+          url: "/organization/members",
+          icon: <Building2 size={18} />,
+          items: [
+            {
+              title: "Org Members",
+              url: "/organization/members",
+            },
+            {
+              title: "Org Work Roles",
+              url: "/organization/work-roles",
+            },
+          ],
+        },
+      ]
+      : []),
     {
       title: "Projects",
       url: "/projects",
       icon: <FolderGit2 size={18} />,
-      isActive: true,
       items: [
         {
           title: "All Projects",
@@ -54,6 +72,11 @@ export function AppSidebar({
           url: "/projects?status=archived",
         },
       ],
+    },
+    {
+      title: "Teams",
+      url: "/teams",
+      icon: <Users size={18} />,
     },
     {
       title: "Meetings",
@@ -80,6 +103,8 @@ export function AppSidebar({
       icon: <CheckSquare size={18} />,
     },
   ]
+
+
 
   const userData = {
     name: user?.userName || "IntellMeet User",
@@ -112,7 +137,6 @@ export function AppSidebar({
       <SidebarFooter className="p-2 border-t border-sidebar-border">
         <NavUser
           user={userData}
-          onOpenInviteModal={onOpenInviteModal}
           onLogout={logout}
         />
       </SidebarFooter>

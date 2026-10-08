@@ -4,7 +4,8 @@ import {
   loginUser,
   refreshAccessToken,
   logoutUser,
-  getCurrentUser
+  getCurrentUser,
+  changePassword
 } from '../controllers/auth.controller.js';
 import { authenticateUser } from '../middlewares/auth.middleware.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -130,5 +131,6 @@ router.post('/logout', asyncHandler(logoutUser));
  *         description: Unauthorized / Missing token
  */
 router.get('/me', authenticateUser, asyncHandler(getCurrentUser));
+router.post('/change-password', authenticateUser, asyncHandler(changePassword));
 
 export default router;

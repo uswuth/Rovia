@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Users, Copy, Check, Mic, MicOff, Video, VideoOff, MonitorUp,
-  PhoneOff, MessageSquare, BarChart3, Hand, Settings,
+  PhoneOff, MessageSquare, MessageCircleQuestion, BarChart3, Hand, Settings,
   ChevronUp, AlertCircle, Radio, Sparkles, Maximize2, Minimize2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,17 +29,19 @@ import { getMeetingById, leaveMeeting, previewMeetingByJoinCode } from '@/api/me
 import { MeetingParticipants } from '@/components/meetings/MeetingParticipants';
 import { ParticipantSettingsModal, type ParticipantPermissions } from '@/components/meetings/ParticipantSettingsModal';
 import { MeetingQuestions } from '@/components/meetings/MeetingQuestions';
+import { MeetingChat } from '@/components/meetings/MeetingChat';
 import { MeetingPolls } from '@/components/meetings/MeetingPolls';
-import type { Meeting, MeetingParticipant } from '@/api/meeting/meeting.types';
+import type { Meeting, MeetingParticipant, MeetingParticipantRaw } from '@/api/meeting/meeting.types';
+import { normalizeParticipants } from '@/api/meeting/meeting.types';
 import { askQuestion, answerQuestion, dismissQuestion, type MeetingQuestion } from '@/api/meeting/meeting-qa.api';
 import { createPoll, votePoll, closePoll, type MeetingPoll } from '@/api/meeting/meeting-poll.api';
 import { useWebRtcMeeting } from '@/hooks/useWebRtcMeeting';
 
 /** One video tile. Hand raised indicator appears when hand is raised. */
 const VideoTile = ({
-  name, isYou, host, muted, cameraOn, stream, handRaised,
+  name, isYou, host, muted, cameraOn, stream, handRaised, avatarUrl,
 }: {
-  name: string; isYou: boolean; host: boolean; isVisitor?: boolean; muted: boolean; cameraOn: boolean; stream?: MediaStream | null; handRaised?: boolean;
+  name: string; isYou: boolean; host: boolean; isVisitor?: boolean; muted: boolean; cameraOn: boolean; stream?: MediaStream | null; handRaised?: boolean; avatarUrl?: string;
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -61,11 +63,19 @@ const VideoTile = ({
       />
 
       {(!cameraOn || !stream) && (
-        <div className="flex size-full flex-col items-center justify-center gap-2 bg-slate-900 p-4 text-center">
-          <div className="flex size-16 items-center justify-center rounded-full bg-slate-800 text-emerald-400 font-bold text-xl border border-slate-700/80">
-            {name.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <p className="text-xs text-slate-400">Camera is off</p>
+        <div className="flex size-full flex-col items-center justify-center gap-3 bg-slate-900/90 p-4 text-center">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={name}
+              className="size-20 rounded-full object-cover border-2 border-emerald-500/50 shadow-xl"
+            />
+          ) : (
+            <div className="flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-teal-800 text-2xl font-bold text-white shadow-xl border-2 border-emerald-500/30">
+              {name.charAt(0).toUpperCase() || 'U'}
+            </div>
+          )}
+          <p className="text-xs font-medium text-slate-400">Camera is off</p>
         </div>
       )}
 
@@ -99,6 +109,7 @@ const VideoTile = ({
 const PANELS = [
   { key: 'people', label: 'People', icon: Users },
   { key: 'chat', label: 'Chat', icon: MessageSquare },
+  { key: 'qa', label: 'Q&A', icon: MessageCircleQuestion },
   { key: 'polls', label: 'Polls', icon: BarChart3 },
 ] as const;
 
@@ -111,18 +122,12 @@ export const MeetingRoom: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
 
-  const guestSessionRaw = sessionStorage.getItem(`meeting_guest_${id}`);
-  const guestSession = guestSessionRaw ? JSON.parse(guestSessionRaw) : null;
-  const isVisitor = !isAuthenticated && Boolean(guestSession || location.state?.fromLobby);
-  const visitorName = location.state?.guestName || guestSession?.name || 'Visitor';
-
   const [panel, setPanel] = useState<PanelKey>('people');
   const [editing, setEditing] = useState<MeetingParticipant | null>(null);
   const [copied, setCopied] = useState(false);
-  const [micOn, setMicOn] = useState(() => (location.state as { initialMic?: boolean } | null)?.initialMic ?? guestSession?.micEnabled ?? true);
-  const [cameraOn, setCameraOn] = useState(() => (location.state as { initialCamera?: boolean } | null)?.initialCamera ?? guestSession?.cameraEnabled ?? true);
+  const [micOn, setMicOn] = useState(() => (location.state as { initialMic?: boolean } | null)?.initialMic ?? true);
+  const [cameraOn, setCameraOn] = useState(() => (location.state as { initialCamera?: boolean } | null)?.initialCamera ?? true);
   const [handRaised, setHandRaised] = useState(false);
-  const [visitorLeft, setVisitorLeft] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -154,7 +159,6 @@ export const MeetingRoom: React.FC = () => {
 
   const getParticipantDisplayName = (participant: { userId: string } | MeetingParticipant) => {
     const pId = participant.userId;
-    if (isVisitor && pId === 'visitor-me') return visitorName;
     if (pId === user?.userId) return user?.userName || 'You';
 
     const matchedMember = (orgMembers || []).find((m) => {
@@ -174,7 +178,27 @@ export const MeetingRoom: React.FC = () => {
     return pId.length > 20 ? `Participant (${pId.slice(-4)})` : pId;
   };
 
-  const rtc = useWebRtcMeeting(id, Boolean(id) && (isAuthenticated || isVisitor), {
+  const getParticipantAvatar = (participant: { userId: string } | MeetingParticipant): string | undefined => {
+    const pId = participant.userId;
+    if (pId === user?.userId) return user?.avatarUrl;
+
+    const raw = participant as unknown as Record<string, string>;
+    if (raw.avatarUrl || raw.avatar) return raw.avatarUrl || raw.avatar;
+
+    const matchedMember = (orgMembers || []).find((m) => {
+      const mId = getMemberId(m);
+      return mId === pId || m.id === pId || (m as unknown as Record<string, string>)._id === pId;
+    });
+
+    if (matchedMember) {
+      const mRaw = matchedMember as unknown as Record<string, string>;
+      return mRaw.avatarUrl || mRaw.avatar;
+    }
+
+    return undefined;
+  };
+
+  const rtc = useWebRtcMeeting(id, Boolean(id) && isAuthenticated, {
     onPeerLeft: (leftUserId) => {
       const leftName = getParticipantDisplayName({ userId: leftUserId });
       showToast(`${leftName} left`);
@@ -265,7 +289,7 @@ export const MeetingRoom: React.FC = () => {
       const { getMeetingQuestions } = await import('@/api/meeting/meeting-qa.api');
       return getMeetingQuestions(id);
     },
-    { enabled: Boolean(id) && panel === 'chat', list: true }
+    { enabled: Boolean(id) && panel === 'qa', list: true }
   );
 
   const polls = useQuery<MeetingPoll[]>(
@@ -285,6 +309,8 @@ export const MeetingRoom: React.FC = () => {
     try {
       await askQuestion(id, questionText);
       await questions.refetch();
+    } catch (err) {
+      showToast(parseApiError(err).message);
     } finally {
       setQaPending(false);
     }
@@ -295,6 +321,8 @@ export const MeetingRoom: React.FC = () => {
     try {
       await answerQuestion(id, questionId, answerText);
       await questions.refetch();
+    } catch (err) {
+      showToast(parseApiError(err).message);
     } finally {
       setQaPending(false);
     }
@@ -305,6 +333,8 @@ export const MeetingRoom: React.FC = () => {
     try {
       await dismissQuestion(id, questionId);
       await questions.refetch();
+    } catch (err) {
+      showToast(parseApiError(err).message);
     } finally {
       setQaPending(false);
     }
@@ -315,6 +345,8 @@ export const MeetingRoom: React.FC = () => {
     try {
       await createPoll(id, { pollQuestion, options, multipleChoice });
       await polls.refetch();
+    } catch (err) {
+      showToast(parseApiError(err).message);
     } finally {
       setPollPending(false);
     }
@@ -325,6 +357,8 @@ export const MeetingRoom: React.FC = () => {
     try {
       await votePoll(id, pollId, optionIds);
       await polls.refetch();
+    } catch (err) {
+      showToast(parseApiError(err).message);
     } finally {
       setPollPending(false);
     }
@@ -335,28 +369,20 @@ export const MeetingRoom: React.FC = () => {
     try {
       await closePoll(id, pollId);
       await polls.refetch();
+    } catch (err) {
+      showToast(parseApiError(err).message);
     } finally {
       setPollPending(false);
     }
   };
 
-  const me = isVisitor
-    ? ({
-      userId: 'visitor-me',
-      participantRole: 'VISITOR',
-      participantStatus: 'JOINED',
-      canSendAudio: micOn,
-      canSendVideo: cameraOn,
-      canShareScreen: false,
-      canUseChat: true
-    } as MeetingParticipant)
-    : meeting?.participants.find((p) => p.userId === user?.userId);
+  const me = meeting?.participants.find((p) => p.userId === user?.userId);
 
   const isTopAdmin = Boolean(
     user?.isSuperAdmin ||
     ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes((user?.userRole || '').toUpperCase())
   );
-  const canManage = !isVisitor && (me?.participantRole === 'HOST' || me?.participantRole === 'MODERATOR' || meeting?.createdBy === user?.userId || isTopAdmin);
+  const canManage = me?.participantRole === 'HOST' || me?.participantRole === 'MODERATOR' || meeting?.createdBy === user?.userId || isTopAdmin;
   const canPost = me?.canUseChat ?? true;
   const joinUrl = meeting ? `${window.location.origin}/meetings/join/${meeting.meetingJoinCode}` : '';
 
@@ -394,14 +420,16 @@ export const MeetingRoom: React.FC = () => {
     onSuccess: () => setEditing(null),
   });
 
-  // Filter out left and stale participants completely (must be in active peer mesh or local user)
-  // Hook MUST be declared before any early return statements to comply with React Rules of Hooks
+  const participants = useMemo(() => {
+    return normalizeParticipants(meeting?.participants ?? [] as unknown as MeetingParticipantRaw[]);
+  }, [meeting?.participants]);
+
   const activePeerUserIds = useMemo(() => {
     return new Set([
-      ...(isVisitor ? ['visitor-me'] : [user?.userId || '']),
+      user?.userId || '',
       ...Object.keys(rtc.peers),
     ]);
-  }, [isVisitor, user?.userId, rtc.peers]);
+  }, [user?.userId, rtc.peers]);
 
   if (loading) {
     return (
@@ -412,68 +440,20 @@ export const MeetingRoom: React.FC = () => {
     );
   }
 
-  if (visitorLeft) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
-        <div className="flex size-14 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-          <PhoneOff size={24} />
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-foreground">You left the meeting</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {meeting?.meetingTitle || 'IntellMeet Video Session'}
-          </p>
-        </div>
-        <div className="flex items-center gap-3 pt-2">
-          {meeting?.meetingJoinCode && (
-            <Button
-              onClick={() => navigate(`/meetings/join/${meeting.meetingJoinCode}`)}
-              className="h-9 px-4 text-xs font-semibold"
-            >
-              Rejoin Meeting
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => navigate('/login')}
-            className="h-9 px-4 text-xs"
-          >
-            Sign in to IntellMeet
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   if (error || !meeting) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background p-6 text-center">
         <p className="text-sm text-destructive">{parseApiError(error).message}</p>
-        <Button variant="outline" onClick={() => navigate(isVisitor ? '/login' : '/meetings')}>
-          {isVisitor ? 'Return to IntellMeet' : 'Back to meetings'}
+        <Button variant="outline" onClick={() => navigate('/meetings')}>
+          Back to meetings
         </Button>
       </div>
     );
   }
 
-  const serverJoined = (meeting.participants || []).filter(
-    (p) => p.participantStatus !== 'LEFT' && (activePeerUserIds.has(p.userId) || p.userId === user?.userId)
+  const joined = (participants || []).filter(
+    (p) => p.participantStatus !== 'LEFT' && (activePeerUserIds.has(p.userId) || p.userId === user?.userId || p.participantStatus === 'JOINED')
   );
-
-  const joined = isVisitor
-    ? [
-      ...serverJoined,
-      {
-        userId: 'visitor-me',
-        participantRole: 'VISITOR' as const,
-        participantStatus: 'JOINED' as const,
-        canSendAudio: micOn,
-        canSendVideo: cameraOn,
-        canShareScreen: false,
-        canUseChat: true
-      }
-    ]
-    : serverJoined;
 
   const activeScreenSharePeer = Object.values(rtc.peers).find((p) => p.screenSharing && p.stream);
 
@@ -551,22 +531,22 @@ export const MeetingRoom: React.FC = () => {
 
           {/* Participant Video Tiles Grid */}
           <div className={`grid w-full max-w-4xl gap-4 ${layoutMode === 'focus'
-              ? 'grid-cols-1'
-              : layoutMode === 'compact'
-                ? 'grid-cols-2 sm:grid-cols-3'
-                : 'grid-cols-1 sm:grid-cols-2'
+            ? 'grid-cols-1'
+            : layoutMode === 'compact'
+              ? 'grid-cols-2 sm:grid-cols-3'
+              : 'grid-cols-1 sm:grid-cols-2'
             }`}>
             {joined.map((participant) => (
               <VideoTile
                 key={participant.userId}
                 name={getParticipantDisplayName(participant)}
-                isYou={isVisitor ? participant.userId === 'visitor-me' : participant.userId === user?.userId}
+                avatarUrl={getParticipantAvatar(participant)}
+                isYou={participant.userId === user?.userId}
                 host={participant.participantRole === 'HOST'}
-                isVisitor={participant.participantRole === 'VISITOR'}
                 muted={!participant.canSendAudio}
                 cameraOn={participant.canSendVideo}
-                handRaised={participant.userId === 'visitor-me' || participant.userId === user?.userId ? handRaised : false}
-                stream={(isVisitor ? participant.userId === 'visitor-me' : participant.userId === user?.userId) ? rtc.localStream : rtc.peers[participant.userId]?.stream}
+                handRaised={participant.userId === user?.userId ? handRaised : false}
+                stream={participant.userId === user?.userId ? rtc.localStream : rtc.peers[participant.userId]?.stream}
               />
             ))}
           </div>
@@ -583,12 +563,22 @@ export const MeetingRoom: React.FC = () => {
               participants={joined}
               canManage={Boolean(canManage)}
               onEditSettings={setEditing}
-              currentUserId={isVisitor ? 'visitor-me' : user?.userId}
-              currentUserName={isVisitor ? visitorName : user?.userName}
+              currentUserId={user?.userId}
+              currentUserName={user?.userName}
             />
           )}
 
           {panel === 'chat' && (
+            <MeetingChat
+              meetingId={meeting.meetingId}
+              currentUserId={user?.userId ?? ''}
+              canPost={Boolean(canPost)}
+              onError={showToast}
+              displayNameFor={(userId) => getParticipantDisplayName({ userId })}
+            />
+          )}
+
+          {panel === 'qa' && (
             <MeetingQuestions
               meetingId={meeting.meetingId}
               questions={questions.data}
@@ -819,8 +809,8 @@ export const MeetingRoom: React.FC = () => {
               await rtc.startScreenShare();
             }}
             className={`flex size-10 items-center justify-center rounded-full border transition-colors cursor-pointer ${rtc.isScreenSharing
-                ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
-                : 'border-border bg-card text-foreground hover:bg-secondary'
+              ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
+              : 'border-border bg-card text-foreground hover:bg-secondary'
               }`}
             title={rtc.isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
           >
@@ -832,8 +822,8 @@ export const MeetingRoom: React.FC = () => {
             type="button"
             onClick={() => setHandRaised(!handRaised)}
             className={`flex size-10 items-center justify-center rounded-full border transition-all cursor-pointer ${handRaised
-                ? 'bg-amber-500 text-white border-amber-500 shadow-md scale-105'
-                : 'border-border bg-card text-foreground hover:bg-secondary'
+              ? 'bg-amber-500 text-white border-amber-500 shadow-md scale-105'
+              : 'border-border bg-card text-foreground hover:bg-secondary'
               }`}
             title={handRaised ? 'Lower Hand' : 'Raise Hand'}
           >
@@ -863,7 +853,7 @@ export const MeetingRoom: React.FC = () => {
           {/* Vertical Separator after Leave button */}
           <div className="h-6 w-px bg-border mx-1" />
 
-          {/* Panel Navigation Buttons (People, Chat, Polls) */}
+          {/* Panel Navigation Buttons (People, Chat, Q&A, Polls) */}
           <div className="flex items-center gap-1.5">
             {PANELS.map((item) => (
               <button
@@ -871,8 +861,8 @@ export const MeetingRoom: React.FC = () => {
                 type="button"
                 onClick={() => setPanel(item.key)}
                 className={`flex size-9 items-center justify-center rounded-full border transition-colors cursor-pointer ${panel === item.key
-                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
-                    : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
+                  : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
                   }`}
                 title={item.label}
               >

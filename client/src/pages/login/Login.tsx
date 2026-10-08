@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react';
@@ -31,11 +31,19 @@ export const Login = () => {
     defaultValues: { userEmail: '', password: '' },
   });
 
+  const location = useLocation();
   const onSubmit = async (data: LoginFormValues) => {
     setServerError('');
     try {
       await login({ userEmail: data.userEmail, password: data.password });
-      navigate('/dashboard');
+      const returnUrl = (location.state as { from?: string } | null)?.from ||
+                        sessionStorage.getItem('intellmeet_redirect_url');
+      sessionStorage.removeItem('intellmeet_redirect_url');
+      if (returnUrl) {
+        navigate(returnUrl, { replace: true });
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       const { message, fieldErrors } = parseApiError(err);
       Object.entries(fieldErrors).forEach(([field, msg]) => {
@@ -380,13 +388,6 @@ export const Login = () => {
                   </Button>
                 </Stack>
               </form>
-
-              <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--muted-foreground)', pt: 1 }}>
-                Don&apos;t have an account?{' '}
-                <Link to="/signup" className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">
-                  Sign Up
-                </Link>
-              </Typography>
             </Stack>
           </Box>
         </Grid>

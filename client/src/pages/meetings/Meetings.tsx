@@ -1,7 +1,6 @@
-/* eslint-disable react-refresh/only-export-components */
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Video, Calendar, Clock, Users, Play, Plus, FolderGit2, Search, X } from 'lucide-react';
+import { Video, Calendar, Clock, Users, Play, Plus, FolderGit2, Search, X, Copy, Check, Share2, ChevronDown, Zap } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import { useTimeFormat } from '@/context/TimeFormatContext';
@@ -12,10 +11,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination } from '@/components/ui/Pagination';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import { getMeetingStatusTone } from '@/lib/status-tone';
 import { useQuery } from '@/hooks/useApi';
 import { queryKeys } from '@/api/queryClient';
-import { getMeetings } from '@/api/meeting/meeting.api';
+import { getMeetings, createMeeting } from '@/api/meeting/meeting.api';
+import { extractApiItems } from '@/utils/apiResponse';
 import type { Meeting, MeetingStatus } from '@/api/meeting/meeting.types';
 
 export const formatCountdown = (scheduledMs: number, now: number): string => {
@@ -70,6 +76,31 @@ export const Meetings: React.FC = () => {
 
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
+  const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
+
+  const handleCopyLink = (joinCode: string, meetingId: string) => {
+    const joinUrl = `${window.location.origin}/meetings/join/${joinCode}`;
+    navigator.clipboard.writeText(joinUrl);
+    setCopiedMeetingId(meetingId);
+    setTimeout(() => setCopiedMeetingId(null), 2000);
+  };
+
+  const handleShareLink = async (joinCode: string, meetingTitle: string) => {
+    const joinUrl = `${window.location.origin}/meetings/join/${joinCode}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: meetingTitle,
+          text: `Join meeting "${meetingTitle}" on IntellMeet`,
+          url: joinUrl,
+        });
+      } catch {
+        await navigator.clipboard.writeText(joinUrl);
+      }
+    } else {
+      await navigator.clipboard.writeText(joinUrl);
+    }
+  };
 
   const currentTab = searchParams.get('tab') || 'upcoming';
   const filterProjectId = searchParams.get('projectId') || selectedProject?.id || '';
@@ -394,14 +425,49 @@ export const Meetings: React.FC = () => {
                     </div>
                   </div>
 
-                  <Button
-                    disabled={!canJoin}
-                    onClick={() => navigate(`/meetings/join/${m.meetingJoinCode}`)}
-                    className="w-full sm:w-40 shrink-0 justify-center gap-1.5 whitespace-nowrap disabled:opacity-50"
-                  >
-                    {buttonIcon}
-                    <span className="truncate">{buttonText}</span>
-                  </Button>
+                  {!isEndedOrCancelled && (
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopyLink(m.meetingJoinCode, m.meetingId)}
+                        className="gap-1 text-xs cursor-pointer border-border hover:bg-muted"
+                        title="Copy meeting link to clipboard"
+                      >
+                        {copiedMeetingId === m.meetingId ? (
+                          <>
+                            <Check size={13} className="text-emerald-500" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} />
+                            <span>Copy Link</span>
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleShareLink(m.meetingJoinCode, m.meetingTitle)}
+                        className="gap-1 text-xs cursor-pointer border-border hover:bg-muted"
+                        title="Share meeting join link"
+                      >
+                        <Share2 size={13} />
+                        <span>Share</span>
+                      </Button>
+
+                      <Button
+                        disabled={!canJoin}
+                        onClick={() => navigate(`/meetings/join/${m.meetingJoinCode}`)}
+                        className="justify-center gap-1.5 whitespace-nowrap disabled:opacity-50"
+                      >
+                        {buttonIcon}
+                        <span className="truncate">{buttonText}</span>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -3,8 +3,8 @@ import { UserClass } from './user.model.js';
 import { OrganizationClass } from './organization.model.js';
 
 export type MeetingStatus = 'SCHEDULED' | 'LIVE' | 'ENDED' | 'CANCELLED';
-export type MeetingJoinMode = 'INVITE_ONLY' | 'OPEN_LINK';
-export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER' | 'VISITOR';
+export type MeetingJoinMode = 'INVITE_ONLY';
+export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER';
 export type MeetingParticipantStatus = 'INVITED' | 'JOINED' | 'LEFT';
 
 /**
@@ -18,7 +18,7 @@ export class MeetingParticipantClass {
 
   @prop({
     type: () => String,
-    enum: ['HOST', 'MODERATOR', 'MEMBER', 'VISITOR'],
+    enum: ['HOST', 'MODERATOR', 'MEMBER'],
     default: 'MEMBER',
     alias: 'participantRole'
   })
@@ -74,6 +74,9 @@ export const MEETING_MAX_DURATION_MINUTES = 480;
           meetingJoinCode: ret.meeting_join_code,
           organizationId: ret.organization_id,
           projectId: ret.project_id,
+          teamId: ret.team_id ?? null,
+          scope: ret.scope ?? 'project',
+          meetingType: ret.meeting_type ?? 'SCHEDULED',
           createdBy: ret.created_by,
           startedAt: ret.meeting_started_at ?? null,
           endedAt: ret.meeting_ended_at ?? null,
@@ -109,6 +112,22 @@ export class MeetingClass {
     this.project_id = val;
   }
 
+  @prop({ ref: () => 'TeamClass', index: true, alias: 'teamId' })
+  public team_id?: Ref<'TeamClass'>;
+
+  public get teamId(): Ref<'TeamClass'> | undefined {
+    return this.team_id;
+  }
+  public set teamId(val: Ref<'TeamClass'> | undefined) {
+    this.team_id = val;
+  }
+
+  @prop({ type: () => String, enum: ['project', 'team', 'custom'], default: 'project' })
+  public scope?: string;
+
+  @prop({ type: () => String, enum: ['SCHEDULED', 'INSTANT'], default: 'SCHEDULED', alias: 'meetingType' })
+  public meeting_type?: string;
+
   @prop({ type: () => String, required: true, trim: true, alias: 'meetingTitle' })
   public meeting_title!: string;
 
@@ -142,7 +161,7 @@ export class MeetingClass {
 
   @prop({
     type: () => String,
-    enum: ['INVITE_ONLY', 'OPEN_LINK'],
+    enum: ['INVITE_ONLY'],
     default: 'INVITE_ONLY',
     alias: 'meetingJoinMode'
   })

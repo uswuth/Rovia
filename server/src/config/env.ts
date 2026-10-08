@@ -82,7 +82,8 @@ export const env: Readonly<EnvConfig> = Object.freeze({
   CORS_ORIGIN: process.env.CORS_ORIGIN || (isProduction ? '' : '*'),
   CLIENT_URL: process.env.CLIENT_URL,
   JWT_ACCESS_SECRET: accessSecret as string,
-  JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY || '24h',
+  // Access token expiry matching client requirement (8 hours).
+  JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY || '8h',
   JWT_REFRESH_SECRET: refreshSecret as string,
   JWT_REFRESH_EXPIRY: process.env.JWT_REFRESH_EXPIRY || '7d',
   // Non-secret S3 settings may have defaults. The credentials may not: they go

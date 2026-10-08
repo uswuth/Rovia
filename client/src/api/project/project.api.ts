@@ -10,6 +10,8 @@ export interface ProjectQueryParams {
 export const getProjects = (params?: ProjectQueryParams) =>
   client.get<{ data: Project[] }>('/projects', { params });
 
+export const getAllProjectsApi = getProjects;
+
 export const getProjectById = (id: string) =>
   client.get<{ data: Project }>(`/projects/${id}`);
 

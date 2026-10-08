@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -70,11 +69,6 @@ export const MeetingLobby: React.FC = () => {
 
   const [showDeviceSettings, setShowDeviceSettings] = useState(false);
 
-  // Visitor identification
-  const [visitorName, setVisitorName] = useState(() => {
-    return sessionStorage.getItem('intellmeet_guest_name') || '';
-  });
-  const [nameError, setNameError] = useState('');
   const [copied, setCopied] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -125,7 +119,15 @@ export const MeetingLobby: React.FC = () => {
     }
   };
 
-  // Fetch meeting preview
+  // Auto-redirect unauthenticated users to login page with saved return URL
+  useEffect(() => {
+    if (!isAuthenticated && code) {
+      const returnPath = `/meetings/join/${code}`;
+      sessionStorage.setItem('intellmeet_redirect_url', returnPath);
+      navigate('/login', { state: { from: returnPath }, replace: true });
+    }
+  }, [isAuthenticated, code, navigate]);
+
   useEffect(() => {
     let mounted = true;
     const fetchPreview = async () => {
@@ -278,25 +280,9 @@ export const MeetingLobby: React.FC = () => {
   const handleJoin = () => {
     if (!preview) return;
 
-    const effectiveName = isAuthenticated ? (user?.userName || 'Member') : visitorName.trim();
-
-    if (!isAuthenticated && !effectiveName) {
-      setNameError('Please enter your name before joining');
-      return;
-    }
-
     if (!isAuthenticated) {
-      sessionStorage.setItem('intellmeet_guest_name', effectiveName);
-      sessionStorage.setItem(
-        `meeting_guest_${preview.meetingId}`,
-        JSON.stringify({
-          name: effectiveName,
-          cameraEnabled,
-          micEnabled,
-          role: 'Visitor',
-          joinCode: code,
-        })
-      );
+      navigate('/login', { state: { from: `/meetings/join/${code}` } });
+      return;
     }
 
     if (stream) {
@@ -306,7 +292,6 @@ export const MeetingLobby: React.FC = () => {
     navigate(`/meetings/${preview.meetingId}/room`, {
       state: {
         fromLobby: true,
-        guestName: effectiveName,
         initialCamera: cameraEnabled,
         initialMic: micEnabled,
         preview,
@@ -314,7 +299,7 @@ export const MeetingLobby: React.FC = () => {
     });
   };
 
-  const displayName = isAuthenticated ? (user?.userName || 'Member') : (visitorName.trim() || 'Guest');
+  const displayName = isAuthenticated ? (user?.userName || 'Member') : 'Member';
 
   // Match project title if available
   const activeProjectName = useMemo(() => {
@@ -376,6 +361,20 @@ export const MeetingLobby: React.FC = () => {
     buttonText = `Opens in ${formatCountdown(scheduledMs, now)}`;
   }
 
+  const isUserAssignedToMeeting = useMemo(() => {
+    if (!preview || !user) return true;
+    const userObj = user as unknown as Record<string, unknown>;
+    const userId = user.userId || (userObj._id as string);
+    if (user.isSuperAdmin || user.userRole === 'SuperAdmin' || user.userRole === 'Admin') return true;
+    if (preview.createdBy === userId) return true;
+    const isParticipant = (preview.participants || []).some((p) => {
+      const pObj = p as unknown as Record<string, unknown>;
+      const pId = typeof p === 'object' && p !== null ? p.userId || pObj._id || pObj.id : p;
+      return pId === userId;
+    });
+    return isParticipant;
+  }, [preview, user]);
+
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-emerald-500/20">
       {/* Header bar */}
@@ -430,6 +429,21 @@ export const MeetingLobby: React.FC = () => {
             </div>
             <Button variant="outline" size="sm" onClick={() => navigate('/login')}>
               Return to IntellMeet
+            </Button>
+          </div>
+        ) : !isUserAssignedToMeeting ? (
+          <div className="flex max-w-md flex-col items-center gap-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-8 text-center shadow-xl">
+            <div className="flex size-14 items-center justify-center rounded-full bg-amber-500/10 text-amber-500">
+              <AlertCircle size={32} />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-lg font-bold text-foreground">Access Restricted</h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                You are logged in as <span className="font-semibold text-foreground">{user?.userEmail}</span>, but you are not assigned to this meeting roster. Please contact your meeting host or organization admin for access.
+              </p>
+            </div>
+            <Button onClick={() => navigate('/meetings')} className="w-full mt-2">
+              Back to Meetings
             </Button>
           </div>
         ) : (
@@ -686,28 +700,10 @@ export const MeetingLobby: React.FC = () => {
                 </div>
               </div>
 
-              {/* Visitor Name Input if not signed in */}
+              {/* Organization Sign-In Prompt if not signed in */}
               {!isAuthenticated && (
-                <div className="space-y-1.5">
-                  <label htmlFor="visitorNameInput" className="block text-xs font-semibold text-foreground">
-                    Enter your name to join:
-                  </label>
-                  <Input
-                    id="visitorNameInput"
-                    value={visitorName}
-                    onChange={(e) => {
-                      setVisitorName(e.target.value);
-                      if (nameError) setNameError('');
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && canJoin) handleJoin();
-                    }}
-                    className={nameError ? 'border-destructive focus-visible:ring-destructive rounded-md' : 'rounded-md'}
-                    autoFocus
-                  />
-                  {nameError && (
-                    <p className="text-[11px] text-destructive">{nameError}</p>
-                  )}
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  🔒 Sign in to your organization account to join this meeting.
                 </div>
               )}
 

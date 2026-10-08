@@ -107,7 +107,7 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity duration-200 animate-in fade-in-0",
+        "fixed inset-0 z-50 bg-white/40 dark:bg-black/70 backdrop-blur-xs transition-opacity duration-200 animate-in fade-in-0",
         className
       )}
       onClick={() => setOpen(false)}

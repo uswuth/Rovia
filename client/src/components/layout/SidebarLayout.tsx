@@ -5,7 +5,6 @@ import { useProject } from '@/context/ProjectContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useAuth } from '@/context/AuthContext';
 import { type Project } from '@/types/project.types';
-import { InviteCodeModal } from '@/components/dashboard/InviteCodeModal';
 import { CreateProjectModal } from '@/components/dashboard/CreateProjectModal';
 import { AppSidebar } from '@/components/app-sidebar';
 import {
@@ -29,12 +28,11 @@ interface SidebarLayoutProps {
 
 export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   const { addProject } = useProject();
-  const { org } = useOrganization();
-  const { refreshProfile } = useAuth();
+  useOrganization();
+  useAuth();
   const location = useLocation();
 
   // Modals state
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // Notifications state & click-outside ref
@@ -92,13 +90,6 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
     setUnreadCount(0);
   };
 
-  // Regenerating the invite code changes the organization, which now comes from
-  // the auth user rather than a separate fetch, so the profile must be re-read
-  // for the new code to appear.
-  const handleGenerateNewCode = async () => {
-    await refreshProfile();
-  };
-
   // `useMutation` invalidates the projects query and `addProject` seeds the
   // cache, so calling `refreshProjects()` here would just be a second request.
   const handleProjectCreated = (newProj: Project) => {
@@ -141,9 +132,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <AppSidebar
-        onOpenInviteModal={() => setInviteModalOpen(true)}
-      />
+      <AppSidebar />
 
       <SidebarInset>
         {/* Top App Header with Trigger, Vertical Separator, Breadcrumbs & Notifications Bell */}
@@ -216,9 +205,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                     {notificationsList.map((item) => (
                       <div
                         key={item.id}
-                        className={`p-3.5 flex gap-3 transition-colors hover:bg-muted/50 ${
-                          item.unread ? 'bg-emerald-500/[0.03]' : ''
-                        }`}
+                        className={`p-3.5 flex gap-3 transition-colors hover:bg-muted/50 ${item.unread ? 'bg-emerald-500/[0.03]' : ''
+                          }`}
                       >
                         <div className="flex shrink-0 items-center justify-center text-emerald-600 dark:text-emerald-400 pt-0.5">
                           {item.type === 'meeting' ? <Video size={16} /> : item.type === 'ai' ? <Sparkles size={16} /> : <Bell size={16} />}
@@ -246,18 +234,10 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
         </header>
 
         {/* Main View Area */}
-        <main className="relative flex-1 w-full bg-background text-foreground overflow-hidden">
-          <div className="relative z-10">{children}</div>
+        <main className="relative flex-1 flex flex-col w-full bg-background text-foreground min-h-0">
+          <div className="relative z-10 flex-1 flex flex-col w-full min-h-0">{children}</div>
         </main>
       </SidebarInset>
-
-      {/* Invite Code Modal */}
-      <InviteCodeModal
-        isOpen={inviteModalOpen}
-        onClose={() => setInviteModalOpen(false)}
-        inviteCode={org.inviteCode}
-        onGenerateNewCode={handleGenerateNewCode}
-      />
 
       {/* Create Project Modal */}
       <CreateProjectModal

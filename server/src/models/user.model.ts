@@ -2,7 +2,7 @@ import { prop, getModelForClass, pre, DocumentType, modelOptions, Severity, Ref 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
-import { UserRole } from '../types/index.js';
+import { UserRole, UserStatus } from '../types/index.js';
 import { OrganizationClass } from './organization.model.js';
 
 @pre<UserClass>('save', async function (next) {
@@ -28,10 +28,15 @@ import { OrganizationClass } from './organization.model.js';
           userName: ret.user_name as string,
           userEmail: ret.user_email as string,
           userRole: ret.user_role as string,
+          userStatus: (ret.user_status ?? 'ACTIVE') as string,
           isSuperAdmin: Boolean(ret.is_super_admin),
-          userCode: (ret.user_code ?? '') as string,
-          avatarUrl: (ret.avatar_url ?? '') as string,
-          jobTitle: (ret.job_title ?? '') as string,
+          userCode: ret.user_code !== undefined ? (ret.user_code as string) : undefined,
+          avatarUrl: ret.avatar_url !== undefined ? (ret.avatar_url as string) : undefined,
+          jobTitle: ret.job_title !== undefined ? (ret.job_title as string) : undefined,
+          phoneNumber: ret.phone_number !== undefined ? (ret.phone_number as string) : undefined,
+          bloodType: ret.blood_type !== undefined ? (ret.blood_type as string) : undefined,
+          address: ret.address !== undefined ? (ret.address as string) : undefined,
+          city: ret.city !== undefined ? (ret.city as string) : undefined,
           isDeleted: Boolean(ret.is_deleted),
           organizationId: ret.organization_id,
           createdAt: ret.created_at,
@@ -66,7 +71,7 @@ export class UserClass {
     unique: true,
     lowercase: true,
     trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email address'],
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.[A-Za-z]{2,})+$/, 'Please provide a valid email address'],
     alias: 'userEmail'
   })
   public user_email!: string;
@@ -88,7 +93,7 @@ export class UserClass {
 
   @prop({
     type: () => String,
-    enum: ['SuperAdmin', 'Member'],
+    enum: ['SuperAdmin', 'Admin', 'Member'],
     default: 'Member',
     alias: 'userRole'
   })
@@ -100,6 +105,23 @@ export class UserClass {
   public set userRole(val: UserRole) {
     this.user_role = val;
   }
+
+  @prop({
+    type: () => String,
+    enum: ['ACTIVE', 'SUSPENDED', 'DEACTIVATED'],
+    default: 'ACTIVE',
+    index: true,
+    alias: 'userStatus'
+  })
+  public user_status!: UserStatus;
+
+  public get userStatus(): UserStatus {
+    return this.user_status;
+  }
+  public set userStatus(val: UserStatus) {
+    this.user_status = val;
+  }
+
 
   @prop({ type: () => Boolean, default: false, alias: 'isSuperAdmin' })
   public is_super_admin!: boolean;
@@ -140,6 +162,32 @@ export class UserClass {
   public set jobTitle(val: string | undefined) {
     this.job_title = val;
   }
+
+  @prop({ type: () => String, default: '', trim: true, alias: 'phoneNumber' })
+  public phone_number?: string;
+
+  public get phoneNumber(): string | undefined {
+    return this.phone_number;
+  }
+  public set phoneNumber(val: string | undefined) {
+    this.phone_number = val;
+  }
+
+  @prop({ type: () => String, default: '', trim: true, alias: 'bloodType' })
+  public blood_type?: string;
+
+  public get bloodType(): string | undefined {
+    return this.blood_type;
+  }
+  public set bloodType(val: string | undefined) {
+    this.blood_type = val;
+  }
+
+  @prop({ type: () => String, default: '', trim: true })
+  public address?: string;
+
+  @prop({ type: () => String, default: '', trim: true })
+  public city?: string;
 
   @prop({ type: () => String, default: '', index: true, alias: 'userCode' })
   public user_code?: string;

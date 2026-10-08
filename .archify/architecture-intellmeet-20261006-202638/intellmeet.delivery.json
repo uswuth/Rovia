@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "ef63c8c2-b73f-4bb2-a2ca-30fc9868e3e2",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "C:\\zidio\\Intellmeet-debug-ui\\.archify\\architecture-intellmeet-20261006-202638\\candidate.json",
+  "output": "C:\\zidio\\Intellmeet-debug-ui\\.archify\\architecture-intellmeet-20261006-202638\\intellmeet.html",
+  "specification": {
+    "sha256": "7ca5b41ad8b4b23c8ef976bc2a43afc6534da45812343308d80b24c6f9427317",
+    "bytes": 6677
+  },
+  "artifact": {
+    "sha256": "6c5ff9d5274a36984ac5966c3ac59f689c87ba9fa150a544cf0ab5a055b500e6",
+    "bytes": 770307
+  }
+}

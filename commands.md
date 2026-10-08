@@ -75,3 +75,9 @@ Run from inside `client/` or `server/`:
 | `pnpm dev` | Dev server with hot reload |
 | `pnpm build` | Production build |
 | `pnpm lint` | Lint the package |
+
+## Architecture docs
+
+| Command | What it does |
+| --- | --- |
+| `node .agents/skills/archify/bin/archify.mjs finalize architecture <candidate.json> <out.html> --repo-root . --quality showcase --json` | Re-validates and regenerates the interactive architecture diagram (see [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)) |

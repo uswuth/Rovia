@@ -4,7 +4,12 @@ AI-Powered Enterprise Meeting & Collaboration Platform
 
 > Progress-tracked README: what the product is, the feature list, and how much of it is implemented today.
 >
-> All commands and their purpose: [`commands.md`](./commands.md).
+> - All commands and their purpose: [`commands.md`](./commands.md)
+> - Live progress tracker (source of truth): [`TASKS.md`](./TASKS.md)
+> - Full API surface with JSON examples: [`docs/API_ROUTES.md`](./docs/API_ROUTES.md)
+> - Technology stack and design choices: [`docs/STACK.md`](./docs/STACK.md)
+> - Architecture diagram (archify-generated) and flows: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+> - Codebase quality audit, scorecard and fix roadmap: [`CODE_AUDIT.md`](./CODE_AUDIT.md)
 
 ---
 
@@ -18,12 +23,15 @@ AI-Powered Enterprise Meeting & Collaboration Platform
 
 ---
 
-## Current Progress — ~35%
+## Current Progress — ~60%
 
-Weeks 1–2 of the 4-week plan are largely done on the **backend foundation** side.
-Auth, org/team management, project management, and the recording upload path are live.
-Meeting infrastructure (WebRTC signaling, transcription, AI summaries) is the
-remaining bulk of the work.
+The backend is essentially complete (auth, orgs, projects, meetings, Q&A,
+polls, recordings, transcripts/summaries — all wired to the client). WebRTC
+video is built and wired into the meeting room, recordings are verified
+end-to-end, and CI runs lint + build on every push. What remains: running the
+local AI pipeline for real, the post-meeting dashboard,
+analytics, tests and rate limiting. See [`TASKS.md`](./TASKS.md) for the
+item-level tracker — it is the source of truth when this table and it disagree.
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -32,17 +40,22 @@ remaining bulk of the work.
 | Response/error layer | ✅ | `ApiResponse`, `ApiError`, `notFoundHandler`, `errorHandler`, `asyncHandler` |
 | Auth (F01) | ✅ | Register, login, refresh, logout, `/auth/me`; JWT + bcrypt, httpOnly refresh cookie |
 | Organizations / teams (F06) | ✅ | Org details, member list, invite-code verify & regenerate |
-| Projects (F06) | ✅ | CRUD, project members, role update, remove member |
-| Socket.io bootstrap | 🟡 | Typed Socket.io server attached; only connect/disconnect handled |
-| WebRTC video meetings (F02) | ⬜ | No signaling or peer logic yet |
+| Projects (F06) | ✅ | CRUD, project members, role update, remove member (max 50 members / 3 hosts) |
+| Meetings backend | ✅ | Schedule, join/leave, join modes, roster, per-member mic/cam/screen/chat permissions, start/end |
+| Q&A + Polls backend | ✅ | Ask/answer/dismiss, create/vote/close — wired to the meeting room UI |
+| WebRTC video (F02) | ✅ | Peer mesh + Socket.io signaling relay (`useWebRtcMeeting`), wired into `MeetingRoom.tsx` |
+| Meeting UI | ✅ | Meetings list (real API), create page, lobby, room with video tiles |
+| Socket.io | ✅ | JWT handshake, meeting rooms, SDP/ICE relay, presence, in-call state |
 | Screen recording capture | ✅ | Browser capture contract measured and documented ([client/docs/SCREEN_RECORDING_CAPTURE.md](./client/docs/SCREEN_RECORDING_CAPTURE.md)) |
-| Recording upload + storage (F08) | ✅ | Org-scoped recording API, browser uploads direct to S3-compatible storage via presigned URLs; metadata in MongoDB only ([client/docs/SCREEN_RECORDING_CAPTURE.md](./client/docs/SCREEN_RECORDING_CAPTURE.md)) |
-| Transcription / AI summary (F03) | ⬜ | `runPostProcessing` seam is in place; no STT provider selected yet |
-| In-meeting chat (F04) | ⬜ | Page shell only |
-| AI intelligence (F03) | ⬜ | Transcription, summary, action items not started |
-| Post-meeting dashboard (F05) | 🟡 | UI page exists, no recordings/summaries data |
+| Recording upload + storage (F08) | ✅ | Presigned PUT direct to S3-compatible storage, HeadObject verification; **verified end-to-end** |
+| Transcription / AI summary (F03) | 🟡 | FFmpeg → local Whisper → Ollama pipeline built and wired into `complete()` — **never actually executed** |
+| In-meeting chat (F04) | ✅ | Real-time `meeting:message` over Socket.io (roster + `can_use_chat` gated); Chat, Q&A and Polls panels side by side |
+| Post-meeting dashboard (F05) | 🟡 | Meetings list + transcript/summary endpoints exist; summaries/action items not surfaced yet |
 | Analytics (F07) | ⬜ | Not started |
-| Docker / CI-CD | 🟡 | Multi-stage Dockerfiles, Compose stacks and file-based secrets done; CI/CD pipeline pending |
+| Docker / CI-CD | ✅ | Multi-stage Dockerfiles, Compose + file-based secrets; GitHub Actions lint+build for client and server |
+| Architecture diagram | ✅ | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), generated with the archify skill |
+| Tests | ⬜ | None yet — no test framework installed |
+| Rate limiting / monitoring | ⬜ | Health endpoint exists; no rate limit, Prometheus/Grafana |
 
 ---
 
@@ -55,23 +68,22 @@ remaining bulk of the work.
 - Protected route middleware and `GET /api/v1/auth/me`
 - Client: `AuthContext`, zod-validated Login/Signup forms, protected/guest route guards
 
-### F02 — Real-Time Video Meetings ⬜
-- WebRTC peer mesh with Socket.io signaling
-- Screen sharing, recording, mute/camera controls
-- Participant presence list
+### F02 — Real-Time Video Meetings ✅
+- WebRTC peer mesh with Socket.io signaling (`useWebRtcMeeting`, SDP/ICE relay)
+- Screen sharing, mute/camera/hand controls via `meeting:state`
+- Participant presence list; browser recording capture in the room
 
-### F03 — AI Meeting Intelligence ⬜
-- Live transcription
-- Auto-generated summary
-- Action-item extraction with assignees
+### F03 — AI Meeting Intelligence 🟡
+- Local Whisper transcript + Ollama summary/action items after each recording (built into `complete()` — not yet executed for real)
+- Live in-meeting captions — not started
 
-### F04 — Real-Time Chat & Collaboration ⬜
-- In-meeting chat over Socket.io
-- Shared notes, task creation during a meeting
+### F04 — Real-Time Chat & Collaboration ✅
+- Real-time meeting chat over the existing Socket.io connection (`meeting:message`), re-checked against the roster and `can_use_chat` on every send
+- Chat, Q&A and Polls panels side by side in the meeting room; visitors get a sign-in prompt for chat
 
 ### F05 — Post-Meeting Dashboard 🟡
-- Meeting history, recordings, summaries, action items
-- Searchable history and export
+- Meetings history in the client; transcript/summary REST endpoints exist
+- Summaries, action items, searchable history and export — not surfaced yet
 
 ### F06 — Team & Project Management ✅
 - Organization workspace with invite codes
@@ -93,60 +105,54 @@ remaining bulk of the work.
 
 ## Implemented API Surface
 
+57 REST endpoints + 8 Socket.io events across system/health, auth,
+organizations, job titles, projects, meetings (with Q&A and polls), and
+recordings (with transcript/summary). The full route index with verified JSON
+request/response examples lives in **[`docs/API_ROUTES.md`](./docs/API_ROUTES.md)**;
+interactive Swagger UI at `GET /api/docs`.
+
 ```
-GET    /                       Welcome
-GET    /api                   Welcome
-GET    /api/health            Legacy health
-GET    /api/docs              Swagger UI
-GET    /api/docs/json         OpenAPI spec
-
-GET    /api/v1/health
-POST   /api/v1/auth/signup
-POST   /api/v1/auth/login
-POST   /api/v1/auth/refresh-token
-POST   /api/v1/auth/logout
-GET    /api/v1/auth/me
-
-GET    /api/v1/organizations/me
-GET    /api/v1/organizations/members
-GET    /api/v1/organizations/invite/:code
-POST   /api/v1/organizations/invite/regenerate
-
-POST   /api/v1/projects
-GET    /api/v1/projects
-GET    /api/v1/projects/:id
-PATCH  /api/v1/projects/:id
-DELETE /api/v1/projects/:id
-GET    /api/v1/projects/:id/members
-POST   /api/v1/projects/:id/members
-PATCH  /api/v1/projects/:id/members/:userId
-DELETE /api/v1/projects/:id/members/:userId
+GET    /api/v1/health · /api/v1/health/ready
+POST   /api/v1/auth/{signup,login,refresh-token,logout} · GET /api/v1/auth/me
+GET    /api/v1/organizations/{me,members,invite/:code} · POST .../invite/regenerate
+GET    /api/v1/job-titles · POST/PUT/DELETE /api/v1/job-titles[/:id] · POST .../assign
+POST/GET/PATCH/DELETE /api/v1/projects[/:id] · /projects/:id/members[/:userId[/role]]
+GET    /api/v1/meetings/join/:code · POST/GET /api/v1/meetings · GET /meetings/:id
+POST   /api/v1/meetings/:id/{join,leave,participants,participant-settings,start,end}
+POST/GET /api/v1/meetings/:id/questions[...] · /meetings/:id/polls[...]
+POST/GET/DELETE /api/v1/recordings[/:id] · .../{upload-url,complete,download-url,transcript,summary}
 ```
 
 ---
 
 ## Next Up
-1. Meeting model + CRUD and WebRTC signaling over the existing Socket.io server
-2. Real-time chat and in-meeting presence
-3. AI transcription → summary → action item pipeline
-4. Persist meetings/tasks behind the existing Meetings and Tasks pages (currently local state)
-5. Kubernetes manifests/Helm chart and a GitHub Actions CI pipeline on top of the Docker setup
-6. Prometheus/Grafana/Sentry observability
+1. Run the local AI pipeline (FFmpeg → Whisper → Ollama) once end-to-end and confirm a real transcript + summary
+2. Surface transcripts, summaries and action items on the post-meeting dashboard (F05)
+3. In-meeting chat (F04) and live captions (F03)
+4. Tests (even 30% coverage) and rate limiting on auth routes
+5. Analytics (F07) and Prometheus/Grafana observability
+6. Seed script so a judge can see data without signing up
 
 ---
 
 ## Tech Stack
 
+Full table with pinned versions, design choices and deliberate deviations from
+the original plan: **[`docs/STACK.md`](./docs/STACK.md)**.
+
 | Layer | Technology |
 | --- | --- |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, React Router 7 |
-| UI | Base UI / shadcn-style primitives, Lucide icons |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, React Router 7, TanStack Query |
+| UI | Base UI / shadcn-style primitives, MUI, Lucide icons |
 | Forms & Validation | React Hook Form, Zod |
-| Backend | Node.js, Express 4, TypeScript |
+| Backend | Node.js 22, Express 4, TypeScript |
 | Database | MongoDB (Mongoose 8, Typegoose) |
-| Real-Time | Socket.io 4 (typed events) |
-| Auth | JWT + bcryptjs |
-| Docs | Swagger / OpenAPI |
+| Real-Time | Socket.io 4 (typed events) + WebRTC peer mesh |
+| Storage | S3-compatible via AWS SDK v3 (LocalStack/Floci → R2), presigned URLs |
+| AI (local) | FFmpeg + Whisper (STT) + Ollama (LLM) — no external AI APIs |
+| Auth | JWT + bcryptjs (access in body, refresh in httpOnly cookie) |
+| Docs | Swagger / OpenAPI, Bruno collection |
+| Tooling | pnpm workspaces, Docker Compose, GitHub Actions CI |
 
 ---
 

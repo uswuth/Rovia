@@ -32,6 +32,10 @@ export class ApiError extends Error {
     return new ApiError(404, message);
   }
 
+  static conflict(message = 'Conflict'): ApiError {
+    return new ApiError(409, message);
+  }
+
   static internal(message = 'Internal Server Error', errors: unknown[] = []): ApiError {
     return new ApiError(500, message, errors);
   }

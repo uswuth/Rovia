@@ -1,26 +1,26 @@
-export type MemberRole = 'SuperAdmin' | 'Admin' | 'Host' | 'Member' | 'Visitor';
-export type MemberStatus = 'Active' | 'Pending' | 'Suspended';
+export type MemberRole = 'SuperAdmin' | 'Admin' | 'Member';
+export type MemberStatus = 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
 
 export interface Member {
-  id: string;
-  name: string;
-  email: string;
-  role: MemberRole;
-  status: MemberStatus;
-  joinedAt: string;
-  avatarUrl?: string;
-  _id?: string;
-  userId?: string;
-  userName?: string;
-  userEmail?: string;
-  userRole?: MemberRole;
-  createdAt?: string;
-  isSuperAdmin?: boolean;
-  jobTitle?: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userRole: MemberRole;
+  userStatus: MemberStatus;
   userCode?: string;
+  jobTitle?: string;
+  avatarUrl?: string;
+  phoneNumber?: string;
+  bloodType?: string;
+  address?: string;
+  city?: string;
+  isSuperAdmin?: boolean;
+  organizationId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface UpdateMemberDTO {
-  role?: MemberRole;
-  status?: MemberStatus;
+  userRole?: MemberRole;
+  userStatus?: MemberStatus;
 }

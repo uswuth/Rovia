@@ -15,7 +15,7 @@ services:
       NODE_ENV: production
       PORT: 5000
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:3000}
-      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
+      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-8h}
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
       AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-http://floci-aws:4566}
       AWS_REGION: ${AWS_REGION:-us-east-1}

@@ -7,6 +7,7 @@ const MAX_PARTICIPANT_LIMIT = 50;
 
 export const createMeetingSchema = z.object({
   projectId: z.string().min(1, 'Choose a project'),
+  teamId: z.string().optional(),
   meetingTitle: z
     .string()
     .trim()
@@ -30,7 +31,7 @@ export const createMeetingSchema = z.object({
     .int('Duration must be a whole number')
     .min(1, 'Duration must be at least 1 minute')
     .max(480, 'Duration cannot exceed 8 hours'),
-  meetingJoinMode: z.enum(['INVITE_ONLY', 'OPEN_LINK']),
+  meetingJoinMode: z.literal('INVITE_ONLY'),
   meetingParticipantLimit: z
     .number()
     .int('Limit must be a whole number')

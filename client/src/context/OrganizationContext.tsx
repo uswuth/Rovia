@@ -8,7 +8,6 @@ import { queryKeys } from '@/api/queryClient';
 
 interface OrgInfo {
   name: string;
-  inviteCode: string;
 }
 
 interface OrganizationContextValue {
@@ -22,7 +21,7 @@ interface OrganizationContextValue {
 
 const OrganizationContext = createContext<OrganizationContextValue | undefined>(undefined);
 
-const EMPTY_ORG: OrgInfo = { name: '', inviteCode: '' };
+const EMPTY_ORG: OrgInfo = { name: '' };
 
 /** `/auth/me` already returns the populated organization, so it is reused here
  *  instead of calling `/organizations/me` for the same fields. */
@@ -32,7 +31,6 @@ const toOrgInfo = (organizationId: unknown): OrgInfo => {
   const org = organizationId as Partial<OrganizationSummary>;
   return {
     name: org.organizationName ?? '',
-    inviteCode: org.inviteCode ?? '',
   };
 };
 
