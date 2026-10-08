@@ -81,17 +81,6 @@ export const getAllOrganizations = async (_req: Request, res: Response): Promise
   );
 };
 
-interface AuthUserRequest {
-  _id?: { toString(): string } | string;
-  id?: string;
-  is_super_admin?: boolean;
-  isSuperAdmin?: boolean;
-  user_role?: string;
-  userRole?: string;
-  organization_id?: { _id?: { toString(): string } | string } | string;
-  organizationId?: { _id?: { toString(): string } | string } | string;
-}
-
 export const provisionUser = async (req: Request, res: Response): Promise<Response> => {
   const currentUser = req.user as IJwtPayload;
   const isGlobalSuperAdmin = Boolean(
