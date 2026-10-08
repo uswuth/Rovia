@@ -1,5 +1,6 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { getAvatarColorByName } from "@/components/ui/avatar-colors"
 
 interface AvatarContextType {
   imageLoaded: boolean
@@ -57,20 +58,49 @@ function AvatarImage({
   )
 }
 
+interface AvatarFallbackProps extends React.ComponentProps<"div"> {
+  name?: string
+}
+
 function AvatarFallback({
   className,
   children,
+  name,
   ...props
-}: React.ComponentProps<"div">) {
+}: AvatarFallbackProps) {
   const { imageLoaded } = React.useContext(AvatarContext)
 
   if (imageLoaded) return null
+
+  const nameToUse = name || (typeof children === "string" ? children : "") || ""
+  const defaultColorClass = getAvatarColorByName(nameToUse)
+  const fallbackText = children !== undefined ? children : (nameToUse ? nameToUse.trim().charAt(0).toUpperCase() : "U")
 
   return (
     <div
       data-slot="avatar-fallback"
       className={cn(
-        "flex size-full items-center justify-center rounded-full bg-zinc-800 text-xs font-semibold text-zinc-300",
+        "flex size-full items-center justify-center rounded-full font-bold select-none text-xs",
+        defaultColorClass,
+        className
+      )}
+      {...props}
+    >
+      {fallbackText}
+    </div>
+  )
+}
+
+function AvatarGroup({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="avatar-group"
+      className={cn(
+        "flex items-center -space-x-2 *:ring-2 *:ring-background *:rounded-full",
         className
       )}
       {...props}
@@ -80,4 +110,23 @@ function AvatarFallback({
   )
 }
 
-export { Avatar, AvatarImage, AvatarFallback }
+function AvatarGroupCount({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="avatar-group-count"
+      className={cn(
+        "relative flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-semibold text-zinc-200 ring-2 ring-background font-mono",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+export { Avatar, AvatarImage, AvatarFallback, AvatarGroup, AvatarGroupCount }

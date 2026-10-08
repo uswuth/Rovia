@@ -8,6 +8,7 @@ import type { Member } from '@/types/member.types';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { getMemberId, isTopAdminRole, getRoleCategory } from '@/components/members/member-utils';
+import { useScrollFade } from '@/hooks/useScrollFade';
 
 export interface MemberRosterProps {
   /** The full pool of organization members available to select from */
@@ -58,16 +59,14 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
     user?.isSuperAdmin ||
     ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes((user?.userRole || '').toUpperCase())
   );
-  const isHost = (user?.userRole || '').toUpperCase() === 'HOST';
-  const isVisitor = (user?.userRole || '').toUpperCase() === 'VISITOR';
+  const meId = user?.userId;
+  const isHost = Boolean(meId ? (value ?? {})[meId] : false);
 
-  // Members, Hosts, Admins, and SuperAdmins CAN see emails; only Visitors CANNOT
-  const canSeeEmail = canViewEmail !== undefined ? canViewEmail : !isVisitor;
-  // The Visitor role tag is ONLY seen by Host, Admin, and SuperAdmin; NOT Member or Visitor
-  const canSeeVisitorRole = isTopAdmin || isHost;
-  // Only TopAdmin or Host can manage the roster; regular Members and Visitors have read-only view
+  const canSeeEmail = canViewEmail !== undefined ? canViewEmail : true;
+  // Only TopAdmin or Host can manage the roster; regular Members have read-only view
   const canModifyRoster = canManage !== undefined ? canManage : (isTopAdmin || isHost);
 
+  const scrollRef = useScrollFade<HTMLDivElement>();
   const [memberSearch, setMemberSearch] = useState('');
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
   const [removeAnchorRect, setRemoveAnchorRect] = useState<DOMRect | null>(null);
@@ -114,6 +113,24 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
     };
   }, []);
 
+  React.useEffect(() => {
+    if (!lockSuperAdmin) return;
+    const topAdmins = members.filter(isTopAdminRole);
+    let updated = false;
+    const copy = { ...value };
+    topAdmins.forEach((m) => {
+      const mId = getMemberId(m);
+      if (mId && copy[mId] !== 'Host') {
+        copy[mId] = 'Host';
+        updated = true;
+      }
+    });
+    if (updated) {
+      onChange(copy);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, lockSuperAdmin]);
+
   const topAdminIds = new Set(
     members.filter(isTopAdminRole).map(getMemberId)
   );
@@ -123,8 +140,8 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
   ).length;
 
   const filteredMembers = members.filter((m) => {
-    const name = m.name || m.userName || '';
-    const email = canSeeEmail ? (m.email || m.userEmail || '') : '';
+    const name = m.userName || '';
+    const email = canSeeEmail ? (m.userEmail || '') : '';
     const query = memberSearch.toLowerCase();
     return name.toLowerCase().includes(query) || (canSeeEmail && email.toLowerCase().includes(query));
   });
@@ -135,33 +152,28 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
     'Super Admin': filteredMembers.filter((m) => getRoleCategory(m) === 'SUPER_ADMIN'),
     'Admins': filteredMembers.filter((m) => getRoleCategory(m) === 'ADMIN'),
     [`${entityTitle} Hosts`]: filteredMembers.filter(
-      (m) => !isTopAdminRole(m) && getRoleCategory(m) !== 'VISITORS' && value[getMemberId(m)] === 'Host',
+      (m) => !isTopAdminRole(m) && value[getMemberId(m)] === 'Host',
     ),
     [`${entityTitle} Members`]: filteredMembers.filter(
-      (m) => !isTopAdminRole(m) && getRoleCategory(m) !== 'VISITORS' && value[getMemberId(m)] === 'Member',
+      (m) => !isTopAdminRole(m) && value[getMemberId(m)] === 'Member',
     ),
-    ...(canSeeVisitorRole
-      ? {
-          'Webinar Visitors': filteredMembers.filter((m) => getRoleCategory(m) === 'VISITORS'),
-        }
-      : {}),
     'Available Team Members': filteredMembers.filter(
-      (m) => !isTopAdminRole(m) && (canSeeVisitorRole ? getRoleCategory(m) !== 'VISITORS' : true) && !value[getMemberId(m)],
+      (m) => !isTopAdminRole(m) && !value[getMemberId(m)],
     ),
   };
 
   const selectedCount = Object.keys(value).length;
 
-  const toggleMemberSelection = (memberId: string, isSuperAdmin: boolean = false) => {
+  const toggleMemberSelection = (memberId: string) => {
     if (!canModifyRoster) return;
-    if (isSuperAdmin && lockSuperAdmin) return;
+    if (topAdminIds.has(memberId) && lockSuperAdmin) return;
     if (!isTopAdmin && topAdminIds.has(memberId)) return;
 
     const copy = { ...value };
     if (copy[memberId]) {
       // Opening confirmation dialog before removing
       const member = members.find((m) => getMemberId(m) === memberId);
-      const displayName = member?.name || member?.userName || member?.email || 'Member';
+      const displayName = member?.userName || member?.userEmail || 'Member';
       setMemberToRemove({ id: memberId, name: displayName });
     } else {
       copy[memberId] = 'Member';
@@ -255,7 +267,8 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
 
       {/* Scrollable Grouped Members List */}
       <div
-        className="flex-1 overflow-y-auto space-y-4 pr-1"
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto scroll-fade-y space-y-4 pr-1"
         style={{ minHeight }}
       >
         {filteredMembers.length === 0 ? (
@@ -283,12 +296,13 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                 <div className="space-y-1.5">
                   {groupList.map((member: Member) => {
                     const memberId = getMemberId(member);
-                    const isSuperAdmin = categoryLabel === 'Super Admin' && lockSuperAdmin;
-                    const isAdmin = categoryLabel === 'Admins' || getRoleCategory(member) === 'ADMIN';
+                    const memberCat = getRoleCategory(member);
+                    const isSuperAdmin = memberCat === 'SUPER_ADMIN';
+                    const isAdmin = memberCat === 'ADMIN';
                     const currentRole = value[memberId];
                     const isSelected = Boolean(currentRole);
-                    const displayName = member.name || member.userName || member.email || 'Unknown';
-                    const displayEmail = member.email || member.userEmail || '';
+                    const displayName = member.userName || member.userEmail || 'Unknown';
+                    const displayEmail = member.userEmail || '';
 
                     return (
                       <div
@@ -329,7 +343,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                         {/* Right side controls: Role toggles and selection buttons */}
                         <div className="flex items-center gap-2 shrink-0">
                           {!canModifyRoster ? (
-                            /* Read-only view for regular Members and Visitors */
+                            /* Read-only view for regular Members */
                             <div className="flex items-center gap-1.5">
                               {isSuperAdmin ? (
                                 <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30">
@@ -339,16 +353,6 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                                 <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
                                   Admin
                                 </span>
-                              ) : getRoleCategory(member) === 'VISITORS' ? (
-                                canSeeVisitorRole ? (
-                                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                                    Visitor
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-secondary text-secondary-foreground border border-border">
-                                    Attendee
-                                  </span>
-                                )
                               ) : isSelected ? (
                                 currentRole === 'Host' ? (
                                   <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
@@ -365,23 +369,52 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                                 </span>
                               )}
                             </div>
-                          ) : (
-                            /* Interactive controls for TopAdmin and Hosts */
+                          ) : (lockSuperAdmin && isSuperAdmin) ? (
                             <>
-                              {isSuperAdmin ? (
-                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30">
-                                  SuperAdmin
-                                </span>
-                              ) : isAdmin ? (
-                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
-                                  Admin
-                                </span>
-                              ) : getRoleCategory(member) === 'VISITORS' && canSeeVisitorRole ? (
-                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                                  Visitor
-                                </span>
-                              ) : (
-                                isSelected && (
+                              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30">
+                                SuperAdmin
+                              </span>
+                              <Tooltip className="w-auto shrink-0 inline-flex">
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex cursor-default">
+                                    <button
+                                      type="button"
+                                      disabled
+                                      tabIndex={-1}
+                                      className="w-7 h-7 rounded-full flex items-center justify-center bg-emerald-500 text-white cursor-default pointer-events-none"
+                                    >
+                                      <Check size={14} />
+                                    </button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="left">SuperAdmin is locked as Host</TooltipContent>
+                              </Tooltip>
+                            </>
+                          ) : (lockSuperAdmin && isAdmin) ? (
+                            <>
+                              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
+                                Admin
+                              </span>
+                              <Tooltip className="w-auto shrink-0 inline-flex">
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex cursor-default">
+                                    <button
+                                      type="button"
+                                      disabled
+                                      tabIndex={-1}
+                                      className="w-7 h-7 rounded-full flex items-center justify-center bg-purple-500 text-white cursor-default pointer-events-none shrink-0"
+                                    >
+                                      <Check size={14} />
+                                    </button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="left">Admin is locked as Host</TooltipContent>
+                              </Tooltip>
+                            </>
+                          ) : (
+                            /* Interactive controls for TopAdmin and Hosts on regular members */
+                            <>
+                              {isSelected && (
                                   <div className="flex items-center gap-1 bg-background/80 rounded-md p-0.5 border border-border">
                                     <button
                                       type="button"
@@ -429,39 +462,15 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                                       Host
                                     </button>
                                   </div>
-                                )
-                              )}
+                                )}
 
-                              {isSuperAdmin ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      type="button"
-                                      disabled
-                                      className="w-7 h-7 rounded-full flex items-center justify-center bg-emerald-500 text-white cursor-default"
-                                    >
-                                      <Check size={14} />
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left">SuperAdmin is locked as Host</TooltipContent>
-                                </Tooltip>
-                              ) : !isTopAdmin && isAdmin ? (
-                                /* Host cannot remove or modify an Admin */
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="w-7 h-7 rounded-full flex items-center justify-center bg-secondary/80 text-muted-foreground border border-border text-[10px] cursor-default">
-                                      <Check size={13} className="text-purple-500" />
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left">Admins are managed by SuperAdmin</TooltipContent>
-                                </Tooltip>
-                              ) : isSelected ? (
-                                <Tooltip>
+                              {isSelected ? (
+                                <Tooltip className="w-auto shrink-0 inline-flex">
                                   <TooltipTrigger asChild>
                                     <button
                                       type="button"
                                       onClick={(e) => {
-                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                                         setRemoveAnchorRect(rect);
                                         setMemberToRemove({ id: memberId, name: displayName });
                                       }}
@@ -474,11 +483,11 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                                   <TooltipContent side="left">Remove from {entityName}</TooltipContent>
                                 </Tooltip>
                               ) : (
-                                <Tooltip>
+                                <Tooltip className="w-auto shrink-0 inline-flex">
                                   <TooltipTrigger asChild>
                                     <button
                                       type="button"
-                                      onClick={() => toggleMemberSelection(memberId, false)}
+                                      onClick={() => toggleMemberSelection(memberId)}
                                       className="w-7 h-7 rounded-full flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground hover:bg-emerald-500/20 transition-colors cursor-pointer"
                                     >
                                       <UserPlus size={14} />

@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "IntellMeet — System Architecture",
+    "locale": "en",
+    "output": ".archify/architecture-intellmeet-20261006-202638/intellmeet.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/uswuth/Rovia.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "319b3efa004b329a997f195f3fb8b103f2427bff"
+    }
+  },
+  "components": [
+    {
+      "id": "participants",
+      "type": "external",
+      "label": "Participants",
+      "sublabel": "Browsers (members & link guests)",
+      "pos": [40, 320],
+      "size": [150, 60]
+    },
+    {
+      "id": "webClient",
+      "type": "frontend",
+      "label": "Web Client",
+      "sublabel": "React 19 · Vite SPA",
+      "tag": "TanStack Query",
+      "pos": [240, 160],
+      "size": [160, 64],
+      "sources": [
+        { "path": "client/package.json", "line": 13, "end_line": 37, "label": "client dependencies" },
+        { "path": "client/src/api/client.ts", "label": "axios client" }
+      ]
+    },
+    {
+      "id": "meetingRoom",
+      "type": "frontend",
+      "label": "Meeting Room",
+      "sublabel": "WebRTC mesh · Q&A · Polls",
+      "pos": [240, 440],
+      "size": [160, 64],
+      "sources": [
+        { "path": "client/src/hooks/useWebRtcMeeting.ts", "line": 5, "end_line": 23, "label": "peer mesh hook" },
+        { "path": "client/src/pages/meetings/MeetingRoom.tsx", "line": 36, "label": "room UI" }
+      ]
+    },
+    {
+      "id": "stun",
+      "type": "external",
+      "label": "STUN Server",
+      "sublabel": "stun.l.google.com",
+      "pos": [240, 650],
+      "size": [160, 56],
+      "sources": [
+        { "path": "client/src/hooks/useWebRtcMeeting.ts", "line": 5, "label": "ICE config" }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Express REST API",
+      "sublabel": "auth · meetings · recordings",
+      "pos": [580, 160],
+      "size": [170, 64],
+      "sources": [
+        { "path": "server/src/routes/index.ts", "line": 14, "end_line": 22, "label": "route mounts" },
+        { "path": "server/src/app.ts", "line": 68, "label": "API mount" },
+        { "path": "server/src/middlewares/auth.middleware.ts", "label": "JWT auth" }
+      ]
+    },
+    {
+      "id": "aiPipeline",
+      "type": "backend",
+      "label": "AI Post-Processing",
+      "sublabel": "FFmpeg → Whisper → Ollama",
+      "pos": [580, 316],
+      "size": [170, 64],
+      "sources": [
+        { "path": "server/src/services/recording.service.ts", "line": 169, "label": "inline trigger" },
+        { "path": "server/src/services/recording-post-processing.service.ts", "line": 41, "label": "pipeline" }
+      ]
+    },
+    {
+      "id": "signaling",
+      "type": "backend",
+      "label": "Socket.io Signaling",
+      "sublabel": "rooms · SDP/ICE relay",
+      "pos": [580, 440],
+      "size": [170, 64],
+      "sources": [
+        { "path": "server/src/socket/socket.ts", "line": 78, "end_line": 106, "label": "meeting:join gate" },
+        { "path": "server/src/socket/socket.ts", "line": 114, "end_line": 126, "label": "SDP/ICE relay" }
+      ]
+    },
+    {
+      "id": "objectStore",
+      "type": "cloud",
+      "label": "S3-Compatible Storage",
+      "sublabel": "private bucket · presigned URLs",
+      "pos": [580, 20],
+      "size": [170, 56],
+      "sources": [
+        { "path": "server/src/services/recording.service.ts", "line": 103, "end_line": 118, "label": "presigned PUT" },
+        { "path": "server/src/services/storage.service.ts", "line": 57, "label": "AWS SDK presigner" }
+      ]
+    },
+    {
+      "id": "mongo",
+      "type": "database",
+      "label": "MongoDB",
+      "sublabel": "tenant-scoped collections",
+      "pos": [920, 300],
+      "size": [150, 64],
+      "sources": [
+        { "path": "server/src/models/meeting.model.ts", "line": 58, "label": "meetings" },
+        { "path": "server/src/models/user.model.ts", "line": 19, "label": "users" },
+        { "path": "server/src/config/db.ts", "label": "connection" }
+      ]
+    }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Browser (client runtime)", "wraps": ["webClient", "meetingRoom"], "pad": 16 },
+    { "kind": "region", "label": "Node 22 server process", "wraps": ["api", "aiPipeline", "signaling"], "pad": 16 }
+  ],
+  "connections": [
+    { "id": "load-spa", "from": "participants", "to": "webClient", "label": "HTTPS + REST", "variant": "emphasis" },
+    { "id": "rest-api", "from": "webClient", "to": "api", "label": "REST · Bearer JWT", "variant": "emphasis" },
+    { "id": "open-room", "from": "webClient", "to": "meetingRoom", "label": "route /meetings/*" },
+    { "id": "signal-socket", "from": "meetingRoom", "to": "signaling", "label": "WebSocket · JWT", "variant": "emphasis" },
+    { "id": "ice-discovery", "from": "meetingRoom", "to": "stun", "label": "ICE lookup", "variant": "dashed" },
+    { "id": "media-p2p", "from": "meetingRoom", "to": "participants", "label": "P2P A/V", "variant": "dashed" },
+    { "id": "presign", "from": "api", "to": "objectStore", "label": "presign" },
+    { "id": "crud", "from": "api", "to": "mongo", "label": "Mongoose · CRUD" },
+    { "id": "run-ai", "from": "api", "to": "aiPipeline", "label": "complete()" },
+    { "id": "ai-write", "from": "aiPipeline", "to": "mongo", "label": "transcript + summary" },
+    { "id": "roster-check", "from": "signaling", "to": "mongo", "label": "roster check" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Browser",
+      "items": [
+        "React 19 SPA served by nginx with /api reverse-proxied to the server",
+        "A/V media flows peer-to-peer — Socket.io relays only SDP and ICE",
+        "Link guests preview the meeting in the lobby before joining"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Server",
+      "items": [
+        "One JWT access token authenticates both REST and the socket handshake",
+        "Every query is tenant-scoped from the verified JWT, never the request body",
+        "meeting:join re-checks INVITE_ONLY roster before admitting a socket"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Data & AI",
+      "items": [
+        "Browser uploads straight to storage via presigned PUT; HeadObject decides type and size",
+        "Local Whisper + Ollama generate transcripts and summaries — no external AI API",
+        "recordings, transcripts and summaries persist in MongoDB only"
+      ]
+    }
+  ]
+}

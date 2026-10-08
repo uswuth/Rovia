@@ -24,7 +24,7 @@ import { useProject } from '@/context/ProjectContext';
 import { createProject, updateProject, getProjectById } from '@/api/project/project.api';
 import { parseApiError } from '@/utils/apiError';
 import { MemberRoster } from '@/components/members/MemberRoster';
-import { getRoleCategory } from '@/components/members/member-utils';
+import { getRoleCategory, getMemberId } from '@/components/members/member-utils';
 import type { Project, CreateProjectDTO } from '@/types/project.types';
 
 const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
@@ -80,8 +80,9 @@ export const CreateProject: React.FC = () => {
     const roleMap: Record<string, 'Host' | 'Member'> = {};
 
     orgMembers?.forEach((m) => {
-      if (getRoleCategory(m) === 'SUPER_ADMIN') {
-        const mId = m.id || m._id || m.userId || m.email;
+      const cat = getRoleCategory(m);
+      if (cat === 'SUPER_ADMIN' || cat === 'ADMIN') {
+        const mId = getMemberId(m);
         if (mId) roleMap[mId] = 'Host';
       }
     });
@@ -157,7 +158,7 @@ export const CreateProject: React.FC = () => {
 
   if (isEditMode && projectLoading) {
     return (
-      <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6 max-w-6xl mx-auto">
+      <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-96 w-full rounded-xl" />
       </div>
@@ -166,7 +167,7 @@ export const CreateProject: React.FC = () => {
 
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         {/* Top Header Row with Title and Inline Back Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">

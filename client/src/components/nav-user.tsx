@@ -21,7 +21,6 @@ import { useTheme } from "@/context/theme-context"
 import {
   ChevronsUpDownIcon,
   LogOutIcon,
-  TicketIcon,
   SettingsIcon,
   SunIcon,
   MoonIcon,
@@ -29,7 +28,6 @@ import {
 
 export function NavUser({
   user,
-  onOpenInviteModal,
   onLogout,
 }: {
   user: {
@@ -37,7 +35,6 @@ export function NavUser({
     email: string
     avatar?: string
   }
-  onOpenInviteModal?: () => void
   onLogout: () => void
 }) {
   const { theme, toggleTheme } = useTheme()
@@ -62,9 +59,9 @@ export function NavUser({
               />
             }
           >
-            <Avatar className="h-8 w-8 rounded-md shrink-0 border border-border group-data-[collapsible=icon]:mx-auto">
+            <Avatar className="h-8 w-8 rounded-full shrink-0 border border-border group-data-[collapsible=icon]:mx-auto">
               <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback className="rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold text-xs">{initials}</AvatarFallback>
+              <AvatarFallback name={user.name} className="rounded-full font-bold text-xs">{initials}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-xs leading-tight min-w-0 group-data-[collapsible=icon]:hidden">
               <span className="truncate font-semibold text-foreground text-sm">{user.name}</span>
@@ -79,12 +76,6 @@ export function NavUser({
             sideOffset={8}
           >
             <DropdownMenuGroup>
-              {onOpenInviteModal && (
-                <DropdownMenuItem onClick={onOpenInviteModal} className="cursor-pointer">
-                  <TicketIcon size={14} className="text-emerald-400" />
-                  <span>Workspace Invite Code</span>
-                </DropdownMenuItem>
-              )}
               <DropdownMenuItem render={<Link to="/settings" className="w-full flex items-center gap-2" />}>
                 <SettingsIcon size={14} className="text-zinc-400" />
                 <span>Account & Settings</span>

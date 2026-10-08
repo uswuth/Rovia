@@ -31,6 +31,9 @@ import { useQuery } from '@/hooks/useApi';
 import { queryKeys } from '@/api/queryClient';
 import { getMeetings } from '@/api/meeting/meeting.api';
 import type { Meeting } from '@/api/meeting/meeting.types';
+import { GroupedAvatars } from '@/components/members/GroupedAvatars';
+import { RosterDetailModal } from '@/components/members/RosterDetailModal';
+import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
 
 export const Projects: React.FC = () => {
   const navigate = useNavigate();
@@ -41,6 +44,13 @@ export const Projects: React.FC = () => {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [gridPage, setGridPage] = useState(1);
   const [gridPageSize, setGridPageSize] = useState(6);
+  const [rosterModal, setRosterModal] = useState<{
+    open: boolean;
+    title: string;
+    projectName?: string;
+    members: Member[];
+    value: Record<string, 'Host' | 'Member'>;
+  } | null>(null);
 
   // Fetch all meetings to accurately count meetings per project
   const { data: meetings } = useQuery<Meeting[]>(
@@ -122,20 +132,52 @@ export const Projects: React.FC = () => {
     {
       id: 'team',
       header: 'Team',
-      width: '100px',
+      width: '140px',
       cell: (project) => {
         const hostList = Array.isArray(project.hosts) ? project.hosts : [];
         const memberList = Array.isArray(project.members) ? project.members : [];
-        const uniqueTeam = new Set([...hostList, ...memberList]);
-        const teamCount =
-          uniqueTeam.size > 0
-            ? uniqueTeam.size
-            : (project.memberCount || (hostList.length + memberList.length) || 1);
+        const rawList = [...hostList, ...memberList];
+        const mappedMembers: Member[] = rawList.map((m) => {
+          if (typeof m === 'string') {
+            return { userId: m, userName: m, userEmail: '', userRole: 'Member', userStatus: 'ACTIVE', createdAt: '' };
+          }
+          const obj = m as Record<string, unknown>;
+          return {
+            userId: (obj.userId || obj._id || obj.id || '') as string,
+            userName: (obj.userName || obj.name || obj.userEmail || '') as string,
+            userEmail: (obj.userEmail || obj.email || '') as string,
+            userRole: ((obj.userRole || obj.role || 'Member') as MemberRole),
+            userStatus: ((obj.userStatus || obj.status || 'ACTIVE') as MemberStatus),
+            jobTitle: obj.jobTitle as string | undefined,
+            createdAt: (obj.createdAt || '') as string,
+          };
+        });
+
+        const valueMap: Record<string, 'Host' | 'Member'> = {};
+        hostList.forEach((h) => {
+          const id = typeof h === 'string' ? h : ((h as Record<string, string>).userId || (h as Record<string, string>)._id);
+          if (id) valueMap[id] = 'Host';
+        });
+        memberList.forEach((m) => {
+          const id = typeof m === 'string' ? m : ((m as Record<string, string>).userId || (m as Record<string, string>)._id);
+          if (id && !valueMap[id]) valueMap[id] = 'Member';
+        });
+
+        const pName = getProjectName(project);
+
         return (
-          <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
-            <Users size={13} className="text-muted-foreground" />
-            <span>{teamCount}</span>
-          </div>
+          <GroupedAvatars
+            members={mappedMembers}
+            onClick={() => {
+              setRosterModal({
+                open: true,
+                title: `Project Members: ${pName}`,
+                projectName: pName,
+                members: mappedMembers,
+                value: valueMap,
+              });
+            }}
+          />
         );
       },
     },
@@ -437,6 +479,18 @@ export const Projects: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* Full Roster Detail Modal */}
+      {rosterModal && (
+        <RosterDetailModal
+          open={rosterModal.open}
+          onClose={() => setRosterModal(null)}
+          title={rosterModal.title}
+          projectName={rosterModal.projectName}
+          members={rosterModal.members}
+          value={rosterModal.value}
+        />
+      )}
     </div>
   );
 };

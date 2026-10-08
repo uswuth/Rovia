@@ -116,6 +116,43 @@ body {
   overflow-x: hidden;
 }
 
+/* Custom sleek scrollbars throughout the application */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 9999px;
+  transition: background 0.15s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
 /* Texture dots pattern for screens below 1200px */
 @media (max-width: 1199.98px) {
   .bg-dots-pattern {
@@ -150,4 +187,90 @@ body {
 
 .animate-ticker:hover {
   animation-play-state: paused;
-}
+}
+
+/* Scroll-fade utilities */
+.scroll-fade,
+.scroll-fade-y {
+  --scroll-fade-size: 40px;
+  --scroll-fade-top: 0px;
+  --scroll-fade-bottom: var(--scroll-fade-size);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    black var(--scroll-fade-top, 0px),
+    black calc(100% - var(--scroll-fade-bottom, var(--scroll-fade-size))),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    black var(--scroll-fade-top, 0px),
+    black calc(100% - var(--scroll-fade-bottom, var(--scroll-fade-size))),
+    transparent 100%
+  );
+}
+
+.scroll-fade-x {
+  --scroll-fade-size: 40px;
+  --scroll-fade-left: 0px;
+  --scroll-fade-right: var(--scroll-fade-size);
+  mask-image: linear-gradient(
+    to right,
+    transparent 0px,
+    black var(--scroll-fade-left, 0px),
+    black calc(100% - var(--scroll-fade-right, var(--scroll-fade-size))),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0px,
+    black var(--scroll-fade-left, 0px),
+    black calc(100% - var(--scroll-fade-right, var(--scroll-fade-size))),
+    transparent 100%
+  );
+}
+
+.scroll-fade-t {
+  mask-image: linear-gradient(to bottom, transparent 0px, black var(--scroll-fade-size, 40px));
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black var(--scroll-fade-size, 40px));
+}
+
+.scroll-fade-b {
+  mask-image: linear-gradient(to top, transparent 0px, black var(--scroll-fade-size, 40px));
+  -webkit-mask-image: linear-gradient(to top, transparent 0px, black var(--scroll-fade-size, 40px));
+}
+
+.scroll-fade-l {
+  mask-image: linear-gradient(to right, transparent 0px, black var(--scroll-fade-size, 40px));
+  -webkit-mask-image: linear-gradient(to right, transparent 0px, black var(--scroll-fade-size, 40px));
+}
+
+.scroll-fade-r {
+  mask-image: linear-gradient(to left, transparent 0px, black var(--scroll-fade-size, 40px));
+  -webkit-mask-image: linear-gradient(to left, transparent 0px, black var(--scroll-fade-size, 40px));
+}
+
+.scroll-fade-s {
+  mask-image: linear-gradient(to right, transparent 0px, black var(--scroll-fade-size, 40px));
+  -webkit-mask-image: linear-gradient(to right, transparent 0px, black var(--scroll-fade-size, 40px));
+}
+
+.scroll-fade-e {
+  mask-image: linear-gradient(to left, transparent 0px, black var(--scroll-fade-size, 40px));
+  -webkit-mask-image: linear-gradient(to left, transparent 0px, black var(--scroll-fade-size, 40px));
+}
+
+.scroll-fade-4 { --scroll-fade-size: 16px; }
+.scroll-fade-8 { --scroll-fade-size: 32px; }
+.scroll-fade-12 { --scroll-fade-size: 48px; }
+.scroll-fade-16 { --scroll-fade-size: 64px; }
+.scroll-fade-24 { --scroll-fade-size: 96px; }
+
+.scroll-fade-none,
+[data-overflow="false"],
+[data-overflow-x="false"] {
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+

@@ -10,16 +10,21 @@ import {
   loginUserService,
   refreshAccessTokenService,
   logoutUserService,
-  getCurrentUserService
+  getCurrentUserService,
+  changePasswordService
 } from '../services/auth.service.js';
 
 export const registerUser = async (req: Request, res: Response): Promise<Response> => {
-  const result = await registerUserService(req.body);
+  const { user, accessToken, refreshToken } = await registerUserService(req.body);
+
+  // Same cookie contract as login: the refresh token lives only in the
+  // httpOnly cookie, never in the response body.
+  res.cookie('refreshToken', refreshToken, refreshTokenCookieOptions);
 
   return ApiResponse.success(
     res,
     'User registered successfully',
-    result,
+    { user, accessToken },
     201
   );
 };
@@ -66,4 +71,11 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<Respo
   const user = await getCurrentUserService(userId);
 
   return ApiResponse.success(res, 'Current user profile retrieved', user, 200);
+};
+
+export const changePassword = async (req: Request, res: Response): Promise<Response> => {
+  const { userId } = getRequestScope(req);
+  await changePasswordService(userId, req.body);
+
+  return ApiResponse.success(res, 'Password changed successfully', null, 200);
 };

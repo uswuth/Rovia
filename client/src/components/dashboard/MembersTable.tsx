@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Filter,
@@ -8,16 +9,15 @@ import {
   Shield,
   Briefcase,
 } from 'lucide-react';
-import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
+import type { Member, MemberRole } from '@/types/member.types';
 import { useAuth } from '@/context/AuthContext';
 import { DataTable, type Column } from '@/components/ui/data-table';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { EditMemberModal } from './EditMemberModal';
 import { DeleteMemberModal } from './DeleteMemberModal';
-import { ManageJobTitlesModal } from './ManageJobTitlesModal';
 
 interface MembersTableProps {
   initialMembers: Member[];
-  inviteCode?: string;
   onUpdateMember: (updated: Member) => void;
   onRemoveMember: (id: string) => void;
 }
@@ -32,47 +32,37 @@ export const MembersTable: React.FC<MembersTableProps> = ({
     user?.isSuperAdmin ||
     ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes((user?.userRole || '').toUpperCase())
   );
-  const isHost = (user?.userRole || '').toUpperCase() === 'HOST';
-  const isVisitor = (user?.userRole || '').toUpperCase() === 'VISITOR';
+  const canSeeEmail = true;
 
-  // Members, Hosts, Admins, and SuperAdmins CAN see emails; only Visitors CANNOT
-  const canSeeEmail = !isVisitor;
-
-  // The Visitor role tag is ONLY seen by Host, Admin, and SuperAdmin; NOT Member or Visitor
-  const canSeeVisitorRole = isTopAdmin || isHost;
-
-  const [isJobTitlesModalOpen, setIsJobTitlesModalOpen] = useState(false);
+  const navigate = useNavigate();
   const [globalFilter, setGlobalFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [deletingMember, setDeletingMember] = useState<Member | null>(null);
 
-  // Active filter logic & normalization for any backend format (User or Member)
+  // Active filter logic using standard Member interface fields
   const filteredData: Member[] = useMemo(() => {
     return initialMembers
       .map((m: Member, idx: number): Member => ({
-        id: m.id || m._id || m.userId || `member-${idx}`,
-        name: m.name || m.userName || m.userEmail || 'Team Member',
-        email: canSeeEmail ? (m.email || m.userEmail || '') : '',
-        role: (m.role || m.userRole || 'Member') as MemberRole,
-        status: (m.status || 'Active') as MemberStatus,
-        jobTitle: m.jobTitle || (m as unknown as Record<string, string>).job_title || '',
-        joinedAt: m.joinedAt
-          ? String(m.joinedAt).split('T')[0]
-          : m.createdAt
-            ? String(m.createdAt).split('T')[0]
-            : '2026-03-01',
+        userId: m.userId || `member-${idx}`,
+        userName: m.userName || 'Team Member',
+        userEmail: canSeeEmail ? (m.userEmail || '') : '',
+        userRole: m.userRole || 'Member',
+        userStatus: m.userStatus || 'ACTIVE',
+        jobTitle: m.jobTitle || '',
+        createdAt: m.createdAt ? String(m.createdAt).split('T')[0] : '2026-03-01',
         avatarUrl: m.avatarUrl || '',
         isSuperAdmin: m.isSuperAdmin,
+        userCode: m.userCode || '',
       }))
       .filter((member) => {
-        const matchesRole = roleFilter === 'ALL' || member.role === roleFilter;
-        const matchesStatus = statusFilter === 'ALL' || member.status === statusFilter;
+        const matchesRole = roleFilter === 'ALL' || member.userRole === roleFilter;
+        const matchesStatus = statusFilter === 'ALL' || member.userStatus === statusFilter;
         const matchesSearch =
           !globalFilter ||
-          (member.name && member.name.toLowerCase().includes(globalFilter.toLowerCase())) ||
-          (canSeeEmail && member.email && member.email.toLowerCase().includes(globalFilter.toLowerCase())) ||
+          member.userName.toLowerCase().includes(globalFilter.toLowerCase()) ||
+          (canSeeEmail && member.userEmail.toLowerCase().includes(globalFilter.toLowerCase())) ||
           (member.jobTitle && member.jobTitle.toLowerCase().includes(globalFilter.toLowerCase()));
         return matchesRole && matchesStatus && matchesSearch;
       });
@@ -85,7 +75,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
         header: 'Member',
         width: '220px',
         cell: (member) => {
-          const displayName = member.name || member.email || 'Member';
+          const displayName = member.userName || 'Member';
           const initials =
             displayName
               .split(' ')
@@ -97,9 +87,10 @@ export const MembersTable: React.FC<MembersTableProps> = ({
 
           return (
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold text-xs border border-emerald-500/20 shrink-0">
-                {initials}
-              </div>
+              <Avatar className="h-9 w-9 shrink-0">
+                {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={displayName} />}
+                <AvatarFallback name={displayName}>{initials}</AvatarFallback>
+              </Avatar>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-semibold text-foreground text-sm leading-snug truncate">
@@ -112,7 +103,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
                   )}
                 </div>
                 {canSeeEmail ? (
-                  <div className="text-xs text-muted-foreground font-normal truncate">{member.email || 'No email'}</div>
+                  <div className="text-xs text-muted-foreground font-normal truncate">{member.userEmail || 'No email'}</div>
                 ) : (
                   <div className="text-[11px] text-muted-foreground/70 font-normal">Attendee</div>
                 )}
@@ -126,28 +117,24 @@ export const MembersTable: React.FC<MembersTableProps> = ({
         header: 'Role',
         width: '130px',
         cell: (member) => {
-          const rawRole = member.role;
-          const role: MemberRole = ['SuperAdmin', 'Admin', 'Host', 'Member', 'Visitor'].includes(rawRole)
-            ? rawRole
+          const rawRole = member.userRole || 'Member';
+          const role: MemberRole = ['SuperAdmin', 'Admin', 'Member'].includes(rawRole)
+            ? (rawRole as MemberRole)
             : 'Member';
-
-          const displayRole = (role === 'Visitor' && !canSeeVisitorRole) ? 'Member' : role;
 
           const roleBadgeStyles: Record<MemberRole, string> = {
             SuperAdmin:
               'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30 shadow-xs',
             Admin: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 shadow-xs',
-            Host: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30 shadow-xs',
             Member: 'bg-secondary text-secondary-foreground border-border shadow-xs',
-            Visitor: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shadow-xs',
           };
 
           return (
             <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${roleBadgeStyles[displayRole]}`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold border ${roleBadgeStyles[role]}`}
             >
               <Shield size={12} />
-              {displayRole}
+              {role}
             </span>
           );
         },
@@ -157,23 +144,21 @@ export const MembersTable: React.FC<MembersTableProps> = ({
         header: 'Status',
         width: '120px',
         cell: (member) => {
-          const rawStatus = member.status;
-          const status: MemberStatus = ['Active', 'Pending', 'Suspended'].includes(rawStatus)
-            ? rawStatus
-            : 'Active';
-
-          const statusStyles: Record<MemberStatus, { dot: string; text: string }> = {
-            Active: { dot: 'bg-emerald-500 dark:bg-emerald-400', text: 'text-emerald-700 dark:text-emerald-400 font-semibold' },
-            Pending: { dot: 'bg-amber-500 dark:bg-amber-400', text: 'text-amber-700 dark:text-amber-400 font-semibold' },
-            Suspended: { dot: 'bg-red-500 dark:bg-red-400', text: 'text-red-700 dark:text-red-400 font-semibold' },
-          };
-
-          const style = statusStyles[status];
+          const rawStatus = member.userStatus || 'ACTIVE';
+          const isActive = rawStatus === 'ACTIVE';
 
           return (
-            <span className={`inline-flex items-center gap-1.5 text-xs ${style.text}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${style.dot} animate-pulse`} />
-              {status}
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold ${isActive
+                  ? 'text-emerald-700 dark:text-emerald-400'
+                  : 'text-red-700 dark:text-red-400'
+                }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full animate-pulse ${isActive ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-red-500 dark:bg-red-400'
+                  }`}
+              />
+              {rawStatus}
             </span>
           );
         },
@@ -184,7 +169,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
         width: '130px',
         cell: (member) => (
           <span className="text-xs text-muted-foreground font-mono">
-            {member.joinedAt || '2026-03-01'}
+            {member.createdAt || 'N/A'}
           </span>
         ),
       },
@@ -197,7 +182,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
         align: 'right',
         width: '90px',
         cell: (member) => {
-          const isTargetSuperAdmin = member.role === 'SuperAdmin' || member.isSuperAdmin;
+          const isTargetSuperAdmin = member.userRole === 'SuperAdmin' || member.isSuperAdmin;
           const isCurrentSuperAdmin = Boolean(
             user?.isSuperAdmin || (user?.userRole || '').toUpperCase().includes('SUPER')
           );
@@ -242,7 +227,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
     }
 
     return list;
-  }, [isTopAdmin, user, canSeeEmail, canSeeVisitorRole]);
+  }, [isTopAdmin, user, canSeeEmail]);
 
   return (
     <div className="w-full space-y-4">
@@ -267,12 +252,11 @@ export const MembersTable: React.FC<MembersTableProps> = ({
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="appearance-none h-10 rounded-md border border-border/80 bg-card pl-8 pr-10 text-xs font-medium text-foreground focus:border-emerald-500 transition-all cursor-pointer shadow-xs"
+              className="appearance-none h-10 rounded-sm border border-border/80 bg-card pl-8 pr-10 text-xs font-medium text-foreground focus:border-emerald-500 transition-all cursor-pointer shadow-xs"
             >
               <option value="ALL">All Roles</option>
               <option value="SuperAdmin">SuperAdmin</option>
               <option value="Admin">Admin</option>
-              <option value="Host">Host</option>
               <option value="Member">Member</option>
             </select>
             <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center px-2 pointer-events-none border-l border-emerald-500/30">
@@ -285,12 +269,12 @@ export const MembersTable: React.FC<MembersTableProps> = ({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="appearance-none h-10 rounded-md border border-border/80 bg-card px-3 pr-10 text-xs font-medium text-foreground focus:border-emerald-500 transition-all cursor-pointer shadow-xs"
+              className="appearance-none h-10 rounded-sm border border-border/80 bg-card px-3 pr-10 text-xs font-medium text-foreground focus:border-emerald-500 transition-all cursor-pointer shadow-xs"
             >
               <option value="ALL">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Pending">Pending</option>
-              <option value="Suspended">Suspended</option>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="SUSPENDED">SUSPENDED</option>
+              <option value="DEACTIVATED">DEACTIVATED</option>
             </select>
             <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center px-2 pointer-events-none border-l border-emerald-500/30">
               <ChevronDown size={14} className="text-emerald-600 dark:text-emerald-400" />
@@ -300,12 +284,12 @@ export const MembersTable: React.FC<MembersTableProps> = ({
           {/* Job Titles Manager Button (TopAdmin Only) */}
           {isTopAdmin && (
             <button
-              onClick={() => setIsJobTitlesModalOpen(true)}
+              onClick={() => navigate('/organization/work-roles')}
               className="h-10 px-3 rounded-md border border-border/80 bg-card hover:bg-secondary text-foreground text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-              title="Manage Organization Job Titles"
+              title="Manage Organization Work Roles"
             >
               <Briefcase size={14} className="text-emerald-500" />
-              <span className="hidden sm:inline">Job Titles</span>
+              <span className="hidden sm:inline">Work Roles</span>
             </button>
           )}
         </div>
@@ -315,7 +299,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
       <DataTable
         columns={columns}
         data={filteredData}
-        keyExtractor={(m) => m.id}
+        keyExtractor={(m) => m.userId}
         emptyMessage="No organization members found matching your search."
         pageSize={5}
         pageSizeOptions={[5, 10, 20, 50]}
@@ -323,7 +307,7 @@ export const MembersTable: React.FC<MembersTableProps> = ({
 
       {/* Edit Modal */}
       <EditMemberModal
-        key={editingMember?.id}
+        key={editingMember?.userId}
         isOpen={!!editingMember}
         member={editingMember}
         onClose={() => setEditingMember(null)}
@@ -336,12 +320,6 @@ export const MembersTable: React.FC<MembersTableProps> = ({
         member={deletingMember}
         onClose={() => setDeletingMember(null)}
         onConfirm={onRemoveMember}
-      />
-
-      {/* Manage Job Titles Modal */}
-      <ManageJobTitlesModal
-        isOpen={isJobTitlesModalOpen}
-        onClose={() => setIsJobTitlesModalOpen(false)}
       />
     </div>
   );

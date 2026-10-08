@@ -1,6 +1,6 @@
 export type MeetingStatus = 'SCHEDULED' | 'LIVE' | 'ENDED' | 'CANCELLED';
-export type MeetingJoinMode = 'INVITE_ONLY' | 'OPEN_LINK';
-export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER' | 'VISITOR';
+export type MeetingJoinMode = 'INVITE_ONLY';
+export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER';
 export type MeetingParticipantStatus = 'INVITED' | 'JOINED' | 'LEFT';
 
 /** Per-member capabilities a host can toggle for one participant. */

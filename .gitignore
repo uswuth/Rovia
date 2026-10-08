@@ -37,3 +37,4 @@ server/tests/bruno/
 
 # antigravity rules
 .agents/rules/role.local
+.agents/skills/archify/

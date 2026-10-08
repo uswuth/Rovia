@@ -25,12 +25,6 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
 }) => {
   const { user } = useAuth();
   const { members: orgMembers } = useOrganization();
-  const isTopAdmin = Boolean(
-    user?.isSuperAdmin ||
-    ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes((user?.userRole || '').toUpperCase())
-  );
-  const isHost = canManage || (user?.userRole || '').toUpperCase() === 'HOST';
-  const canSeeVisitorRole = isTopAdmin || isHost;
 
   // Filter out participants who have left
   const activeParticipants = (participants ?? []).filter(
@@ -50,20 +44,19 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
       {activeParticipants.map((participant, index) => {
         const uId = participant?.userId || (participant as unknown as Record<string, string>)?.user_id || `User-${index}`;
         const role = participant?.participantRole || (participant as unknown as Record<string, string>)?.participant_role || 'MEMBER';
-        const isYou = uId === currentUserId || uId === 'visitor-me' || uId === user?.userId;
+        const isYou = uId === currentUserId || uId === user?.userId;
 
         // Resolve clean display name instead of raw Mongo/UUID hex string
         let displayName = (participant as unknown as Record<string, string>)?.userName ||
                           (participant as unknown as Record<string, string>)?.name ||
                           (isYou ? (currentUserName || user?.userName || 'You') : '');
 
+        let avatarUrl = participant.avatarUrl || (participant as unknown as Record<string, string>)?.avatar || (isYou ? user?.avatarUrl : '');
         if (!displayName && orgMembers) {
-          const matched = orgMembers.find((m) => {
-            const mId = getMemberId(m);
-            return mId === uId || m.id === uId || (m as unknown as Record<string, string>)._id === uId;
-          });
+          const matched = orgMembers.find((m) => getMemberId(m) === uId);
           if (matched) {
-            displayName = matched.name || matched.userName || matched.email;
+            displayName = matched.userName || matched.userEmail;
+            if (!avatarUrl) avatarUrl = matched.avatarUrl || '';
           }
         }
 
@@ -75,15 +68,17 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
 
         return (
           <li
-            key={uId}
+            key={`${uId}-${index}`}
             className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-xs"
           >
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-                {role === 'HOST' ? (
-                  <Crown size={14} className="text-amber-500" />
+              <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-muted-foreground border border-border">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} className="size-full object-cover" />
+                ) : role === 'HOST' ? (
+                  <Crown size={15} className="text-amber-500" />
                 ) : (
-                  <User size={14} />
+                  <User size={15} />
                 )}
               </span>
 
@@ -92,8 +87,8 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
                   {displayName} {isYou ? '(You)' : ''}
                 </p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                  {role !== 'MEMBER' && (role !== 'VISITOR' || canSeeVisitorRole) && (
-                    <Badge tone={role === 'VISITOR' ? 'warning' : 'accent'} className="text-[10px] py-0 px-1.5">
+                  {role !== 'MEMBER' && (
+                    <Badge tone="accent" className="text-[10px] py-0 px-1.5">
                       <Shield size={9} />
                       {(role || '').toLowerCase()}
                     </Badge>

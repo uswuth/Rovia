@@ -3,7 +3,7 @@ import { User } from '../models/user.model.js';
 import { Organization } from '../models/organization.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { env } from '../config/env.js';
-import { generateOrgInviteCode, generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
+import { generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
 import { validateRequired } from '../utils/validation.js';
 import { ORGANIZATION_POPULATE } from '../utils/projections.js';
 import {
@@ -12,7 +12,9 @@ import {
   IAuthTokensResponse
 } from '../types/index.js';
 
-export const registerUserService = async (input: IUserRegisterInput): Promise<IAuthTokensResponse> => {
+export const registerUserService = async (
+  input: IUserRegisterInput
+): Promise<IAuthTokensResponse & { refreshToken: string }> => {
   validateRequired(input, ['userName', 'userEmail', 'password']);
 
   const userName = input.userName.trim();
@@ -45,13 +47,17 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
       .trim()
       .replace(/[^a-z0-9]/g, '-');
 
+    // Collision handling: try a random suffix, then a timestamp suffix, so a
+    // repeated collision can never surface as a raw duplicate-key 500.
+    const slugExists = async (slug: string) =>
+      Boolean(await Organization.findOne({ organization_slug: slug }).lean());
     let finalSlug = baseSlug;
-    const existingOrg = await Organization.findOne({ organization_slug: finalSlug });
-    if (existingOrg) {
-      finalSlug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+    if (await slugExists(finalSlug)) {
+      finalSlug = `${baseSlug}-${Math.random().toString(36).slice(2, 8)}`;
+      if (await slugExists(finalSlug)) {
+        finalSlug = `${baseSlug}-${Date.now().toString(36)}`;
+      }
     }
-
-    const generatedInvite = generateOrgInviteCode(finalSlug);
 
     const userCode = await generateSequentialCode(ENTITY_PREFIXES.USER, User, 'user_code');
     const user = new User({
@@ -68,13 +74,16 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
     user.refreshToken = refreshToken;
     await user.save();
 
-    // 2. Create Organization with user as owner
+    // 2. Create Organization with user as owner. If this fails, the half-created
+    // user is rolled back so a failed signup never consumes the email address.
     const newOrg = await Organization.create({
       organization_name: orgName,
       organization_slug: finalSlug,
       organization_location: input.organizationLocation ? input.organizationLocation.trim() : '',
-      organization_invite_code: generatedInvite,
       organization_owner_id: user._id
+    }).catch(async (error: unknown) => {
+      await User.deleteOne({ _id: user._id }).catch(() => undefined);
+      throw error;
     });
 
     // 3. Link organization to user
@@ -88,28 +97,13 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
 
     return {
       user: populatedUser!.toJSON() as unknown as IAuthTokensResponse['user'],
-      accessToken
+      accessToken,
+      refreshToken
     };
   }
 
-  // ── CASE 2: Toggle = FALSE (Joining via Invite Code -> Member) ──
-  const inviteCode = (input.inviteCode || '').trim().toUpperCase();
-  if (inviteCode) {
-    // Check if code was previously revoked
-    const revokedOrg = await Organization.findOne({ revoked_invite_codes: inviteCode });
-    if (revokedOrg) {
-      throw ApiError.badRequest('This invite code has been revoked. Please request an updated invite code from your SuperAdmin.', [
-        { field: 'inviteCode', message: 'Invite code is revoked' }
-      ]);
-    }
-
-    const org = await Organization.findOne({ organization_invite_code: inviteCode });
-    if (!org) {
-      throw ApiError.badRequest('Invalid invite code. Organization not found.', [
-        { field: 'inviteCode', message: 'Invalid invite code. Please check with your SuperAdmin.' }
-      ]);
-    }
-    assignedOrgId = org._id.toString();
+  if (input.organizationId) {
+    assignedOrgId = input.organizationId;
   }
 
   const userCode = await generateSequentialCode(ENTITY_PREFIXES.USER, User, 'user_code');
@@ -134,7 +128,8 @@ export const registerUserService = async (input: IUserRegisterInput): Promise<IA
 
   return {
     user: populatedUser!.toJSON() as unknown as IAuthTokensResponse['user'],
-    accessToken
+    accessToken,
+    refreshToken
   };
 };
 
@@ -210,4 +205,41 @@ export const getCurrentUserService = async (userId: string): Promise<IAuthTokens
     throw ApiError.notFound('User not found');
   }
   return user.toJSON() as unknown as IAuthTokensResponse['user'];
+};
+
+export interface IChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export const changePasswordService = async (
+  userId: string,
+  input: IChangePasswordInput
+): Promise<void> => {
+  const { currentPassword, newPassword } = input;
+
+  if (!currentPassword || !newPassword) {
+    throw ApiError.badRequest('Current password and new password are required');
+  }
+
+  if (newPassword.length < 6) {
+    throw ApiError.badRequest('New password must be at least 6 characters long', [
+      { field: 'newPassword', message: 'Password must be at least 6 characters' }
+    ]);
+  }
+
+  const user = await User.findById(userId).select('+password');
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+
+  const isCurrentValid = await user.comparePassword(currentPassword);
+  if (!isCurrentValid) {
+    throw ApiError.badRequest('Current password is incorrect', [
+      { field: 'currentPassword', message: 'Current password is incorrect' }
+    ]);
+  }
+
+  user.password = newPassword;
+  await user.save();
 };

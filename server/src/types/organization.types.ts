@@ -6,7 +6,6 @@ export interface IOrganization {
   name: string;
   slug: string;
   location?: string;
-  inviteCode: string;
   ownerId: Ref<UserClass> | string;
   createdAt: Date;
   updatedAt: Date;
@@ -15,13 +14,5 @@ export interface IOrganization {
 export interface ICreateOrganizationInput {
   name: string;
   slug?: string;
-  location?: string;
-}
-
-export interface IVerifyInviteCodeResponse {
-  valid: boolean;
-  organizationId: string;
-  organizationName: string;
-  organizationSlug: string;
   location?: string;
 }

@@ -28,10 +28,9 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
   if (!isOpen || !member) return null;
 
-  // Remounting on member change re-initializes the form state from the new member
   return (
     <EditMemberForm
-      key={member.id}
+      key={member.userId}
       member={member}
       availableTitles={availableTitles}
       onClose={onClose}
@@ -53,23 +52,23 @@ const EditMemberForm: React.FC<EditMemberFormProps> = ({
   onClose,
   onSave,
 }) => {
-  const [role, setRole] = useState<MemberRole>(member.role ?? 'Member');
-  const [status, setStatus] = useState<MemberStatus>(member.status ?? 'Active');
+  const [role, setRole] = useState<MemberRole>(member.userRole ?? 'Member');
+  const [status, setStatus] = useState<MemberStatus>(member.userStatus ?? 'ACTIVE');
   const [jobTitle, setJobTitle] = useState<string>(member.jobTitle ?? '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (member && jobTitle !== (member.jobTitle ?? '')) {
       try {
-        await assignJobTitle(member.id, jobTitle);
+        await assignJobTitle(member.userId, jobTitle);
       } catch {
         // Ignore background assignment failure if offline
       }
     }
     onSave({
       ...member,
-      role,
-      status,
+      userRole: role,
+      userStatus: status,
       jobTitle,
     });
     onClose();
@@ -77,21 +76,21 @@ const EditMemberForm: React.FC<EditMemberFormProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-white/40 dark:bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 
-        className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-2xl"
+        className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <div className="flex h-9 w-9 items-center justify-center rounded-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               <User size={18} />
             </div>
             <div>
               <h3 className="text-base font-semibold text-foreground">Manage Member</h3>
-              <p className="text-xs text-muted-foreground">{member.email || member.role}</p>
+              <p className="text-xs text-muted-foreground">{member.userEmail || member.userRole}</p>
             </div>
           </div>
         </div>
@@ -102,8 +101,8 @@ const EditMemberForm: React.FC<EditMemberFormProps> = ({
             <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
               Member Name
             </label>
-            <div className="h-10 w-full rounded-md border border-border bg-secondary/50 px-3.5 flex items-center text-sm font-medium text-foreground">
-              {member.name}
+            <div className="h-10 w-full rounded-sm border border-border bg-secondary/50 px-3.5 flex items-center text-sm font-medium text-foreground">
+              {member.userName}
             </div>
           </div>
 
@@ -117,7 +116,7 @@ const EditMemberForm: React.FC<EditMemberFormProps> = ({
               <select
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
-                className="h-10 w-full rounded-md border border-border bg-card pl-10 pr-3.5 text-sm text-foreground focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/30 transition-colors cursor-pointer"
+                className="h-10 w-full rounded-sm border border-border bg-card pl-10 pr-3.5 text-sm text-foreground focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/30 transition-colors cursor-pointer"
               >
                 <option value="">No Title Assigned</option>
                 {availableTitles.map((t) => (
@@ -139,11 +138,10 @@ const EditMemberForm: React.FC<EditMemberFormProps> = ({
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as MemberRole)}
-                className="h-10 w-full rounded-md border border-border bg-card pl-10 pr-3.5 text-sm text-foreground focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/30 transition-colors cursor-pointer"
+                className="h-10 w-full rounded-sm border border-border bg-card pl-10 pr-3.5 text-sm text-foreground focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/30 transition-colors cursor-pointer"
               >
                 <option value="SuperAdmin">SuperAdmin</option>
                 <option value="Admin">Admin</option>
-                <option value="Host">Host</option>
                 <option value="Member">Member</option>
               </select>
             </div>
@@ -159,11 +157,11 @@ const EditMemberForm: React.FC<EditMemberFormProps> = ({
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as MemberStatus)}
-                className="h-10 w-full rounded-md border border-border bg-card pl-10 pr-3.5 text-sm text-foreground focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/30 transition-colors cursor-pointer"
+                className="h-10 w-full rounded-sm border border-border bg-card pl-10 pr-3.5 text-sm text-foreground focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/30 transition-colors cursor-pointer"
               >
-                <option value="Active">Active</option>
-                <option value="Pending">Pending</option>
-                <option value="Suspended">Suspended</option>
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="SUSPENDED">SUSPENDED</option>
+                <option value="DEACTIVATED">DEACTIVATED</option>
               </select>
             </div>
           </div>
@@ -173,13 +171,13 @@ const EditMemberForm: React.FC<EditMemberFormProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 rounded-md text-xs font-medium bg-secondary text-foreground hover:bg-secondary/80 transition-colors cursor-pointer"
+              className="h-9 px-4 rounded-sm text-xs font-medium bg-secondary text-foreground hover:bg-secondary/80 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-9 px-4 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+              className="h-9 px-4 rounded-sm bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
             >
               Save Changes
             </button>

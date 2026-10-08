@@ -7,7 +7,7 @@ const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 export const refreshTokenCookieOptions: CookieOptions = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  sameSite: env.NODE_ENV === 'production' ? 'strict' : 'lax',
   maxAge: REFRESH_TOKEN_MAX_AGE
 };
 
@@ -15,5 +15,5 @@ export const refreshTokenCookieOptions: CookieOptions = {
 export const clearRefreshTokenCookieOptions: CookieOptions = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
-  sameSite: 'strict'
+  sameSite: env.NODE_ENV === 'production' ? 'strict' : 'lax'
 };

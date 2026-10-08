@@ -14,8 +14,6 @@ import { UserClass } from './user.model.js';
           organizationSlug: ret.organization_slug as string,
           organizationLocation: (ret.organization_location ?? '') as string,
           organizationDescription: (ret.organization_description ?? '') as string,
-          inviteCode: ret.organization_invite_code as string,
-          revokedInviteCodes: (ret.revoked_invite_codes as string[]) || [],
           ownerId: ret.organization_owner_id,
           createdAt: ret.created_at,
           updatedAt: ret.updated_at
@@ -79,36 +77,6 @@ export class OrganizationClass {
   }
   public set organizationDescription(val: string | undefined) {
     this.organization_description = val;
-  }
-
-  @prop({
-    type: () => String,
-    required: [true, 'Invite code is required'],
-    unique: true,
-    index: true,
-    alias: 'inviteCode'
-  })
-  public organization_invite_code!: string;
-
-  public get inviteCode(): string {
-    return this.organization_invite_code;
-  }
-  public set inviteCode(val: string) {
-    this.organization_invite_code = val;
-  }
-
-  @prop({
-    type: () => [String],
-    default: [],
-    alias: 'revokedInviteCodes'
-  })
-  public revoked_invite_codes!: string[];
-
-  public get revokedInviteCodes(): string[] {
-    return this.revoked_invite_codes;
-  }
-  public set revokedInviteCodes(val: string[]) {
-    this.revoked_invite_codes = val;
   }
 
   @prop({ ref: () => 'UserClass', required: true, alias: 'ownerId' })

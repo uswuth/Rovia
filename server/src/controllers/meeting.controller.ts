@@ -22,7 +22,7 @@ import {
   MeetingStatus
 } from '../types/index.js';
 
-const JOIN_MODES: MeetingJoinMode[] = ['INVITE_ONLY', 'OPEN_LINK'];
+const JOIN_MODES: MeetingJoinMode[] = ['INVITE_ONLY'];
 const MEETING_STATUSES: MeetingStatus[] = ['SCHEDULED', 'LIVE', 'ENDED', 'CANCELLED'];
 
 export const createMeeting = async (req: Request, res: Response): Promise<Response> => {
@@ -30,7 +30,7 @@ export const createMeeting = async (req: Request, res: Response): Promise<Respon
   const input = req.body as ICreateMeetingInput;
 
   if (input.meetingJoinMode && !JOIN_MODES.includes(input.meetingJoinMode)) {
-    throw ApiError.badRequest('meetingJoinMode must be INVITE_ONLY or OPEN_LINK');
+    throw ApiError.badRequest('meetingJoinMode must be INVITE_ONLY');
   }
 
   const meeting = await createMeetingService(input, organizationId, userId);

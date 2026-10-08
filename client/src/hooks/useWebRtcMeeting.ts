@@ -23,7 +23,7 @@ export interface PeerState {
 export const useWebRtcMeeting = (
   meetingId: string,
   enabled: boolean,
-  options?: { onPeerLeft?: (userId: string) => void }
+  options?: { visitorId?: string; onPeerLeft?: (userId: string) => void }
 ) => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [peers, setPeers] = useState<Record<string, PeerState>>({});
@@ -86,8 +86,16 @@ export const useWebRtcMeeting = (
 
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'connected') setStatus('connected');
-        if (['failed', 'closed'].includes(pc.connectionState)) {
-          setError(`Connection to ${userId} ${pc.connectionState}`);
+        if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
+          connections.current[userId]?.close();
+          delete connections.current[userId];
+          setPeers((prev) => {
+            if (!prev[userId]) return prev;
+            const next = { ...prev };
+            delete next[userId];
+            return next;
+          });
+          onPeerLeftRef.current?.(userId);
         }
       };
 
@@ -108,6 +116,8 @@ export const useWebRtcMeeting = (
     if (!enabled || !meetingId) return undefined;
 
     let cancelled = false;
+    let joinTimer: number | undefined;
+    let joinTimedOut = false;
 
     const start = async () => {
       setStatus('connecting');
@@ -127,7 +137,7 @@ export const useWebRtcMeeting = (
         return;
       }
 
-      const socket = getMeetingSocket();
+      const socket = getMeetingSocket(options?.visitorId);
       socketRef.current = socket;
 
       socket.on('meeting:peer-joined', ({ userId }) => {
@@ -148,11 +158,13 @@ export const useWebRtcMeeting = (
       });
 
       socket.on('meeting:state', ({ userId, state }) => {
-        upsertPeer(userId, {
-          audioEnabled: typeof state.audioEnabled === 'boolean' ? state.audioEnabled : true,
-          videoEnabled: typeof state.videoEnabled === 'boolean' ? state.videoEnabled : true,
-          screenSharing: typeof state.screenSharing === 'boolean' ? state.screenSharing : false
-        });
+        // Merge only the keys the event actually carries; defaulting the rest
+        // would reset flags the peer never changed.
+        const patch: { audioEnabled?: boolean; videoEnabled?: boolean; screenSharing?: boolean } = {};
+        if (typeof state.audioEnabled === 'boolean') patch.audioEnabled = state.audioEnabled;
+        if (typeof state.videoEnabled === 'boolean') patch.videoEnabled = state.videoEnabled;
+        if (typeof state.screenSharing === 'boolean') patch.screenSharing = state.screenSharing;
+        if (Object.keys(patch).length > 0) upsertPeer(userId, patch);
       });
 
       socket.on('webrtc:offer', async (data: MeetingSignalPayload) => {
@@ -177,8 +189,24 @@ export const useWebRtcMeeting = (
         }
       });
 
+      // No-ack guard: a rejected or dead socket must surface as an error,
+      // not an endless "connecting" spinner.
+      joinTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        joinTimedOut = true;
+        setError('Could not join the meeting: the server did not respond');
+        setStatus('failed');
+      }, 10000);
+
       socket.emit('meeting:join', meetingId, (result) => {
         if (cancelled) return;
+        if (joinTimer !== undefined) window.clearTimeout(joinTimer);
+        if (joinTimedOut) {
+          // Late ack: recover instead of leaving the stale failure on screen.
+          joinTimedOut = false;
+          setError(null);
+          if (result.ok) setStatus('connecting');
+        }
         if (!result.ok) {
           setError(result.error ?? 'Could not join the meeting');
           setStatus('failed');
@@ -192,6 +220,7 @@ export const useWebRtcMeeting = (
 
     return () => {
       cancelled = true;
+      if (joinTimer !== undefined) window.clearTimeout(joinTimer);
       socketRef.current?.emit('meeting:leave', meetingId);
       Object.values(connections.current).forEach((pc) => pc.close());
       connections.current = {};
@@ -201,7 +230,7 @@ export const useWebRtcMeeting = (
       setPeers({});
       disconnectMeetingSocket();
     };
-  }, [enabled, meetingId, createConnection, upsertPeer]);
+  }, [enabled, meetingId, createConnection, upsertPeer, options?.visitorId]);
 
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);

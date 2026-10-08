@@ -22,6 +22,7 @@ import { queryKeys } from '@/api/queryClient';
 import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { getProjects, getProjectById } from '@/api/project/project.api';
+import { getTeamsApi } from '@/api/teams/teams.api';
 import { createMeeting } from '@/api/meeting/meeting.api';
 import { getProjectName, getProjectId, type Project } from '@/types/project.types';
 import { parseApiError } from '@/utils/apiError';
@@ -29,10 +30,6 @@ import { createMeetingSchema, type CreateMeetingFormValues } from '@/schemas/mee
 import { MemberRoster } from '@/components/members/MemberRoster';
 import { getRoleCategory, getMemberId } from '@/components/members/member-utils';
 
-const JOIN_MODE_OPTIONS = [
-  { value: 'INVITE_ONLY', label: 'Invite Only (Assigned Project Members)' },
-  { value: 'OPEN_LINK', label: 'Open Link (Anyone with Account)' },
-];
 
 export const CreateMeeting: React.FC = () => {
   const [params] = useSearchParams();
@@ -47,6 +44,13 @@ export const CreateMeeting: React.FC = () => {
     () => getProjects(),
     { enabled: isAuthenticated && !lockedProjectId, list: true }
   );
+
+  const { data: teamsData } = useQuery<Record<string, unknown>[]>(
+    ['teams', 'list'],
+    () => getTeamsApi(),
+    { enabled: isAuthenticated, list: true }
+  );
+  const teams = teamsData || [];
 
   // Default schedule start date/time dynamically based on current user time (rounded up to next 5 minutes)
   const [defaultStart] = useState(() => {
@@ -65,6 +69,7 @@ export const CreateMeeting: React.FC = () => {
     resolver: zodResolver(createMeetingSchema),
     defaultValues: {
       projectId: lockedProjectId ?? '',
+      teamId: '',
       meetingTitle: '',
       meetingDescription: '',
       meetingScheduledAt: defaultStart,
@@ -75,7 +80,35 @@ export const CreateMeeting: React.FC = () => {
   });
 
   const watchedProjectId = useWatch({ control, name: 'projectId' });
+  const watchedTeamId = useWatch({ control, name: 'teamId' });
   const selectedProjectId = lockedProjectId || watchedProjectId;
+
+  // Compute sub-team member IDs if a team is selected
+  const activeTeamMemberIds = useMemo<Set<string> | null>(() => {
+    if (!watchedTeamId || watchedTeamId === 'NONE') return null;
+    const tObj = teams.find((t) => ((t.teamId || t._id) as string) === watchedTeamId);
+    if (!tObj) return null;
+
+    const set = new Set<string>();
+    const hosts = (tObj.hosts as unknown[]) || [];
+    const membersList = (tObj.members as unknown[]) || [];
+
+    const extractId = (entry: unknown): string | undefined => {
+      if (typeof entry === 'string') return entry;
+      if (typeof entry === 'object' && entry !== null) {
+        const obj = entry as Record<string, unknown>;
+        return (obj.userId || obj._id) as string | undefined;
+      }
+      return undefined;
+    };
+
+    [...hosts, ...membersList].forEach((m) => {
+      const idStr = extractId(m);
+      if (idStr) set.add(idStr);
+    });
+
+    return set;
+  }, [teams, watchedTeamId]);
 
   // Fetch full project details (including project_members and hosts) for the selected project
   const { data: selectedProjectDetails } = useQuery<Project>(
@@ -117,7 +150,7 @@ export const CreateMeeting: React.FC = () => {
     return set;
   }, [activeProject]);
 
-  // Data isolation filter: show only members assigned to this project (+ SuperAdmin/Admin)
+  // Data isolation filter: show only members assigned to this team (or project if no team selected) (+ SuperAdmin/Admin)
   const projectFilteredMembers = useMemo(() => {
     if (!members) return [];
     if (!selectedProjectId) return members;
@@ -131,10 +164,17 @@ export const CreateMeeting: React.FC = () => {
         return true;
       }
 
-      // Regular members must be assigned to this project
-      return mId ? projectMemberIds.has(mId) : false;
+      if (!mId) return false;
+
+      // If a specific sub-team is selected, restrict candidate pool to that team
+      if (activeTeamMemberIds) {
+        return activeTeamMemberIds.has(mId);
+      }
+
+      // Otherwise, show all project members
+      return projectMemberIds.has(mId);
     });
-  }, [members, selectedProjectId, projectMemberIds]);
+  }, [members, selectedProjectId, projectMemberIds, activeTeamMemberIds]);
 
   const defaultEnd = useMemo(() => {
     const startDate = new Date(defaultStart);
@@ -148,11 +188,12 @@ export const CreateMeeting: React.FC = () => {
     setValue('meetingScheduledAt', defaultStart);
   }, [defaultStart, setValue]);
 
-  // Pre-assign SuperAdmins as Host, keeping any assignment the user has already made.
-  const superAdminRoles = useMemo<Record<string, 'Host' | 'Member'>>(() => {
+  // Pre-assign SuperAdmins & Admins as Host by default
+  const topAdminRoles = useMemo<Record<string, 'Host' | 'Member'>>(() => {
     const roleMap: Record<string, 'Host' | 'Member'> = {};
     projectFilteredMembers.forEach((m) => {
-      if (getRoleCategory(m) === 'SUPER_ADMIN') {
+      const cat = getRoleCategory(m);
+      if (cat === 'SUPER_ADMIN' || cat === 'ADMIN') {
         const mId = getMemberId(m);
         if (mId) roleMap[mId] = 'Host';
       }
@@ -160,10 +201,10 @@ export const CreateMeeting: React.FC = () => {
     return roleMap;
   }, [projectFilteredMembers]);
 
-  const [seededRoles, setSeededRoles] = useState(superAdminRoles);
-  if (seededRoles !== superAdminRoles) {
-    setSeededRoles(superAdminRoles);
-    setAssignedRoles((prev) => ({ ...superAdminRoles, ...prev }));
+  const [seededRoles, setSeededRoles] = useState(topAdminRoles);
+  if (seededRoles !== topAdminRoles) {
+    setSeededRoles(topAdminRoles);
+    setAssignedRoles((prev) => ({ ...topAdminRoles, ...prev }));
   }
 
   const handleStartChange = (newStartIso: string) => {
@@ -203,6 +244,7 @@ export const CreateMeeting: React.FC = () => {
     mutationFn: (values) =>
       createMeeting({
         projectId: lockedProjectId ?? values.projectId,
+        teamId: values.teamId || undefined,
         meetingTitle: values.meetingTitle.trim(),
         meetingDescription: values.meetingDescription?.trim(),
         meetingScheduledAt: new Date(values.meetingScheduledAt).toISOString(),
@@ -220,7 +262,7 @@ export const CreateMeeting: React.FC = () => {
 
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         {/* Top Header Row with Title and Inline Back Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
@@ -244,69 +286,123 @@ export const CreateMeeting: React.FC = () => {
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit((values) => create.mutate(values))}>
+        <form onSubmit={handleSubmit((values) => create.mutate(values as CreateMeetingFormValues))}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
             {/* LEFT COLUMN: Meeting Details Form Fields */}
             <div className="lg:col-span-7 space-y-4">
-              {lockedProjectId ? (
-                <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground">Project</p>
-                    <p className="truncate text-sm font-bold text-foreground">
-                      {lockedProject ? getProjectName(lockedProject) : lockedProjectId}
-                    </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {lockedProjectId ? (
+                  <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">Project</p>
+                      <p className="truncate text-sm font-bold text-foreground">
+                        {lockedProject ? getProjectName(lockedProject) : lockedProjectId}
+                      </p>
+                    </div>
+                    <Badge tone="neutral">
+                      <Lock size={10} />
+                      Fixed by project
+                    </Badge>
                   </div>
-                  <Badge tone="neutral">
-                    <Lock size={10} />
-                    Fixed by project
-                  </Badge>
-                </div>
-              ) : (
-                <FormField
-                  label="Project"
-                  htmlFor="meeting-project"
-                  required
-                  error={errors.projectId?.message}
-                >
-                  {projectsLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                  ) : (
-                    <Controller
-                      control={control}
-                      name="projectId"
-                      render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={(val) => {
-                            if (val) field.onChange(val);
-                          }}
-                        >
-                          <SelectTrigger id="meeting-project" className="w-full">
-                            <SelectValue placeholder="Select project">
-                              {(val: unknown) => {
-                                if (!val) return 'Select project';
-                                const selected = (projects ?? []).find((p) => getProjectId(p) === val);
-                                return selected ? getProjectName(selected) : String(val);
-                              }}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(projects ?? []).map((project) => {
-                              const pId = getProjectId(project);
-                              const pName = getProjectName(project);
+                ) : (
+                  <FormField
+                    label="Project"
+                    htmlFor="meeting-project"
+                    required
+                    error={errors.projectId?.message}
+                  >
+                    {projectsLoading ? (
+                      <Skeleton className="h-10 w-full" />
+                    ) : (
+                      <Controller
+                        control={control}
+                        name="projectId"
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onValueChange={(val) => {
+                              if (val) {
+                                field.onChange(val);
+                                setValue('teamId', '');
+                                setAssignedRoles({});
+                              }
+                            }}
+                          >
+                            <SelectTrigger id="meeting-project" className="w-full">
+                              <SelectValue placeholder="Select project">
+                                {(val: unknown) => {
+                                  if (!val) return 'Select project';
+                                  const selected = (projects ?? []).find((p) => getProjectId(p) === val);
+                                  return selected ? getProjectName(selected) : String(val);
+                                }}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(projects ?? []).map((project) => {
+                                const pId = getProjectId(project);
+                                const pName = getProjectName(project);
+                                return (
+                                  <SelectItem key={pId} value={pId}>
+                                    {pName}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    )}
+                  </FormField>
+                )}
+
+                <FormField label="Assigned Team (Optional)" htmlFor="meeting-team" error={errors.teamId?.message}>
+                  <Controller
+                    control={control}
+                    name="teamId"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value || 'NONE'}
+                        onValueChange={(val) => {
+                          field.onChange(val === 'NONE' ? '' : val);
+                          setAssignedRoles({});
+                        }}
+                      >
+                        <SelectTrigger id="meeting-team" className="w-full">
+                          <SelectValue placeholder="No Specific Team (Project Alone)">
+                            {(val: unknown) => {
+                              if (!val || val === 'NONE') return 'No Specific Team (Project Alone)';
+                              const match = (teams ?? []).find((t) => ((t.teamId || t._id) as string) === val);
+                              return match ? (match.teamName as string) : String(val);
+                            }}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NONE">No Specific Team (Project Alone)</SelectItem>
+                          {(teams ?? [])
+                            .filter((tm) => {
+                              if (!selectedProjectId) return true;
+                              const pObj =
+                                typeof tm.projectId === 'object' && tm.projectId !== null
+                                  ? (tm.projectId as unknown as Record<string, unknown>)
+                                  : null;
+                              const pId = pObj ? ((pObj._id || pObj.projectId) as string) : (tm.projectId as string);
+                              return pId === selectedProjectId;
+                            })
+                            .map((tm) => {
+                              const tmId = (tm.teamId || tm._id) as string;
+                              const tmName = tm.teamName as string;
                               return (
-                                <SelectItem key={pId} value={pId}>
-                                  {pName}
+                                <SelectItem key={tmId} value={tmId}>
+                                  {tmName}
                                 </SelectItem>
                               );
                             })}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </FormField>
-              )}
+              </div>
 
               <FormField label="Title" htmlFor="meeting-title" required error={errors.meetingTitle?.message}>
                 <Input id="meeting-title" {...register('meetingTitle')} />
@@ -355,42 +451,6 @@ export const CreateMeeting: React.FC = () => {
                   />
                 </FormField>
               </div>
-
-              <FormField
-                label="Who can join"
-                htmlFor="meeting-join-mode"
-                error={errors.meetingJoinMode?.message}
-              >
-                <Controller
-                  control={control}
-                  name="meetingJoinMode"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(val) => {
-                        if (val) field.onChange(val);
-                      }}
-                    >
-                      <SelectTrigger id="meeting-join-mode" className="w-72 max-w-sm">
-                        <SelectValue placeholder="Who can join">
-                          {(val: unknown) => {
-                            if (!val) return 'Who can join';
-                            const opt = JOIN_MODE_OPTIONS.find((o) => o.value === val);
-                            return opt ? opt.label : String(val);
-                          }}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {JOIN_MODE_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </FormField>
 
               {isProjectReadOnly && (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">

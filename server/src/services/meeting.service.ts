@@ -271,6 +271,7 @@ export const previewMeetingByJoinCodeService = async (joinCode: string, organiza
     meetingParticipantCount: meeting.meeting_participants.length,
     meetingParticipantLimit: meeting.meeting_participant_limit,
     meetingJoinCode: meeting.meeting_join_code,
+    createdBy: meeting.created_by ? meeting.created_by.toString() : undefined,
     participants: (meeting.meeting_participants || []).map((p) => ({
       userId: p.userId,
       participantRole: p.participant_role,

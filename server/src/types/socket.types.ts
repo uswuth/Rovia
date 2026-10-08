@@ -12,6 +12,13 @@ export interface ServerToClientEvents {
   'meeting:peer-joined': (data: { userId: string }) => void;
   'meeting:peer-left': (data: { userId: string }) => void;
   'meeting:state': (data: { userId: string; state: Record<string, boolean | string> }) => void;
+  'meeting:message': (data: {
+    messageId: string;
+    meetingId: string;
+    from: string;
+    text: string;
+    at: string;
+  }) => void;
   'webrtc:offer': (data: MeetingSignalPayload) => void;
   'webrtc:answer': (data: MeetingSignalPayload) => void;
   'webrtc:ice': (data: MeetingSignalPayload) => void;
@@ -36,6 +43,10 @@ export interface ClientToServerEvents {
   'meeting:join': (meetingId: string, ack?: (result: { ok: boolean; peers?: string[]; error?: string }) => void) => void;
   'meeting:leave': (meetingId: string) => void;
   'meeting:state': (payload: { meetingId: string; state: Record<string, boolean | string> }) => void;
+  'meeting:message': (
+    payload: { meetingId: string; text: string },
+    ack?: (result: { ok: boolean; error?: string }) => void
+  ) => void;
   'webrtc:offer': (payload: { meetingId: string; to: string; description: RTCSessionDescriptionInitLike }) => void;
   'webrtc:answer': (payload: { meetingId: string; to: string; description: RTCSessionDescriptionInitLike }) => void;
   'webrtc:ice': (payload: { meetingId: string; to: string; candidate: RTCIceCandidateInitLike }) => void;
@@ -49,4 +60,5 @@ export interface SocketData {
   userId?: string;
   organizationId?: string;
   meetingId?: string;
+  isSuperAdmin?: boolean;
 }

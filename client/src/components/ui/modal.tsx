@@ -11,6 +11,7 @@ interface ModalProps {
   footer?: React.ReactNode
   children: React.ReactNode
   className?: string
+  showCloseButton?: boolean
 }
 
 /**
@@ -26,15 +27,21 @@ const Modal: React.FC<ModalProps> = ({
   footer,
   children,
   className,
+  showCloseButton = false,
 }) => {
   const titleId = React.useId()
   const panelRef = React.useRef<HTMLDivElement>(null)
+
+  const onCloseRef = React.useRef(onClose)
+  React.useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
   React.useEffect(() => {
     if (!open) return
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose()
+      if (event.key === "Escape") onCloseRef.current()
     }
 
     document.addEventListener("keydown", onKeyDown)
@@ -49,13 +56,13 @@ const Modal: React.FC<ModalProps> = ({
       document.body.style.overflow = overflow
       previouslyFocused?.focus()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-white/40 dark:bg-black/70 p-4 backdrop-blur-xs cursor-pointer transition-opacity"
       onClick={onClose}
     >
       <div
@@ -66,12 +73,12 @@ const Modal: React.FC<ModalProps> = ({
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
         className={cn(
-          "w-full max-w-md space-y-5 rounded-md border border-border bg-card p-6 shadow-2xl outline-none",
+          "w-full max-w-md space-y-5 rounded-xl border border-border/80 bg-card p-6 shadow-2xl outline-none cursor-default animate-in fade-in-0 zoom-in-95 duration-150",
           className
         )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-base font-bold leading-tight text-foreground">
               {title}
             </h2>
@@ -79,14 +86,16 @@ const Modal: React.FC<ModalProps> = ({
               <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onClose}
-            aria-label={`Close ${title}`}
-          >
-            <X size={16} />
-          </Button>
+          {showCloseButton && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onClose}
+              aria-label={`Close ${title}`}
+            >
+              <X size={16} />
+            </Button>
+          )}
         </div>
 
         {children}

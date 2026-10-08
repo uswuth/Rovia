@@ -29,7 +29,6 @@ export const signupSchema = z
     organizationName: z.string().trim().optional(),
     organizationLocation: z.string().trim().optional(),
     organizationSlug: z.string().trim().optional(),
-    inviteCode: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.isCreatingOrg) {
@@ -38,14 +37,6 @@ export const signupSchema = z
           code: 'custom',
           path: ['organizationName'],
           message: 'Organization name must be at least 2 characters',
-        });
-      }
-    } else {
-      if (!data.inviteCode || data.inviteCode.length < 4) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['inviteCode'],
-          message: 'Please enter a valid invite code',
         });
       }
     }
