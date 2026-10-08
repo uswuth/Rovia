@@ -98,8 +98,9 @@ export const CreateTask: React.FC = () => {
         setTeams(rawTeams as unknown as Record<string, unknown>[]);
 
         if (id && tkRes) {
-          const rawTaskData = (tkRes as { data?: { data?: Record<string, unknown> } }).data?.data || (tkRes as Record<string, unknown>);
-          const found = (rawTaskData.items ? rawTaskData.items[0] : rawTaskData) as Record<string, unknown>;
+          const rawTaskData = ((tkRes as { data?: { data?: Record<string, unknown> } }).data?.data || (tkRes as Record<string, unknown>)) as Record<string, unknown>;
+          const itemsList = Array.isArray(rawTaskData.items) ? (rawTaskData.items as Record<string, unknown>[]) : null;
+          const found = (itemsList && itemsList.length > 0 ? itemsList[0] : rawTaskData) as Record<string, unknown>;
 
           if (found) {
             const pObj =

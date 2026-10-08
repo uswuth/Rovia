@@ -176,7 +176,7 @@ export const CreateOrgMember: React.FC = () => {
           userName: values.userName.trim(),
           userEmail: values.userEmail.trim(),
           password: values.password?.trim() || undefined,
-          organizationId: organizationId || undefined,
+          organizationId: organizationId || '',
           userRole: values.userRole,
           userStatus: values.userStatus,
           jobTitle: values.jobTitle?.trim() || undefined,

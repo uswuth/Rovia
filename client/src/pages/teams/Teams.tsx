@@ -288,9 +288,9 @@ export const Teams: React.FC = () => {
             />
             <Select
               value={selectedProjectFilter}
-              onValueChange={(val: string) => {
+              onValueChange={(val) => {
                 if (val) {
-                  setSelectedProjectFilter(val);
+                  setSelectedProjectFilter(String(val));
                   setCurrentPage(1);
                 }
               }}

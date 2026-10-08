@@ -163,11 +163,12 @@ export const MeetingRoom: React.FC = () => {
 
     const matchedMember = (orgMembers || []).find((m) => {
       const mId = getMemberId(m);
-      return mId === pId || m.id === pId || (m as unknown as Record<string, string>)._id === pId;
+      return mId === pId || (m as unknown as Record<string, string>).id === pId || (m as unknown as Record<string, string>)._id === pId;
     });
 
     if (matchedMember) {
-      return matchedMember.name || matchedMember.userName || matchedMember.email;
+      const mRaw = matchedMember as unknown as Record<string, string>;
+      return mRaw.name || matchedMember.userName || mRaw.email || matchedMember.userEmail || 'Member';
     }
 
     const raw = participant as unknown as Record<string, string>;
@@ -187,7 +188,7 @@ export const MeetingRoom: React.FC = () => {
 
     const matchedMember = (orgMembers || []).find((m) => {
       const mId = getMemberId(m);
-      return mId === pId || m.id === pId || (m as unknown as Record<string, string>)._id === pId;
+      return mId === pId || (m as unknown as Record<string, string>).id === pId || (m as unknown as Record<string, string>)._id === pId;
     });
 
     if (matchedMember) {
@@ -257,7 +258,7 @@ export const MeetingRoom: React.FC = () => {
         return getMeetingById(id);
       }
       const preview = (location.state as { preview?: { meetingJoinCode?: string } } | null)?.preview;
-      const code = preview?.meetingJoinCode || guestSession?.joinCode;
+      const code = preview?.meetingJoinCode;
       if (code) {
         const res = await previewMeetingByJoinCode(code);
         const data = res.data.data;
@@ -280,7 +281,7 @@ export const MeetingRoom: React.FC = () => {
       }
       throw new Error('Meeting join code not found');
     },
-    { enabled: Boolean(id) && (isAuthenticated || isVisitor) }
+    { enabled: Boolean(id) && isAuthenticated }
   );
 
   const questions = useQuery<MeetingQuestion[]>(
@@ -404,12 +405,7 @@ export const MeetingRoom: React.FC = () => {
 
   const confirmLeave = () => {
     setShowLeaveModal(false);
-    if (isVisitor) {
-      sessionStorage.removeItem(`meeting_guest_${id}`);
-      setVisitorLeft(true);
-    } else {
-      leaving.mutate();
-    }
+    leaving.mutate();
   };
 
   const savePermissions = useMutation<Meeting, [string, ParticipantPermissions]>({

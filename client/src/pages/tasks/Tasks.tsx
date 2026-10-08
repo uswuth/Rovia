@@ -392,9 +392,9 @@ export const Tasks: React.FC = () => {
 
           <Select
             value={projectFilter}
-            onValueChange={(val: string) => {
+            onValueChange={(val) => {
               if (val) {
-                setProjectFilter(val);
+                setProjectFilter(String(val));
                 setCurrentPage(1);
               }
             }}
@@ -424,9 +424,9 @@ export const Tasks: React.FC = () => {
 
           <Select
             value={teamFilter}
-            onValueChange={(val: string) => {
+            onValueChange={(val) => {
               if (val) {
-                setTeamFilter(val);
+                setTeamFilter(String(val));
                 setCurrentPage(1);
               }
             }}
