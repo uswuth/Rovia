@@ -6,7 +6,7 @@ const TITLE_ERROR_MSG = 'Title can only contain letters, numbers, spaces, -, _, 
 const MAX_PARTICIPANT_LIMIT = 50;
 
 export const createMeetingSchema = z.object({
-  projectId: z.string().min(1, 'Choose a project'),
+  projectId: z.string().optional(),
   teamId: z.string().optional(),
   meetingTitle: z
     .string()

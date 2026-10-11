@@ -89,6 +89,7 @@ function TooltipTrigger({
 function TooltipContent({
   className,
   side = "top",
+  align = "center",
   hidden = false,
   children,
   ...props
@@ -100,11 +101,28 @@ function TooltipContent({
   const ctx = React.useContext(TooltipContext)
   if (!ctx?.open || hidden) return null
 
-  const sideClasses = {
-    top: "bottom-full left-1/2 -translate-x-1/2 mb-2",
-    bottom: "top-full left-1/2 -translate-x-1/2 mt-2",
-    left: "right-full top-1/2 -translate-y-1/2 mr-2",
-    right: "left-full top-1/2 -translate-y-1/2 ml-2",
+  const getPositionClass = () => {
+    if (side === "top") {
+      if (align === "end") return "bottom-full right-0 mb-2"
+      if (align === "start") return "bottom-full left-0 mb-2"
+      return "bottom-full left-1/2 -translate-x-1/2 mb-2"
+    }
+    if (side === "bottom") {
+      if (align === "end") return "top-full right-0 mt-2"
+      if (align === "start") return "top-full left-0 mt-2"
+      return "top-full left-1/2 -translate-x-1/2 mt-2"
+    }
+    if (side === "left") {
+      if (align === "start") return "right-full top-0 mr-2"
+      if (align === "end") return "right-full bottom-0 mr-2"
+      return "right-full top-1/2 -translate-y-1/2 mr-2"
+    }
+    if (side === "right") {
+      if (align === "start") return "left-full top-0 ml-2"
+      if (align === "end") return "left-full bottom-0 ml-2"
+      return "left-full top-1/2 -translate-y-1/2 ml-2"
+    }
+    return "bottom-full left-1/2 -translate-x-1/2 mb-2"
   }
 
   return (
@@ -113,7 +131,7 @@ function TooltipContent({
       role="tooltip"
       className={cn(
         "absolute z-50 whitespace-nowrap rounded-md bg-zinc-900 border border-zinc-800 px-2.5 py-1 text-xs text-zinc-100 shadow-md animate-in fade-in-0 zoom-in-95 pointer-events-none",
-        sideClasses[side],
+        getPositionClass(),
         className
       )}
       {...props}

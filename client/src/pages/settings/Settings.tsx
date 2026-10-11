@@ -137,11 +137,10 @@ export const SettingsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setTimeFormat('12h')}
-                className={`flex items-center justify-center p-4 rounded-lg border transition-all cursor-pointer ${
-                  timeFormat === '12h'
+                className={`flex items-center justify-center p-4 rounded-lg border transition-all cursor-pointer ${timeFormat === '12h'
                     ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
                     : 'border-border/80 bg-secondary/50 text-muted-foreground hover:border-border hover:bg-secondary'
-                }`}
+                  }`}
               >
                 <span className="text-sm font-bold">12-Hour</span>
               </button>
@@ -149,11 +148,10 @@ export const SettingsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setTimeFormat('24h')}
-                className={`flex items-center justify-center p-4 rounded-lg border transition-all cursor-pointer ${
-                  timeFormat === '24h'
+                className={`flex items-center justify-center p-4 rounded-lg border transition-all cursor-pointer ${timeFormat === '24h'
                     ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
                     : 'border-border/80 bg-secondary/50 text-muted-foreground hover:border-border hover:bg-secondary'
-                }`}
+                  }`}
               >
                 <span className="text-sm font-bold">24-Hour</span>
               </button>
@@ -176,7 +174,6 @@ export const SettingsPage: React.FC = () => {
               <div>
                 <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
                   <span>Password</span>
-                  <span className="text-xs font-mono text-muted-foreground font-normal">••••••••••••</span>
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   Ensure your account uses a strong, secure password.

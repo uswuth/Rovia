@@ -10,6 +10,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination } from '@/components/ui/Pagination';
 import { cn } from '@/lib/utils';
+import { useScrollFade } from '@/hooks/useScrollFade';
 
 export interface Column<T> {
   /** Unique column identifier (defaults to accessorKey) */
@@ -141,6 +142,8 @@ export function DataTable<T>({
     ? data
     : data.slice((currentPage - 1) * currentPageSize, currentPage * currentPageSize);
 
+  const horizontalScrollRef = useScrollFade<HTMLDivElement>({ orientation: 'horizontal' });
+
   // Column drag-resize handlers
   const handleMouseDown = (e: React.MouseEvent, colKey: string, currentWidth?: string | number) => {
     e.preventDefault();
@@ -196,12 +199,12 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        'w-full overflow-hidden rounded-md border border-border bg-card shadow-xs flex flex-col',
+        'w-full max-w-full overflow-hidden rounded-md border border-border bg-card shadow-xs flex flex-col',
         wrapperClassName,
       )}
     >
-      <div className="overflow-x-auto w-full">
-        <Table className={cn('w-full', className)}>
+      <div ref={horizontalScrollRef} className="overflow-x-auto w-full max-w-full scroll-fade-x">
+        <Table className={cn('w-full min-w-max', className)}>
           <TableHeader>
             <TableRow>
               {columns.map((col, index) => {

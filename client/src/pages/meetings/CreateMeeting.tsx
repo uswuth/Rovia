@@ -7,13 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FormField } from '@/components/ui/form-field';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { DateTimePicker } from '@/components/ui/date-picker';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +20,7 @@ import { createMeeting } from '@/api/meeting/meeting.api';
 import { getProjectName, getProjectId, type Project } from '@/types/project.types';
 import { parseApiError } from '@/utils/apiError';
 import { createMeetingSchema, type CreateMeetingFormValues } from '@/schemas/meeting.schema';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { MemberRoster } from '@/components/members/MemberRoster';
 import { getRoleCategory, getMemberId } from '@/components/members/member-utils';
 
@@ -50,7 +44,7 @@ export const CreateMeeting: React.FC = () => {
     () => getTeamsApi(),
     { enabled: isAuthenticated, list: true }
   );
-  const teams = teamsData || [];
+  const teams = useMemo(() => teamsData || [], [teamsData]);
 
   // Default schedule start date/time dynamically based on current user time (rounded up to next 5 minutes)
   const [defaultStart] = useState(() => {
@@ -82,6 +76,38 @@ export const CreateMeeting: React.FC = () => {
   const watchedProjectId = useWatch({ control, name: 'projectId' });
   const watchedTeamId = useWatch({ control, name: 'teamId' });
   const selectedProjectId = lockedProjectId || watchedProjectId;
+
+  const projectOptions = useMemo<SearchableSelectOption[]>(() => {
+    return (projects ?? []).map((p) => {
+      const pId = getProjectId(p) || '';
+      const pName = getProjectName(p) || 'Unnamed Project';
+      return {
+        value: pId,
+        label: pName,
+      };
+    });
+  }, [projects]);
+
+  const teamOptions = useMemo<SearchableSelectOption[]>(() => {
+    return (teams ?? [])
+      .filter((tm) => {
+        if (!selectedProjectId) return true;
+        const pObj =
+          typeof tm.projectId === 'object' && tm.projectId !== null
+            ? (tm.projectId as unknown as Record<string, unknown>)
+            : null;
+        const pId = pObj ? ((pObj._id || pObj.projectId) as string) : (tm.projectId as string);
+        return !pId || pId === selectedProjectId;
+      })
+      .map((tm) => {
+        const tmId = (tm.teamId || tm._id) as string;
+        const tmName = (tm.teamName as string) || 'Unnamed Team';
+        return {
+          value: tmId,
+          label: tmName,
+        };
+      });
+  }, [teams, selectedProjectId]);
 
   // Compute sub-team member IDs if a team is selected
   const activeTeamMemberIds = useMemo<Set<string> | null>(() => {
@@ -193,7 +219,7 @@ export const CreateMeeting: React.FC = () => {
     const roleMap: Record<string, 'Host' | 'Member'> = {};
     projectFilteredMembers.forEach((m) => {
       const cat = getRoleCategory(m);
-      if (cat === 'SUPER_ADMIN' || cat === 'ADMIN') {
+      if (cat === 'SUPER_ADMIN' || cat === 'ADMIN' || m.isSuperAdmin) {
         const mId = getMemberId(m);
         if (mId) roleMap[mId] = 'Host';
       }
@@ -229,21 +255,11 @@ export const CreateMeeting: React.FC = () => {
     }
   };
 
-  // Fix project select initialization using getProjectId
-  useEffect(() => {
-    if (!lockedProjectId && projects && projects.length > 0) {
-      const firstId = getProjectId(projects[0]);
-      if (firstId) {
-        setValue('projectId', firstId, { shouldValidate: true });
-      }
-    }
-  }, [projects, lockedProjectId, setValue]);
-
   const create = useMutation<unknown, CreateMeetingFormValues>({
     invalidates: [queryKeys.meetings.all],
     mutationFn: (values) =>
       createMeeting({
-        projectId: lockedProjectId ?? values.projectId,
+        projectId: lockedProjectId || (values.projectId ? values.projectId : undefined),
         teamId: values.teamId || undefined,
         meetingTitle: values.meetingTitle.trim(),
         meetingDescription: values.meetingDescription?.trim(),
@@ -306,9 +322,8 @@ export const CreateMeeting: React.FC = () => {
                   </div>
                 ) : (
                   <FormField
-                    label="Project"
+                    label="Project (Optional)"
                     htmlFor="meeting-project"
-                    required
                     error={errors.projectId?.message}
                   >
                     {projectsLoading ? (
@@ -318,37 +333,27 @@ export const CreateMeeting: React.FC = () => {
                         control={control}
                         name="projectId"
                         render={({ field }) => (
-                          <Select
+                          <SearchableSelect
+                            id="meeting-project"
                             value={field.value}
-                            onValueChange={(val) => {
-                              if (val) {
-                                field.onChange(val);
-                                setValue('teamId', '');
-                                setAssignedRoles({});
+                            options={projectOptions}
+                            placeholder="Select project (Optional)"
+                            searchPlaceholder="Search projects..."
+                            onChange={(val) => {
+                              field.onChange(val);
+                              if (watchedTeamId) {
+                                const matchedTeam = (teams ?? []).find((t) => ((t.teamId || t._id) as string) === watchedTeamId);
+                                if (matchedTeam) {
+                                  const pObj = typeof matchedTeam.projectId === 'object' && matchedTeam.projectId !== null ? (matchedTeam.projectId as Record<string, unknown>) : null;
+                                  const parentPId = pObj ? ((pObj.projectId || pObj._id) as string) : (matchedTeam.projectId as string);
+                                  if (parentPId && parentPId !== val) {
+                                    setValue('teamId', '');
+                                  }
+                                }
                               }
+                              setAssignedRoles({});
                             }}
-                          >
-                            <SelectTrigger id="meeting-project" className="w-full">
-                              <SelectValue placeholder="Select project">
-                                {(val: unknown) => {
-                                  if (!val) return 'Select project';
-                                  const selected = (projects ?? []).find((p) => getProjectId(p) === val);
-                                  return selected ? getProjectName(selected) : String(val);
-                                }}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(projects ?? []).map((project) => {
-                                const pId = getProjectId(project);
-                                const pName = getProjectName(project);
-                                return (
-                                  <SelectItem key={pId} value={pId}>
-                                    {pName}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
+                          />
                         )}
                       />
                     )}
@@ -360,45 +365,29 @@ export const CreateMeeting: React.FC = () => {
                     control={control}
                     name="teamId"
                     render={({ field }) => (
-                      <Select
-                        value={field.value || 'NONE'}
-                        onValueChange={(val) => {
-                          field.onChange(val === 'NONE' ? '' : val);
+                      <SearchableSelect
+                        id="meeting-team"
+                        value={field.value || ''}
+                        options={teamOptions}
+                        placeholder="Select Assigned Team (Optional)"
+                        searchPlaceholder="Search teams..."
+                        allowClear={true}
+                        clearLabel="No Specific Team (Project Alone)"
+                        onChange={(val) => {
+                          field.onChange(val);
                           setAssignedRoles({});
+                          if (val) {
+                            const matchedTeam = (teams ?? []).find((t) => ((t.teamId || t._id) as string) === val);
+                            if (matchedTeam) {
+                              const pObj = typeof matchedTeam.projectId === 'object' && matchedTeam.projectId !== null ? (matchedTeam.projectId as Record<string, unknown>) : null;
+                              const parentPId = pObj ? ((pObj.projectId || pObj._id) as string) : (matchedTeam.projectId as string);
+                              if (parentPId && parentPId !== selectedProjectId) {
+                                setValue('projectId', parentPId, { shouldValidate: true });
+                              }
+                            }
+                          }
                         }}
-                      >
-                        <SelectTrigger id="meeting-team" className="w-full">
-                          <SelectValue placeholder="No Specific Team (Project Alone)">
-                            {(val: unknown) => {
-                              if (!val || val === 'NONE') return 'No Specific Team (Project Alone)';
-                              const match = (teams ?? []).find((t) => ((t.teamId || t._id) as string) === val);
-                              return match ? (match.teamName as string) : String(val);
-                            }}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="NONE">No Specific Team (Project Alone)</SelectItem>
-                          {(teams ?? [])
-                            .filter((tm) => {
-                              if (!selectedProjectId) return true;
-                              const pObj =
-                                typeof tm.projectId === 'object' && tm.projectId !== null
-                                  ? (tm.projectId as unknown as Record<string, unknown>)
-                                  : null;
-                              const pId = pObj ? ((pObj._id || pObj.projectId) as string) : (tm.projectId as string);
-                              return pId === selectedProjectId;
-                            })
-                            .map((tm) => {
-                              const tmId = (tm.teamId || tm._id) as string;
-                              const tmName = tm.teamName as string;
-                              return (
-                                <SelectItem key={tmId} value={tmId}>
-                                  {tmName}
-                                </SelectItem>
-                              );
-                            })}
-                        </SelectContent>
-                      </Select>
+                      />
                     )}
                   />
                 </FormField>

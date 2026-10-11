@@ -10,6 +10,7 @@ export const ENTITY_PREFIXES = Object.freeze({
   ROLE: 'ROLE',
   JOB_TITLE: 'JOB',
   ORGANIZATION: 'ORG',
+  TEAM: 'TEAM',
 } as const);
 
 export type EntityPrefixKey = keyof typeof ENTITY_PREFIXES;

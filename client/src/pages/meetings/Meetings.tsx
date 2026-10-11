@@ -10,11 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { Pagination } from '@/components/ui/Pagination';
 import { getMeetingStatusTone } from '@/lib/status-tone';
 import { useQuery } from '@/hooks/useApi';
 import { queryKeys } from '@/api/queryClient';
 import { getMeetings } from '@/api/meeting/meeting.api';
+import { useDebounce } from '@/hooks/useDebounce';
 import type { Meeting, MeetingStatus } from '@/api/meeting/meeting.types';
 import { formatCountdown } from '@/lib/format-countdown';
 
@@ -33,6 +35,11 @@ export const Meetings: React.FC = () => {
 
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 300);
+
+  useEffect(() => {
+    setActiveSearch(debouncedSearch);
+  }, [debouncedSearch]);
   const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
 
   const handleCopyLink = (joinCode: string, meetingId: string) => {
@@ -64,6 +71,20 @@ export const Meetings: React.FC = () => {
 
   const activeProject = projects.find((p) => getProjectId(p) === filterProjectId);
   const activeProjectName = activeProject ? getProjectName(activeProject) : (selectedProject ? getProjectName(selectedProject) : '');
+
+  const projectFilterOptions = useMemo<SearchableSelectOption[]>(() => {
+    return [
+      { value: '', label: 'All Projects' },
+      ...projects.map((p) => {
+        const pId = getProjectId(p);
+        const pName = getProjectName(p) || 'Unnamed Project';
+        return {
+          value: pId,
+          label: pName,
+        };
+      }),
+    ];
+  }, [projects]);
 
   const { data: meetings, loading } = useQuery<Meeting[]>(
     queryKeys.meetings.list(filterProjectId || undefined),
@@ -239,36 +260,30 @@ export const Meetings: React.FC = () => {
 
         {/* Project Selector Filter */}
         {projects.length > 0 && (
-          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-            <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto min-w-[220px]">
+            <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium shrink-0">
               <FolderGit2 size={13} />
               Project:
             </span>
-            <select
-              value={filterProjectId}
-              onChange={(e) => {
-                const newParams = new URLSearchParams(searchParams);
-                if (e.target.value) {
-                  newParams.set('projectId', e.target.value);
-                } else {
-                  newParams.delete('projectId');
-                }
-                setSearchParams(newParams);
-                setMeetingPage(1);
-              }}
-              className="h-9 rounded-md border border-border bg-background px-2.5 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-            >
-              <option value="">All Projects</option>
-              {projects.map((p) => {
-                const pId = getProjectId(p);
-                const pName = getProjectName(p);
-                return (
-                  <option key={pId} value={pId}>
-                    {pName}
-                  </option>
-                );
-              })}
-            </select>
+            <div className="w-48">
+              <SearchableSelect
+                value={filterProjectId}
+                onChange={(val) => {
+                  const newParams = new URLSearchParams(searchParams);
+                  if (val) {
+                    newParams.set('projectId', val);
+                  } else {
+                    newParams.delete('projectId');
+                  }
+                  setSearchParams(newParams);
+                  setMeetingPage(1);
+                }}
+                options={projectFilterOptions}
+                placeholder="All Projects"
+                searchPlaceholder="Search projects..."
+                className="w-full text-xs"
+              />
+            </div>
           </div>
         )}
       </div>

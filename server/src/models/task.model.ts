@@ -16,6 +16,7 @@ export type TaskStatus = 'to_do' | 'in_progress' | 'bug' | 'backlog' | 'complete
       transform: (_doc, ret: Record<string, unknown>) => {
         return {
           taskId: (ret._id as { toString(): string })?.toString(),
+          taskCode: ret.task_code !== undefined && ret.task_code !== '' ? (ret.task_code as string) : `TSK-${(ret._id as { toString(): string })?.toString().slice(-4).toUpperCase()}`,
           taskTitle: ret.task_title as string,
           taskDescription: (ret.task_description ?? '') as string,
           taskStatus: (ret.task_status ?? 'to_do') as string,
@@ -34,6 +35,16 @@ export type TaskStatus = 'to_do' | 'in_progress' | 'bug' | 'backlog' | 'complete
   options: { allowMixed: Severity.ALLOW }
 })
 export class TaskClass {
+  @prop({ type: () => String, default: '', index: true, alias: 'taskCode' })
+  public task_code?: string;
+
+  public get taskCode(): string | undefined {
+    return this.task_code;
+  }
+  public set taskCode(val: string | undefined) {
+    this.task_code = val;
+  }
+
   @prop({ type: () => String, required: true, trim: true })
   public task_title!: string;
 

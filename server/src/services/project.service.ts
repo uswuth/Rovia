@@ -39,9 +39,9 @@ import { Types } from 'mongoose';
 const findScopedProject = async (projectIdOrCode: string, organizationId: string) => {
   const query: Record<string, unknown> = { organization_id: organizationId };
   if (Types.ObjectId.isValid(projectIdOrCode)) {
-    query.$or = [{ _id: projectIdOrCode }, { project_code: projectIdOrCode }];
+    query.$or = [{ _id: projectIdOrCode }, { project_code: projectIdOrCode }, { project_code: projectIdOrCode.toUpperCase() }];
   } else {
-    query.project_code = projectIdOrCode;
+    query.$or = [{ project_code: projectIdOrCode }, { project_code: projectIdOrCode.toUpperCase() }];
   }
   const project = await Project.findOne(query);
   if (!project) {
@@ -134,8 +134,6 @@ export const getProjectMembersService = async (
   query: Record<string, unknown> = {}
 ) => {
   requireOrganizationId(organizationId, 'view project members');
-  assertObjectId(projectId, 'id');
-
   const project = await findScopedProject(projectId, organizationId);
 
   const allMembers = buildMemberList(project);
@@ -227,10 +225,9 @@ export const getProjectsService = async (
 };
 
 export const getProjectByIdService = async (projectId: string, organizationId: string) => {
-  // Scope by organization first: a bare findById would let any org read any project.
-  await findScopedProject(assertObjectId(projectId, 'id'), organizationId);
+  const project = await findScopedProject(projectId, organizationId);
 
-  return await Project.findById(projectId)
+  return await Project.findById(project._id)
     .populate('project_hosts', USER_POPULATE)
     .populate('project_members', USER_POPULATE)
     .populate('created_by', USER_POPULATE);
@@ -241,7 +238,7 @@ export const updateProjectService = async (
   organizationId: string,
   input: IUpdateProjectInput
 ) => {
-  const project = await findScopedProject(assertObjectId(projectId, 'id'), organizationId);
+  const project = await findScopedProject(projectId, organizationId);
 
   const updatedName = input.projectName !== undefined ? input.projectName : input.name;
   if (updatedName !== undefined) {
@@ -275,9 +272,9 @@ export const updateProjectService = async (
 export const deleteProjectService = async (projectIdOrCode: string, organizationId: string) => {
   const query: Record<string, unknown> = { organization_id: organizationId };
   if (Types.ObjectId.isValid(projectIdOrCode)) {
-    query.$or = [{ _id: projectIdOrCode }, { project_code: projectIdOrCode }];
+    query.$or = [{ _id: projectIdOrCode }, { project_code: projectIdOrCode }, { project_code: projectIdOrCode.toUpperCase() }];
   } else {
-    query.project_code = projectIdOrCode;
+    query.$or = [{ project_code: projectIdOrCode }, { project_code: projectIdOrCode.toUpperCase() }];
   }
   const project = await Project.findOneAndDelete(query);
   if (!project) {
@@ -291,7 +288,6 @@ export const addProjectMembersService = async (
   input: IAddProjectMembersInput
 ) => {
   requireOrganizationId(organizationId, 'manage project members');
-  assertObjectId(projectId, 'id');
 
   const userIds = Array.isArray(input.userIds) ? input.userIds.filter(Boolean) : [];
   if (userIds.length === 0) {
@@ -334,7 +330,6 @@ export const updateProjectMemberRoleService = async (
   if (!organizationId) {
     throw ApiError.badRequest('User must belong to an organization to manage project members');
   }
-  assertObjectId(projectId, 'id');
   assertObjectId(userId, 'userId');
 
   const projectRole: ProjectRole = input.projectRole;
@@ -376,7 +371,6 @@ export const removeProjectMemberService = async (
   userId: string
 ) => {
   requireOrganizationId(organizationId, 'manage project members');
-  assertObjectId(projectId, 'id');
   assertObjectId(userId, 'userId');
 
   const project = await findScopedProject(projectId, organizationId);

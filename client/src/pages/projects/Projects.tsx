@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   FolderGit2,
@@ -18,22 +18,20 @@ import {
   getProjectDesc,
   getProjectStatus,
   getProjectId,
-  type Project,
 } from '@/types/project.types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DataTable, type Column } from '@/components/ui/data-table';
+import { DataTable } from '@/components/ui/data-table';
 import { Pagination } from '@/components/ui/Pagination';
 import { getProjectStatusTone } from '@/lib/status-tone';
 import { useQuery } from '@/hooks/useApi';
 import { queryKeys } from '@/api/queryClient';
 import { getMeetings } from '@/api/meeting/meeting.api';
 import type { Meeting } from '@/api/meeting/meeting.types';
-import { GroupedAvatars } from '@/components/members/GroupedAvatars';
 import { RosterDetailModal } from '@/components/members/RosterDetailModal';
-import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
+import { getProjectColumns, type ProjectRosterModalState } from './Projects.TanCol';
 
 export const Projects: React.FC = () => {
   const navigate = useNavigate();
@@ -44,13 +42,7 @@ export const Projects: React.FC = () => {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [gridPage, setGridPage] = useState(1);
   const [gridPageSize, setGridPageSize] = useState(6);
-  const [rosterModal, setRosterModal] = useState<{
-    open: boolean;
-    title: string;
-    projectName?: string;
-    members: Member[];
-    value: Record<string, 'Host' | 'Member'>;
-  } | null>(null);
+  const [rosterModal, setRosterModal] = useState<ProjectRosterModalState | null>(null);
 
   // Fetch all meetings to accurately count meetings per project
   const { data: meetings } = useQuery<Meeting[]>(
@@ -70,197 +62,18 @@ export const Projects: React.FC = () => {
       ? 'Projects'
       : `Projects (${currentTab.charAt(0).toUpperCase() + currentTab.slice(1).toLowerCase()})`;
 
-  const columns: Column<Project>[] = [
-    {
-      id: 'code',
-      header: 'Code',
-      width: '110px',
-      cell: (project) => {
-        const pCode = getProjectCode(project);
-        const pId = getProjectId(project);
-        return (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (pId) navigate(`/projects/${pId}/edit`);
-            }}
-            className="font-mono text-xs font-bold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm hover:bg-emerald-500/20 cursor-pointer transition-colors"
-            title="Edit project"
-          >
-            {pCode}
-          </button>
-        );
-      },
-    },
-    {
-      id: 'name',
-      header: 'Project Name',
-      width: '180px',
-      cell: (project) => {
-        const pName = getProjectName(project);
-        return (
-          <span className="font-semibold text-foreground text-sm leading-snug">
-            {pName}
-          </span>
-        );
-      },
-    },
-    {
-      id: 'description',
-      header: 'Description',
-      cell: (project) => {
-        const pDesc = getProjectDesc(project);
-        return pDesc ? (
-          <span className="text-xs text-muted-foreground line-clamp-2 block">
-            {pDesc}
-          </span>
-        ) : (
-          <span className="text-xs italic text-muted-foreground/50">No description</span>
-        );
-      },
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      width: '120px',
-      cell: (project) => {
-        const pStatus = getProjectStatus(project);
-        return <Badge tone={getProjectStatusTone(pStatus)}>{pStatus}</Badge>;
-      },
-    },
-    {
-      id: 'team',
-      header: 'Team',
-      width: '140px',
-      cell: (project) => {
-        const hostList = Array.isArray(project.hosts) ? project.hosts : [];
-        const memberList = Array.isArray(project.members) ? project.members : [];
-        const rawList = [...hostList, ...memberList];
-        const mappedMembers: Member[] = rawList.map((m) => {
-          if (typeof m === 'string') {
-            return { userId: m, userName: m, userEmail: '', userRole: 'Member', userStatus: 'ACTIVE', createdAt: '' };
-          }
-          const obj = m as Record<string, unknown>;
-          return {
-            userId: (obj.userId || obj._id || obj.id || '') as string,
-            userName: (obj.userName || obj.name || obj.userEmail || '') as string,
-            userEmail: (obj.userEmail || obj.email || '') as string,
-            userRole: ((obj.userRole || obj.role || 'Member') as MemberRole),
-            userStatus: ((obj.userStatus || obj.status || 'ACTIVE') as MemberStatus),
-            jobTitle: obj.jobTitle as string | undefined,
-            createdAt: (obj.createdAt || '') as string,
-          };
-        });
-
-        const valueMap: Record<string, 'Host' | 'Member'> = {};
-        hostList.forEach((h) => {
-          const id = typeof h === 'string' ? h : ((h as Record<string, string>).userId || (h as Record<string, string>)._id);
-          if (id) valueMap[id] = 'Host';
-        });
-        memberList.forEach((m) => {
-          const id = typeof m === 'string' ? m : ((m as Record<string, string>).userId || (m as Record<string, string>)._id);
-          if (id && !valueMap[id]) valueMap[id] = 'Member';
-        });
-
-        const pName = getProjectName(project);
-
-        return (
-          <GroupedAvatars
-            members={mappedMembers}
-            onClick={() => {
-              setRosterModal({
-                open: true,
-                title: `Project Members: ${pName}`,
-                projectName: pName,
-                members: mappedMembers,
-                value: valueMap,
-              });
-            }}
-          />
-        );
-      },
-    },
-    {
-      id: 'meetings',
-      header: 'Meets',
-      width: '100px',
-      cell: (project) => {
-        const pId = getProjectId(project);
-        const projectMeetingsCount = (meetings || []).filter((m) => {
-          const mProjId = m.projectId || (m as unknown as Record<string, string>).project;
-          return mProjId === pId;
-        }).length;
-        const finalMeetingCount =
-          projectMeetingsCount > 0 ? projectMeetingsCount : (project.meetingCount || 0);
-        return (
-          <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
-            <Video size={13} className="text-muted-foreground" />
-            <span>{finalMeetingCount}</span>
-          </div>
-        );
-      },
-    },
-    {
-      id: 'tasks',
-      header: 'Tasks',
-      width: '100px',
-      cell: (project) => {
-        const finalTaskCount = project.taskCount || 0;
-        return (
-          <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
-            <CheckSquare size={13} className="text-muted-foreground" />
-            <span>{finalTaskCount}</span>
-          </div>
-        );
-      },
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      align: 'right',
-      width: '80px',
-      cell: (project) => {
-        const pId = getProjectId(project);
-        const pCode = getProjectCode(project);
-        const pStatus = getProjectStatus(project).toLowerCase();
-        const isReadOnly = pStatus === 'completed' || pStatus === 'archived';
-
-        return (
-          <div className="flex justify-end gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isReadOnly}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isReadOnly) navigate(`/meetings/new?projectId=${pCode || pId}`);
-              }}
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-emerald-500 hover:bg-secondary cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-              title={isReadOnly ? `Project is ${pStatus}. Re-activate status to Active to schedule meetings.` : 'Schedule meeting'}
-            >
-              <Video size={14} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/projects/${pCode || pId}/edit`);
-              }}
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-              title="Edit project"
-            >
-              <Edit size={14} />
-            </Button>
-          </div>
-        );
-      },
-    },
-  ];
+  const columns = useMemo(
+    () =>
+      getProjectColumns({
+        navigate,
+        meetings,
+        onOpenRoster: setRosterModal,
+      }),
+    [navigate, meetings, setRosterModal]
+  );
 
   return (
-    <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
+    <div className="w-full max-w-full min-w-0 bg-background text-foreground p-6 lg:p-8 space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

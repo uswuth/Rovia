@@ -11,7 +11,6 @@ import type { Member } from '@/types/member.types';
 import { useAuth } from '@/context/AuthContext';
 import { getMemberId, getRoleCategory } from './member-utils';
 import { getUserStatusTone } from '@/lib/status-tone';
-import { useScrollFade } from '@/hooks/useScrollFade';
 
 export interface RosterDetailModalProps {
   open: boolean;
@@ -46,7 +45,6 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
   const isHost = (user?.userRole || '').toUpperCase() === 'HOST';
   const canModify = canManage !== undefined ? canManage : (isTopAdmin || isHost);
 
-  const scrollRef = useScrollFade<HTMLDivElement>();
   const [search, setSearch] = useState('');
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
 
@@ -228,8 +226,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
       open={open}
       onClose={onClose}
       title={title}
-      description={`Viewing full roster details for ${projectName || teamName || 'workspace'}. Authorized updates are saved instantly.`}
-      className="max-w-4xl"
+      className="w-[95vw] sm:w-[88vw] lg:w-[80vw] max-w-6xl min-w-[320px] sm:min-w-[640px] lg:min-w-[850px]"
     >
       <div className="space-y-4">
         {/* Filter and stats row */}
@@ -253,19 +250,16 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
         </div>
 
         {/* Member Table */}
-        <div ref={scrollRef} className="max-h-[420px] overflow-y-auto scroll-fade-y rounded-md border border-border">
-          <DataTable
-            columns={columns}
-            data={filteredMembers}
-            keyExtractor={(m) => getMemberId(m)}
-          />
-        </div>
+        <DataTable
+          columns={columns}
+          data={filteredMembers}
+          keyExtractor={(m) => getMemberId(m)}
+          pageSize={5}
+          pageSizeOptions={[5, 10, 20]}
+        />
 
         {/* Footer info */}
-        <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground border-t border-border">
-          <p className="text-[11px]">
-            {isTopAdmin ? 'SuperAdmin & Admin privileges active: You may adjust host assignments or remove team members.' : 'Viewing in read-only mode.'}
-          </p>
+        <div className="flex items-center justify-end pt-2 text-xs text-muted-foreground border-t border-border">
           <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>

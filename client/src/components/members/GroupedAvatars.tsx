@@ -8,7 +8,6 @@ import {
   AvatarGroupCount,
   AvatarImage,
 } from '@/components/ui/avatar';
-import { getAvatarColorByName } from '@/components/ui/avatar-colors';
 import { Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +16,7 @@ interface GroupedAvatarsProps {
   maxDisplay?: number;
   onClick?: () => void;
   className?: string;
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
 }
 
 export const GroupedAvatars: React.FC<GroupedAvatarsProps> = ({
@@ -30,7 +29,7 @@ export const GroupedAvatars: React.FC<GroupedAvatarsProps> = ({
   if (!members || members.length === 0) {
     return (
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60 italic font-mono">
-        <Users size={13} />
+        <Users size={12} />
         <span>0</span>
       </div>
     );
@@ -52,7 +51,12 @@ export const GroupedAvatars: React.FC<GroupedAvatarsProps> = ({
   const visible = normalized.slice(0, maxDisplay);
   const remainingCount = Math.max(0, normalized.length - maxDisplay);
 
-  const avatarSizeClass = size === 'sm' ? 'size-7 text-[11px]' : 'size-8 text-xs';
+  const avatarSizeClass =
+    size === 'xs'
+      ? 'size-5 text-[9px]'
+      : size === 'sm'
+      ? 'size-6 text-[10px]'
+      : 'size-8 text-xs';
 
   return (
     <div
@@ -70,7 +74,6 @@ export const GroupedAvatars: React.FC<GroupedAvatarsProps> = ({
     >
       <AvatarGroup>
         {visible.map((item, idx) => {
-          const colorClass = getAvatarColorByName(item.name);
           return (
             <Tooltip key={item.id || idx}>
               <TooltipTrigger asChild>
@@ -78,7 +81,7 @@ export const GroupedAvatars: React.FC<GroupedAvatarsProps> = ({
                   {item.avatarUrl ? (
                     <AvatarImage src={item.avatarUrl} alt={item.name} />
                   ) : null}
-                  <AvatarFallback className={cn(colorClass, 'font-bold rounded-full select-none')}>
+                  <AvatarFallback name={item.name} className="font-bold rounded-full select-none">
                     {(item.name.charAt(0) || 'M').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>

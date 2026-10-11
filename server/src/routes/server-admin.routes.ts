@@ -5,6 +5,7 @@ import {
   getServerMetrics,
   createOrgWithCredentials,
   listAllOrganizationsServerAdmin,
+  getOrgDetailsServerAdmin,
   updateOrgServerAdmin,
   deleteOrgServerAdmin
 } from '../controllers/server-admin.controller.js';
@@ -18,6 +19,7 @@ router.post('/login', asyncHandler(loginServerAdmin));
 // Requires ServerAdmin role authorization
 router.get('/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
 router.get('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(listAllOrganizationsServerAdmin));
+router.get('/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getOrgDetailsServerAdmin));
 router.post('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(createOrgWithCredentials));
 router.patch('/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(updateOrgServerAdmin));
 router.delete('/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(deleteOrgServerAdmin));

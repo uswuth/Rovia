@@ -571,6 +571,9 @@ export const MeetingRoom: React.FC = () => {
               canPost={Boolean(canPost)}
               onError={showToast}
               displayNameFor={(userId) => getParticipantDisplayName({ userId })}
+              participants={meeting.participants}
+              canViewProfile={isTopAdmin}
+              onOpenPolls={() => setPanel('polls')}
             />
           )}
 

@@ -101,14 +101,14 @@ export class MeetingClass {
     this.organization_id = val;
   }
 
-  /** The roster a meeting may draw from. Members must belong to this project. */
-  @prop({ ref: () => 'ProjectClass', required: true, index: true, alias: 'projectId' })
-  public project_id!: Ref<'ProjectClass'>;
+  /** The roster a meeting may draw from. Optional for general/team meetings. */
+  @prop({ ref: () => 'ProjectClass', index: true, alias: 'projectId' })
+  public project_id?: Ref<'ProjectClass'>;
 
-  public get projectId(): Ref<'ProjectClass'> {
+  public get projectId(): Ref<'ProjectClass'> | undefined {
     return this.project_id;
   }
-  public set projectId(val: Ref<'ProjectClass'>) {
+  public set projectId(val: Ref<'ProjectClass'> | undefined) {
     this.project_id = val;
   }
 
@@ -122,7 +122,7 @@ export class MeetingClass {
     this.team_id = val;
   }
 
-  @prop({ type: () => String, enum: ['project', 'team', 'custom'], default: 'project' })
+  @prop({ type: () => String, enum: ['project', 'team', 'custom', 'organization', 'general'], default: 'project' })
   public scope?: string;
 
   @prop({ type: () => String, enum: ['SCHEDULED', 'INSTANT'], default: 'SCHEDULED', alias: 'meetingType' })

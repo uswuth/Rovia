@@ -1,9 +1,11 @@
+import mongoose from 'mongoose';
 import { Task, TaskStatus } from '../models/task.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { Ref } from '@typegoose/typegoose';
 import { UserClass } from '../models/user.model.js';
 import { ProjectClass } from '../models/project.model.js';
 import { TeamClass } from '../models/team.model.js';
+import { generateSequentialCode, CodeGeneratorModel, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
 
 export const createTaskService = async (input: {
   taskTitle: string;
@@ -21,7 +23,15 @@ export const createTaskService = async (input: {
     throw ApiError.badRequest('Task title is required');
   }
 
+  const taskCode = await generateSequentialCode(
+    ENTITY_PREFIXES.TASK,
+    Task as unknown as CodeGeneratorModel,
+    'task_code',
+    { organization_id: organizationId }
+  );
+
   const task = await Task.create({
+    task_code: taskCode,
     task_title: taskTitle.trim(),
     task_description: taskDescription || '',
     task_status: taskStatus || 'to_do',
@@ -36,8 +46,8 @@ export const createTaskService = async (input: {
   const populated = await Task.findById(task._id)
     .populate('project_id', 'project_name project_code')
     .populate('team_id', 'team_name team_code')
-    .populate('assigned_members', 'user_name user_email user_role avatar_url job_title')
-    .populate('created_by', 'user_name user_email');
+    .populate('assigned_members', 'user_name user_email user_role avatar_url job_title user_code')
+    .populate('created_by', 'user_name user_email avatar_url user_code');
 
   return populated;
 };
@@ -56,20 +66,28 @@ export const getTasksByOrgService = async (
     .populate('project_id', 'project_name project_code')
     .populate('team_id', 'team_name team_code')
     .populate('assigned_members', 'user_name user_email user_role avatar_url job_title user_code')
-    .populate('created_by', 'user_name user_email')
-    .populate('updated_by', 'user_name user_email')
+    .populate('created_by', 'user_name user_email avatar_url user_code')
+    .populate('updated_by', 'user_name user_email avatar_url user_code')
     .sort({ created_at: -1 });
 
   return tasks;
 };
 
 export const getTaskByIdService = async (taskId: string, organizationId: string) => {
-  const task = await Task.findOne({ _id: taskId, organization_id: organizationId })
+  const isMongoId = mongoose.isValidObjectId(taskId);
+  const task = await Task.findOne({
+    $or: [
+      ...(isMongoId ? [{ _id: taskId }] : []),
+      { task_code: taskId },
+      { task_code: taskId.toUpperCase() },
+    ],
+    organization_id: organizationId,
+  })
     .populate('project_id', 'project_name project_code')
     .populate('team_id', 'team_name team_code')
     .populate('assigned_members', 'user_name user_email user_role avatar_url job_title user_code')
-    .populate('created_by', 'user_name user_email')
-    .populate('updated_by', 'user_name user_email');
+    .populate('created_by', 'user_name user_email avatar_url user_code')
+    .populate('updated_by', 'user_name user_email avatar_url user_code');
 
   if (!task) {
     throw ApiError.notFound('Task not found');
@@ -90,7 +108,15 @@ export const updateTaskService = async (
     teamId?: string;
   }
 ) => {
-  const task = await Task.findOne({ _id: taskId, organization_id: organizationId });
+  const isMongoId = mongoose.isValidObjectId(taskId);
+  const task = await Task.findOne({
+    $or: [
+      ...(isMongoId ? [{ _id: taskId }] : []),
+      { task_code: taskId },
+      { task_code: taskId.toUpperCase() },
+    ],
+    organization_id: organizationId,
+  });
   if (!task) {
     throw ApiError.notFound('Task not found');
   }
@@ -108,18 +134,26 @@ export const updateTaskService = async (
   const updated = await Task.findById(task._id)
     .populate('project_id', 'project_name project_code')
     .populate('team_id', 'team_name team_code')
-    .populate('assigned_members', 'user_name user_email user_role avatar_url job_title')
-    .populate('created_by', 'user_name user_email')
-    .populate('updated_by', 'user_name user_email');
+    .populate('assigned_members', 'user_name user_email user_role avatar_url job_title user_code')
+    .populate('created_by', 'user_name user_email avatar_url user_code')
+    .populate('updated_by', 'user_name user_email avatar_url user_code');
 
   return updated;
 };
 
 export const deleteTaskService = async (taskId: string, organizationId: string) => {
-  const task = await Task.findOne({ _id: taskId, organization_id: organizationId });
+  const isMongoId = mongoose.isValidObjectId(taskId);
+  const task = await Task.findOne({
+    $or: [
+      ...(isMongoId ? [{ _id: taskId }] : []),
+      { task_code: taskId },
+      { task_code: taskId.toUpperCase() },
+    ],
+    organization_id: organizationId,
+  });
   if (!task) {
     throw ApiError.notFound('Task not found');
   }
-  await Task.deleteOne({ _id: taskId });
+  await Task.deleteOne({ _id: task._id });
   return { message: 'Task deleted successfully' };
 };

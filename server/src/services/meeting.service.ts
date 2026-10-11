@@ -63,15 +63,26 @@ export const findScopedMeetingByJoinCode = async (
 };
 
 /** The project's roster: members and hosts, which is the only assignable set. */
-const loadProjectRoster = async (projectId: string, organizationId: string): Promise<Set<string>> => {
-  const project = await Project.findOne({ _id: projectId, organization_id: organizationId });
+const loadProjectRoster = async (projectIdOrCode: string, organizationId: string): Promise<{ roster: Set<string>; project: import('../models/project.model.js').ProjectDocument }> => {
+  const isMongoId = Types.ObjectId.isValid(projectIdOrCode);
+  const project = await Project.findOne({
+    $or: [
+      ...(isMongoId ? [{ _id: projectIdOrCode }] : []),
+      { project_code: projectIdOrCode },
+      { project_code: projectIdOrCode.toUpperCase() }
+    ],
+    organization_id: organizationId
+  });
   if (!project) {
     throw ApiError.notFound('Project not found');
   }
-  return new Set([
-    ...project.project_members.map(toObjectIdString),
-    ...project.project_hosts.map(toObjectIdString)
-  ]);
+  return {
+    roster: new Set([
+      ...project.project_members.map(toObjectIdString),
+      ...project.project_hosts.map(toObjectIdString)
+    ]),
+    project
+  };
 };
 
 const assertUsersInOrganization = async (userIds: string[], organizationId: string): Promise<string[]> => {
@@ -115,7 +126,6 @@ export const createMeetingService = async (
   userId: string
 ): Promise<MeetingDocument> => {
   requireOrganizationId(organizationId, 'create a meeting');
-  assertObjectId(input.projectId, 'projectId');
 
   const title = (input.meetingTitle || '').trim();
   validateTitle(title, 'meetingTitle');
@@ -140,31 +150,38 @@ export const createMeetingService = async (
     );
   }
 
-  const roster = await loadProjectRoster(input.projectId, organizationId);
-  const project = await Project.findOne({ _id: input.projectId, organization_id: organizationId });
-  if (project) {
+  let project: import('../models/project.model.js').ProjectDocument | null = null;
+  let roster = new Set<string>();
+
+  if (input.projectId && input.projectId.trim() && input.projectId !== 'NONE') {
+    const loaded = await loadProjectRoster(input.projectId, organizationId);
+    roster = loaded.roster;
+    project = loaded.project;
     const projectStatus = (project.project_status || '').toLowerCase();
     if (projectStatus === 'completed' || projectStatus === 'archived') {
       throw ApiError.badRequest(`Cannot schedule meetings for a ${projectStatus} project. Change project status to active first.`);
     }
   }
+
   const creator = await User.findById(userId).lean();
   const isSuperAdmin = creator?.user_role === 'SuperAdmin' || creator?.is_super_admin === true;
 
-  // The creator must belong to the project as a member/host, unless they are a SuperAdmin.
-  if (!isSuperAdmin && !roster.has(userId)) {
+  // The creator must belong to the project as a member/host, unless they are a SuperAdmin or it's a general meeting.
+  if (project && !isSuperAdmin && !roster.has(userId)) {
     throw ApiError.forbidden('Only project members or hosts can create a meeting for this project');
   }
 
   const requested = input.participantIds?.length
     ? await assertUsersInOrganization(input.participantIds, organizationId)
     : [];
-  const outsiders = requested.filter((id) => !roster.has(id));
-  if (!isSuperAdmin && outsiders.length > 0) {
-    // An organization invite code does not bypass this for ordinary members.
-    throw ApiError.badRequest('Participants must be members or hosts of the selected project', [
-      { field: 'participantIds', message: `Not a project member: ${outsiders.join(', ')}` }
-    ]);
+
+  if (project && !isSuperAdmin) {
+    const outsiders = requested.filter((id) => !roster.has(id));
+    if (outsiders.length > 0) {
+      throw ApiError.badRequest('Participants must be members or hosts of the selected project', [
+        { field: 'participantIds', message: `Not a project member: ${outsiders.join(', ')}` }
+      ]);
+    }
   }
 
   const uniqueRoster = [...new Set([userId, ...requested])];
@@ -176,9 +193,13 @@ export const createMeetingService = async (
 
   const joinCode = await generateSessionCode(Meeting as unknown as CodeGeneratorModel, organizationId);
 
+  const scope = input.teamId ? 'team' : project ? 'project' : 'general';
+
   const meeting = new Meeting({
     organization_id: organizationId,
-    project_id: input.projectId,
+    project_id: project ? project._id : undefined,
+    team_id: input.teamId && input.teamId !== 'NONE' ? input.teamId : undefined,
+    scope,
     created_by: userId,
     meeting_title: title,
     meeting_description: (input.meetingDescription || '').trim(),
@@ -362,13 +383,16 @@ export const addMeetingParticipantsService = async (
   const meeting = await findScopedMeeting(meetingId, organizationId);
   assertCanManageMeeting(meeting, userId);
 
-  const roster = await loadProjectRoster(toObjectIdString(meeting.project_id), organizationId);
   const requested = await assertUsersInOrganization(participantIds, organizationId);
-  const outsiders = requested.filter((id) => !roster.has(id));
-  if (outsiders.length > 0) {
-    throw ApiError.badRequest('Participants must be members or hosts of the meeting project', [
-      { field: 'participantIds', message: `Not a project member: ${outsiders.join(', ')}` }
-    ]);
+
+  if (meeting.project_id) {
+    const { roster } = await loadProjectRoster(toObjectIdString(meeting.project_id), organizationId);
+    const outsiders = requested.filter((id) => !roster.has(id));
+    if (outsiders.length > 0) {
+      throw ApiError.badRequest('Participants must be members or hosts of the meeting project', [
+        { field: 'participantIds', message: `Not a project member: ${outsiders.join(', ')}` }
+      ]);
+    }
   }
 
   const existing = new Set(meeting.meeting_participants.map((p) => p.userId));

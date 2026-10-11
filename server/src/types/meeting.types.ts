@@ -12,7 +12,8 @@ export interface IMeetingPermissions {
 }
 
 export interface ICreateMeetingInput {
-  projectId: string;
+  projectId?: string;
+  teamId?: string;
   meetingTitle: string;
   meetingDescription?: string;
   meetingScheduledAt: string;
@@ -20,7 +21,7 @@ export interface ICreateMeetingInput {
   meetingJoinMode?: MeetingJoinMode;
   /** May only lower the limit, never raise it above 50. */
   meetingParticipantLimit?: number;
-  /** Must all be members or hosts of the project. */
+  /** Must all be members or hosts of the organization. */
   participantIds?: string[];
 }
 

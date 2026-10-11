@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { getMemberId, isTopAdminRole, getRoleCategory } from '@/components/members/member-utils';
 import { useScrollFade } from '@/hooks/useScrollFade';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export interface MemberRosterProps {
   /** The full pool of organization members available to select from */
@@ -68,6 +69,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
 
   const scrollRef = useScrollFade<HTMLDivElement>();
   const [memberSearch, setMemberSearch] = useState('');
+  const debouncedSearch = useDebounce(memberSearch, 300);
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
   const [removeAnchorRect, setRemoveAnchorRect] = useState<DOMRect | null>(null);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
@@ -139,12 +141,15 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
     ([mId, role]) => role === 'Host' && !topAdminIds.has(mId)
   ).length;
 
-  const filteredMembers = members.filter((m) => {
-    const name = m.userName || '';
-    const email = canSeeEmail ? (m.userEmail || '') : '';
-    const query = memberSearch.toLowerCase();
-    return name.toLowerCase().includes(query) || (canSeeEmail && email.toLowerCase().includes(query));
-  });
+  const filteredMembers = React.useMemo(() => {
+    if (!debouncedSearch.trim()) return members;
+    const query = debouncedSearch.toLowerCase();
+    return members.filter((m) => {
+      const name = m.userName || '';
+      const email = canSeeEmail ? (m.userEmail || '') : '';
+      return name.toLowerCase().includes(query) || (canSeeEmail && email.toLowerCase().includes(query));
+    });
+  }, [members, debouncedSearch, canSeeEmail]);
 
   const entityTitle = entityName.charAt(0).toUpperCase() + entityName.slice(1);
 

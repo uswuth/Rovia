@@ -25,6 +25,10 @@ export const getAllOrganizationsServerAdminApi = async () => {
   return await api.get('/server-admin/organizations');
 };
 
+export const getOrgDetailsServerAdminApi = async (orgId: string) => {
+  return await api.get(`/server-admin/organizations/${orgId}`);
+};
+
 export const createOrgWithCredentialsApi = async (payload: CreateOrgWithCredentialsPayload) => {
   return await api.post('/server-admin/organizations', payload);
 };

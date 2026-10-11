@@ -22,9 +22,13 @@ const MeetingLobby = lazy(() => import('@/pages/meetings/MeetingLobby').then((m)
 const CreateMeeting = lazy(() => import('@/pages/meetings/CreateMeeting').then((m) => ({ default: m.CreateMeeting })));
 const Tasks = lazy(() => import('@/pages/tasks/Tasks').then((m) => ({ default: m.Tasks })));
 const SettingsPage = lazy(() => import('@/pages/settings/Settings').then((m) => ({ default: m.SettingsPage })));
-const AdminOrgManager = lazy(() => import('@/pages/admin/AdminOrgManager'));
 const ServerAdminLogin = lazy(() => import('@/pages/admin/ServerAdminLogin').then((m) => ({ default: m.ServerAdminLogin })));
+const ServerAdminLayout = lazy(() => import('@/components/layout/ServerAdminLayout').then((m) => ({ default: m.ServerAdminLayout })));
 const ServerAdminDashboard = lazy(() => import('@/pages/admin/ServerAdminDashboard').then((m) => ({ default: m.ServerAdminDashboard })));
+const ServerAdminOrganizations = lazy(() => import('@/pages/admin/ServerAdminOrganizations').then((m) => ({ default: m.ServerAdminOrganizations })));
+const ServerAdminOrgView = lazy(() => import('@/pages/admin/ServerAdminOrgView').then((m) => ({ default: m.ServerAdminOrgView })));
+const CreateServerAdminOrg = lazy(() => import('@/pages/admin/CreateServerAdminOrg').then((m) => ({ default: m.CreateServerAdminOrg })));
+const ServerAdminTelemetry = lazy(() => import('@/pages/admin/ServerAdminTelemetry').then((m) => ({ default: m.ServerAdminTelemetry })));
 const OrgMembers = lazy(() => import('@/pages/organization/OrgMembers').then((m) => ({ default: m.OrgMembers })));
 const CreateOrgMember = lazy(() => import('@/pages/organization/CreateOrgMember').then((m) => ({ default: m.CreateOrgMember })));
 const UserProfile = lazy(() => import('@/pages/organization/UserProfile').then((m) => ({ default: m.UserProfile })));
@@ -32,6 +36,7 @@ const OrgWorkRoles = lazy(() => import('@/pages/organization/OrgWorkRoles').then
 const Teams = lazy(() => import('@/pages/teams/Teams').then((m) => ({ default: m.Teams })));
 const CreateTeam = lazy(() => import('@/pages/teams/CreateTeam').then((m) => ({ default: m.CreateTeam })));
 const CreateTask = lazy(() => import('@/pages/tasks/CreateTask').then((m) => ({ default: m.CreateTask })));
+const TaskView = lazy(() => import('@/pages/tasks/TaskView').then((m) => ({ default: m.TaskView })));
 
 const SuspenseFallback = () => (
 
@@ -129,12 +134,17 @@ const App = () => (
                         <Route path="/meetings/:id/room" element={<MeetingRoom />} />
                       </Route>
 
-                      {/* Server Admin Control Plane Routes (Unframed) */}
+                      {/* Server Admin Control Plane Routes (Strictly Isolated) */}
                       <Route path="/server-admin" element={<Navigate to="/server-admin/dashboard" replace />} />
                       <Route path="/server-admin/login" element={<ServerAdminLogin />} />
-                      <Route path="/server-admin/dashboard" element={<ServerAdminDashboard />} />
-                      <Route path="/server-admin/organizations" element={<AdminOrgManager />} />
-                      <Route path="/server-admin/console" element={<AdminOrgManager />} />
+                      <Route element={<ServerAdminLayout />}>
+                        <Route path="/server-admin/dashboard" element={<ServerAdminDashboard />} />
+                        <Route path="/server-admin/organizations" element={<ServerAdminOrganizations />} />
+                        <Route path="/server-admin/organizations/new" element={<CreateServerAdminOrg />} />
+                        <Route path="/server-admin/organizations/:id" element={<ServerAdminOrgView />} />
+                        <Route path="/server-admin/create-org" element={<Navigate to="/server-admin/organizations/new" replace />} />
+                        <Route path="/server-admin/telemetry" element={<ServerAdminTelemetry />} />
+                      </Route>
 
                       {/* Protected Dashboard Routes with SidebarLayout */}
                       <Route element={<ProtectedRoute />}>
@@ -157,9 +167,10 @@ const App = () => (
                         <Route path="/meetings/new" element={<CreateMeeting />} />
                         <Route path="/tasks" element={<Tasks />} />
                         <Route path="/tasks/new" element={<CreateTask />} />
+                        <Route path="/tasks/:id" element={<TaskView />} />
+                        <Route path="/tasks/:id/view" element={<TaskView />} />
                         <Route path="/tasks/:id/edit" element={<CreateTask />} />
                         <Route path="/settings" element={<SettingsPage />} />
-                        <Route path="/admin/organizations" element={<AdminOrgManager />} />
                       </Route>
                     </Routes>
                   </Suspense>

@@ -4,6 +4,7 @@ import { getRequestScope } from '../utils/scope.js';
 import {
   createTeamService,
   getTeamsByOrgService,
+  getTeamByIdService,
   updateTeamService,
   deleteTeamService
 } from '../services/team.service.js';
@@ -26,6 +27,14 @@ export const getTeams = async (req: Request, res: Response): Promise<Response> =
 
   const result = await getTeamsByOrgService(organizationId, projectId);
   return ApiResponse.success(res, 'Teams retrieved successfully', result, 200);
+};
+
+export const getTeamById = async (req: Request, res: Response): Promise<Response> => {
+  const { teamId } = req.params;
+  const { organizationId } = getRequestScope(req);
+
+  const result = await getTeamByIdService(teamId, organizationId);
+  return ApiResponse.success(res, 'Team retrieved successfully', result, 200);
 };
 
 export const updateTeam = async (req: Request, res: Response): Promise<Response> => {

@@ -149,6 +149,15 @@ export const loginUserService = async (input: IUserLoginInput): Promise<IAuthTok
     throw ApiError.unauthorized('Invalid email or password');
   }
 
+  // Ensure organization owner is guaranteed SuperAdmin role
+  if (user.organization_id) {
+    const org = await Organization.findById(user.organization_id).select('organization_owner_id');
+    if (org?.organization_owner_id && org.organization_owner_id.toString() === user._id.toString()) {
+      user.user_role = 'SuperAdmin';
+      user.is_super_admin = true;
+    }
+  }
+
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
 
@@ -179,6 +188,15 @@ export const refreshAccessTokenService = async (incomingRefreshToken: string): P
   const user = await User.findById(decoded.id).select('+refreshToken');
   if (!user || user.refreshToken !== incomingRefreshToken) {
     throw ApiError.unauthorized('Invalid or expired refresh token');
+  }
+
+  // Ensure organization owner is guaranteed SuperAdmin role
+  if (user.organization_id) {
+    const org = await Organization.findById(user.organization_id).select('organization_owner_id');
+    if (org?.organization_owner_id && org.organization_owner_id.toString() === user._id.toString()) {
+      user.user_role = 'SuperAdmin';
+      user.is_super_admin = true;
+    }
   }
 
   const newAccessToken = user.generateAccessToken();

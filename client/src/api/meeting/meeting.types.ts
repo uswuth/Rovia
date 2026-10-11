@@ -100,7 +100,7 @@ export interface Meeting {
   meetingParticipantLimit: number;
   meetingJoinCode: string;
   organizationId: string;
-  projectId: string;
+  projectId?: string;
   teamId?: string;
   createdBy: string;
   createdAt?: string;
@@ -126,7 +126,7 @@ export interface MeetingPreview {
 }
 
 export interface CreateMeetingDTO {
-  projectId: string;
+  projectId?: string;
   teamId?: string;
   meetingTitle: string;
   meetingDescription?: string;

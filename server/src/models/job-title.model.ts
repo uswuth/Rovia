@@ -40,3 +40,4 @@ export class JobTitleClass {
 }
 
 export const JobTitleModel = getModelForClass(JobTitleClass);
+export const JobTitle = JobTitleModel;

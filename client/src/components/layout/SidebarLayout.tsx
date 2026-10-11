@@ -134,7 +134,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
     <SidebarProvider defaultOpen={true}>
       <AppSidebar />
 
-      <SidebarInset>
+      <SidebarInset className="min-w-0 max-w-full overflow-hidden">
         {/* Top App Header with Trigger, Vertical Separator, Breadcrumbs & Notifications Bell */}
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-card/85 dark:bg-card/75 backdrop-blur-xl px-4 transition-[width,height] ease-linear">
           <div className="flex items-center gap-2">
@@ -234,8 +234,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
         </header>
 
         {/* Main View Area */}
-        <main className="relative flex-1 flex flex-col w-full bg-background text-foreground min-h-0">
-          <div className="relative z-10 flex-1 flex flex-col w-full min-h-0">{children}</div>
+        <main className="relative flex-1 flex flex-col w-full min-w-0 max-w-full overflow-x-hidden bg-background text-foreground min-h-0">
+          <div className="relative z-10 flex-1 flex flex-col w-full min-w-0 max-w-full min-h-0">{children}</div>
         </main>
       </SidebarInset>
 

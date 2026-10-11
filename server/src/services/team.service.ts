@@ -1,8 +1,10 @@
+import mongoose from 'mongoose';
 import { Team, TeamStatus } from '../models/team.model.js';
 import { Project } from '../models/project.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { Ref } from '@typegoose/typegoose';
 import { UserClass } from '../models/user.model.js';
+import { generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
 
 export const createTeamService = async (input: {
   teamName: string;
@@ -22,7 +24,15 @@ export const createTeamService = async (input: {
     throw ApiError.badRequest('Parent Project ID is required');
   }
 
-  const project = await Project.findOne({ _id: projectId, organization_id: organizationId });
+  const isMongoId = mongoose.isValidObjectId(projectId);
+  const project = await Project.findOne({
+    $or: [
+      ...(isMongoId ? [{ _id: projectId }] : []),
+      { project_code: projectId },
+      { project_code: projectId.toUpperCase() }
+    ],
+    organization_id: organizationId
+  });
   if (!project) {
     throw ApiError.notFound('Parent project not found in this organization');
   }
@@ -38,7 +48,12 @@ export const createTeamService = async (input: {
     throw ApiError.badRequest('Team members must be selected strictly from members assigned to the parent project');
   }
 
-  const teamCode = `TM-${Math.floor(1000 + Math.random() * 9000)}`;
+  const teamCode = await generateSequentialCode(
+    ENTITY_PREFIXES.TEAM,
+    Team,
+    'team_code',
+    { organization_id: organizationId }
+  );
 
   const team = await Team.create({
     team_name: teamName.trim(),
@@ -62,7 +77,17 @@ export const createTeamService = async (input: {
 export const getTeamsByOrgService = async (organizationId: string, projectId?: string) => {
   if (!organizationId) return [];
   const query: Record<string, unknown> = { organization_id: organizationId };
-  if (projectId) query.project_id = projectId;
+  if (projectId) {
+    if (mongoose.isValidObjectId(projectId)) {
+      query.project_id = projectId;
+    } else {
+      const proj = await Project.findOne({
+        $or: [{ project_code: projectId }, { project_code: projectId.toUpperCase() }],
+        organization_id: organizationId
+      });
+      if (proj) query.project_id = proj._id;
+    }
+  }
 
   const teams = await Team.find(query)
     .populate('project_id', 'project_name project_code project_status')
@@ -71,6 +96,26 @@ export const getTeamsByOrgService = async (organizationId: string, projectId?: s
     .sort({ created_at: -1 });
 
   return teams;
+};
+
+export const getTeamByIdService = async (teamId: string, organizationId: string) => {
+  const isMongoId = mongoose.isValidObjectId(teamId);
+  const team = await Team.findOne({
+    $or: [
+      ...(isMongoId ? [{ _id: teamId }] : []),
+      { team_code: teamId },
+      { team_code: teamId.toUpperCase() },
+    ],
+    organization_id: organizationId,
+  })
+    .populate('project_id', 'project_name project_code')
+    .populate('team_hosts', 'user_name user_email user_role avatar_url job_title user_code')
+    .populate('team_members', 'user_name user_email user_role avatar_url job_title user_code');
+
+  if (!team) {
+    throw ApiError.notFound('Team not found');
+  }
+  return team;
 };
 
 export const updateTeamService = async (
@@ -84,7 +129,15 @@ export const updateTeamService = async (
     teamStatus?: TeamStatus;
   }
 ) => {
-  const team = await Team.findOne({ _id: teamId, organization_id: organizationId });
+  const isMongoId = mongoose.isValidObjectId(teamId);
+  const team = await Team.findOne({
+    $or: [
+      ...(isMongoId ? [{ _id: teamId }] : []),
+      { team_code: teamId },
+      { team_code: teamId.toUpperCase() },
+    ],
+    organization_id: organizationId,
+  });
   if (!team) {
     throw ApiError.notFound('Team not found');
   }
@@ -121,10 +174,18 @@ export const updateTeamService = async (
 };
 
 export const deleteTeamService = async (teamId: string, organizationId: string) => {
-  const team = await Team.findOne({ _id: teamId, organization_id: organizationId });
+  const isMongoId = mongoose.isValidObjectId(teamId);
+  const team = await Team.findOne({
+    $or: [
+      ...(isMongoId ? [{ _id: teamId }] : []),
+      { team_code: teamId },
+      { team_code: teamId.toUpperCase() },
+    ],
+    organization_id: organizationId,
+  });
   if (!team) {
     throw ApiError.notFound('Team not found');
   }
-  await Team.deleteOne({ _id: teamId });
+  await Team.deleteOne({ _id: team._id });
   return { message: 'Team deleted successfully' };
 };

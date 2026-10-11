@@ -1,29 +1,37 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Lock, User, AlertCircle, RefreshCw } from 'lucide-react';
-import { loginServerAdminApi } from '@/api/server-admin/server-admin.api';
+import { ShieldCheck, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Box, Grid, Stack, Typography } from '@mui/material';
 
-export function ServerAdminLogin() {
-  const navigate = useNavigate();
+import { loginServerAdminApi } from '@/api/server-admin/server-admin.api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { IntellMeetLogo } from '@/components/ui/IntellMeetLogo';
+
+export const ServerAdminLogin = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setError('Please enter your Server Admin username and password');
+      setError('Please enter your Server Admin username or email and password');
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
-      const res = await loginServerAdminApi({ username, password });
-      const { accessToken } = res.data.data;
+      const res = await loginServerAdminApi({ username: username.trim(), password: password.trim() });
+      const { accessToken, admin } = res.data.data;
       localStorage.setItem('server_admin_token', accessToken);
-      localStorage.setItem('server_admin_user', JSON.stringify(res.data.data.admin));
+      localStorage.setItem('server_admin_user', JSON.stringify(admin));
       navigate('/server-admin/dashboard');
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { message?: string } } };
@@ -33,73 +41,332 @@ export function ServerAdminLogin() {
     }
   };
 
+  const inputCls =
+    'h-10.5 rounded-md border-border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground shadow-none transition-all hover:border-emerald-500/50 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:shadow-[0_0_20px_rgba(16,185,129,0.3)]';
+  const labelCls = 'text-[11px] font-medium text-muted-foreground';
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-4">
-      <div className="w-full max-w-md bg-card border border-border rounded-2xl p-8 shadow-xl space-y-6">
-        <div className="text-center space-y-2">
-          <div className="inline-flex p-3 bg-primary/10 text-primary rounded-2xl mb-1">
-            <ShieldCheck className="w-8 h-8" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">Server Admin Control Plane</h1>
-          <p className="text-xs text-muted-foreground">
-            Isolated platform lead authentication. Access server telemetry & Organization provisioning.
-          </p>
-        </div>
+    <Box
+      component="main"
+      className="bg-dots-pattern"
+      sx={{
+        minHeight: '100vh',
+        width: '100%',
+        bgcolor: 'var(--background)',
+        color: 'var(--foreground)',
+        overflowX: 'hidden',
+        position: 'relative',
+      }}
+    >
+      {/* Ambient Green Color Bloom Overlay */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: '-10%',
+          right: '25%',
+          width: '500px',
+          height: '500px',
+          borderRadius: '50%',
+          pointerEvents: 'none',
+          background: 'radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0) 70%)',
+          filter: 'blur(40px)',
+          zIndex: 1,
+        }}
+      />
 
-        {error && (
-          <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-xl flex items-center gap-2 text-xs text-destructive">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Server Admin Username / Email</label>
-            <div className="relative">
-              <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                required
-                placeholder="serveradmin"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 text-sm bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Master Secret Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="password"
-                required
-                placeholder="••••••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 text-sm bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 px-4 bg-primary text-primary-foreground font-semibold text-sm rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+      <Grid container sx={{ minHeight: '100vh', width: '100%', position: 'relative', zIndex: 2 }}>
+        {/* ── Left Hero Column (Inset with all 4 corners rounded) ── */}
+        <Grid
+          size={{ xs: 12, lg: 6 }}
+          sx={{
+            display: { xs: 'none', lg: 'flex' },
+            p: 1,
+            height: { lg: '100vh' },
+            position: { lg: 'sticky' },
+            top: 0,
+            boxSizing: 'border-box',
+          }}
+        >
+          {/* Inner Rounded Green Card */}
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              borderRadius: '24px',
+              overflow: 'hidden',
+              position: 'relative',
+              p: { lg: 5, xl: 6 },
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              background: 'linear-gradient(145deg, #031c13 0%, #063725 45%, #095237 100%)',
+              border: 'none',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+            }}
           >
-            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-            {loading ? 'Authenticating...' : 'Authenticate Server Admin'}
-          </button>
-        </form>
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                opacity: 0.5,
+                background: 'radial-gradient(circle at 65% 40%, rgba(16, 185, 129, 0.45) 0%, transparent 65%)',
+              }}
+            />
 
-        <div className="text-center pt-2 border-t border-border">
-          <p className="text-[11px] text-muted-foreground">
-            Platform Operator Portal • IntellMeet Server Node v2.0
-          </p>
-        </div>
-      </div>
-    </div>
+            {/* Top Brand Mark */}
+            <Box sx={{ position: 'relative', zIndex: 10 }}>
+              <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                <IntellMeetLogo size={26} />
+                <Typography
+                  sx={{
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '1.05rem',
+                    letterSpacing: '-0.025em',
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  }}
+                >
+                  Intell<span style={{ color: '#34d399' }}>Meet</span>
+                </Typography>
+              </Stack>
+            </Box>
+
+            {/* Bottom Hero & Steps */}
+            <Stack spacing={4} sx={{ position: 'relative', zIndex: 10, width: '100%' }}>
+              <Stack
+                direction={{ xs: 'column', xl: 'row' }}
+                spacing={2}
+                sx={{
+                  justifyContent: 'space-between',
+                  alignItems: { xs: 'flex-start', xl: 'flex-end' },
+                }}
+              >
+                <Typography
+                  component="h1"
+                  sx={{
+                    fontSize: { xs: '2rem', xl: '2.5rem' },
+                    fontWeight: 700,
+                    lineHeight: 1.15,
+                    color: '#ffffff',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  Server Admin<br />Operations
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.875rem',
+                    color: 'rgba(167, 243, 208, 0.75)',
+                    maxWidth: 240,
+                    lineHeight: 1.5,
+                    pb: { xl: 0.5 },
+                  }}
+                >
+                  Dedicated root control plane for cluster telemetry & tenant provisioning.
+                </Typography>
+              </Stack>
+
+              <Grid container spacing={1.75}>
+                {[
+                  { n: '1', label: 'Root IDP\nAuthentication', active: true },
+                  { n: '2', label: 'Prometheus &\nGrafana Status', active: false },
+                  { n: '3', label: 'Tenant &\nIAM Control', active: false },
+                ].map((step) => (
+                  <Grid key={step.n} size={{ xs: 4 }}>
+                    <Box
+                      sx={{
+                        p: { lg: 1.25, xl: 1.75 },
+                        height: '100%',
+                        borderRadius: '12px',
+                        transition: 'all 0.2s ease',
+                        border: step.active ? '1px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
+                        bgcolor: step.active ? '#ffffff' : 'rgba(255, 255, 255, 0.07)',
+                        color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: step.active ? 'none' : 'blur(4px)',
+                        boxShadow: step.active ? '0 10px 25px -5px rgba(0, 0, 0, 0.4)' : 'none',
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          mb: 1.25,
+                          bgcolor: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.2)',
+                          color: '#ffffff',
+                        }}
+                      >
+                        {step.n}
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontSize: { lg: '0.72rem', xl: '0.75rem' },
+                          fontWeight: 600,
+                          lineHeight: 1.35,
+                          whiteSpace: 'pre-line',
+                          color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.85)',
+                        }}
+                      >
+                        {step.label}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </Stack>
+          </Box>
+        </Grid>
+
+        {/* ── Right Form Panel ── */}
+        <Grid
+          size={{ xs: 12, lg: 6 }}
+          sx={{
+            minHeight: '100vh',
+            height: { lg: '100vh' },
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            px: { xs: 2, sm: 6, lg: 8 },
+            py: { xs: 3, sm: 4, lg: 2.5 },
+            bgcolor: { xs: 'transparent', lg: 'var(--background)' },
+          }}
+        >
+          <Box sx={{ width: '100%', maxWidth: 440, mx: 'auto', my: 'auto' }}>
+            <Stack spacing={2.5}>
+              {/* Brand Logo Header for Small Screens */}
+              <Box sx={{ display: { xs: 'flex', lg: 'none' }, justifyContent: { xs: 'center', sm: 'flex-start' }, mb: 0.5 }}>
+                <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                  <IntellMeetLogo size={26} />
+                  <Typography
+                    sx={{
+                      color: 'var(--foreground)',
+                      fontWeight: 700,
+                      fontSize: '1.2rem',
+                      letterSpacing: '-0.025em',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    }}
+                  >
+                    Intell<span className="text-emerald-600 dark:text-emerald-400">Meet</span>
+                  </Typography>
+                </Stack>
+              </Box>
+
+              <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold mb-2">
+                  <ShieldCheck size={13} />
+                  <span>Isolated Root IDP</span>
+                </div>
+                <Typography
+                  component="h2"
+                  sx={{
+                    fontSize: { xs: '1.35rem', sm: '1.55rem' },
+                    fontWeight: 700,
+                    letterSpacing: '-0.02em',
+                    color: 'var(--foreground)',
+                  }}
+                >
+                  Server Admin Portal
+                </Typography>
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', mt: 0.25 }}>
+                  Enter root operator credentials to access cluster management.
+                </Typography>
+              </Box>
+
+              {error && (
+                <Box
+                  role="alert"
+                  sx={{
+                    p: 1.5,
+                    borderRadius: '6px',
+                    bgcolor: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#ef4444',
+                    fontSize: '0.75rem',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {error}
+                </Box>
+              )}
+
+              <form onSubmit={handleSubmit} noValidate>
+                <Stack spacing={1.75}>
+                  <Stack spacing={0.5}>
+                    <Label htmlFor="adminUsername" className={labelCls}>
+                      Admin Username / Email
+                    </Label>
+                    <Box sx={{ position: 'relative' }}>
+                      <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <Input
+                        id="adminUsername"
+                        type="text"
+                        autoComplete="username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className={`${inputCls} pl-10`}
+                        autoFocus
+                      />
+                    </Box>
+                  </Stack>
+
+                  <Stack spacing={0.5}>
+                    <Label htmlFor="adminPassword" className={labelCls}>
+                      Master Secret Password
+                    </Label>
+                    <Box sx={{ position: 'relative' }}>
+                      <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      <Input
+                        id="adminPassword"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`${inputCls} pl-10 pr-10`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((p) => !p)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </Box>
+                  </Stack>
+
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full h-10.5 mt-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold text-sm rounded-md transition-all duration-200 shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Authenticating...</span>
+                      </>
+                    ) : (
+                      <span>Sign In to Server Admin</span>
+                    )}
+                  </Button>
+                </Stack>
+              </form>
+
+              <Box sx={{ textAlign: 'center', pt: 1, borderTop: '1px solid var(--border)' }}>
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                  IntellMeet Root Control Plane
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
+        </Grid>
+      </Grid>
+    </Box>
   );
-}
+};

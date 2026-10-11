@@ -1,33 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { Briefcase, Plus, Edit2, Trash2, RefreshCw, Tag } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Briefcase, Plus, RefreshCw } from 'lucide-react';
 import {
   getWorkRolesApi,
   createWorkRoleApi,
   updateWorkRoleApi,
   deleteWorkRoleApi,
+  type WorkRoleItem,
 } from '@/api/work-roles/work-roles.api';
 import { useAuth } from '@/context/AuthContext';
 import { extractApiItems } from '@/utils/apiResponse';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { FormField } from '@/components/ui/form-field';
-import { DataTable, type Column } from '@/components/ui/data-table';
+import { DataTable } from '@/components/ui/data-table';
 import { parseApiError } from '@/utils/apiError';
+import { getWorkRoleColumns } from './WorkRoles.TanCol';
 
 export const OrgWorkRoles: React.FC = () => {
   const { user } = useAuth();
   const isSuperAdmin = Boolean(user?.userRole === 'SuperAdmin' || user?.isSuperAdmin);
   const canManage = isSuperAdmin || user?.userRole === 'Admin';
 
-  const [roles, setRoles] = useState<Record<string, unknown>[]>([]);
+  const [roles, setRoles] = useState<WorkRoleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   // Form modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState<Record<string, unknown> | null>(null);
+  const [editingRole, setEditingRole] = useState<WorkRoleItem | null>(null);
   const [form, setForm] = useState({ roleName: '', tagName: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState('');
@@ -36,7 +37,7 @@ export const OrgWorkRoles: React.FC = () => {
     try {
       setLoading(true);
       const res = await getWorkRolesApi();
-      setRoles(extractApiItems(res));
+      setRoles(extractApiItems<WorkRoleItem>(res));
     } catch (err) {
       console.error(err);
       setRoles([]);
@@ -61,11 +62,11 @@ export const OrgWorkRoles: React.FC = () => {
       const userOrgId =
         typeof user?.organizationId === 'object' && user?.organizationId !== null
           ? (user.organizationId as { organizationId?: string; _id?: string }).organizationId ||
-            (user.organizationId as { organizationId?: string; _id?: string })._id
+          (user.organizationId as { organizationId?: string; _id?: string })._id
           : (user?.organizationId as string | undefined);
 
       if (editingRole) {
-        const targetId = (editingRole.roleId || editingRole._id) as string;
+        const targetId = (editingRole.roleId || (editingRole as unknown as { _id?: string })._id) as string;
         await updateWorkRoleApi(targetId, form);
       } else {
         await createWorkRoleApi({
@@ -85,7 +86,7 @@ export const OrgWorkRoles: React.FC = () => {
     }
   };
 
-  const handleDelete = async (roleId: string) => {
+  const handleDelete = useCallback(async (roleId: string) => {
     if (!confirm('Are you sure you want to delete this work role?')) return;
     try {
       await deleteWorkRoleApi(roleId);
@@ -94,123 +95,37 @@ export const OrgWorkRoles: React.FC = () => {
       const { message } = parseApiError(err);
       alert(message || 'Failed to delete work role.');
     }
-  };
+  }, []);
+
+  const handleEdit = useCallback((role: WorkRoleItem) => {
+    setEditingRole(role);
+    setForm({
+      roleName: role.roleName || '',
+      tagName: role.tagName || '',
+      description: role.description || '',
+    });
+    setIsModalOpen(true);
+  }, []);
 
   const filteredRoles = roles.filter(
     (r) =>
-      ((r.roleName as string) || '').toLowerCase().includes(search.toLowerCase()) ||
-      (r.roleCode && (r.roleCode as string).toLowerCase().includes(search.toLowerCase())) ||
-      (r.tagName && (r.tagName as string).toLowerCase().includes(search.toLowerCase()))
+      (r.roleName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (r.roleCode && r.roleCode.toLowerCase().includes(search.toLowerCase())) ||
+      (r.tagName && r.tagName.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const columns: Column<Record<string, unknown>>[] = [
-    {
-      id: 'code',
-      header: 'Role Code',
-      width: '110px',
-      cell: (r) => {
-        const code = (r.roleCode as string) || 'WR-N/A';
-        return (
-          <span className="font-mono text-xs font-bold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm">
-            {code}
-          </span>
-        );
-      },
-    },
-    {
-      id: 'name',
-      header: 'Role Name',
-      width: '180px',
-      cell: (r) => (
-        <span className="font-semibold text-foreground text-sm leading-snug">
-          {(r.roleName as string) || ''}
-        </span>
-      ),
-    },
-    {
-      id: 'tag',
-      header: 'Tag / Category',
-      width: '140px',
-      cell: (r) => {
-        const tag = (r.tagName as string) || '';
-        return tag ? (
-          <Badge tone="neutral" className="gap-1 font-mono text-xs">
-            <Tag size={11} />
-            <span>{tag}</span>
-          </Badge>
-        ) : (
-          <span className="text-xs italic text-muted-foreground/50">N/A</span>
-        );
-      },
-    },
-    {
-      id: 'description',
-      header: 'Description',
-      cell: (r) => {
-        const desc = (r.description as string) || '';
-        return desc ? (
-          <span className="text-xs text-muted-foreground line-clamp-2 block">{desc}</span>
-        ) : (
-          <span className="text-xs italic text-muted-foreground/50">No description</span>
-        );
-      },
-    },
-    {
-      id: 'createdAt',
-      header: 'Created At',
-      width: '110px',
-      cell: (r) => {
-        const date = r.createdAt ? new Date(r.createdAt as string).toLocaleDateString() : 'N/A';
-        return <span className="text-xs text-muted-foreground font-mono">{date}</span>;
-      },
-    },
-    ...(canManage
-      ? [
-          {
-            id: 'actions',
-            header: 'Actions',
-            align: 'right' as const,
-            width: '80px',
-            cell: (r: Record<string, unknown>) => {
-              const roleIdStr = (r.roleId || r._id) as string;
-              return (
-                <div className="flex justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditingRole(r);
-                      setForm({
-                        roleName: (r.roleName as string) || '',
-                        tagName: (r.tagName as string) || '',
-                        description: (r.description as string) || '',
-                      });
-                      setIsModalOpen(true);
-                    }}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-                    title="Edit Work Role"
-                  >
-                    <Edit2 size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(roleIdStr)}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
-                    title="Delete Work Role"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              );
-            },
-          },
-        ]
-      : []),
-  ];
+  const columns = useMemo(
+    () =>
+      getWorkRoleColumns({
+        canManage,
+        onEdit: handleEdit,
+        onDelete: handleDelete,
+      }),
+    [canManage, handleEdit, handleDelete]
+  );
 
   return (
-    <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
+    <div className="w-full max-w-full min-w-0 bg-background text-foreground p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -262,7 +177,7 @@ export const OrgWorkRoles: React.FC = () => {
         data={filteredRoles}
         loading={loading}
         loadingRowCount={4}
-        keyExtractor={(r) => (r.roleId || r._id || r.roleCode) as string}
+        keyExtractor={(r) => (r.roleId || r.roleCode) as string}
       />
 
       {/* Create / Edit Work Role Modal */}
