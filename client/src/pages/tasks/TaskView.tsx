@@ -22,6 +22,7 @@ import { KANBAN_COLUMNS } from './Tasks.TanCol';
 import { getUserStatusTone } from '@/lib/status-tone';
 import { cn } from '@/lib/utils';
 import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
+import { formatDate } from '@/lib/format-date';
 
 export const TaskView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,19 +65,6 @@ export const TaskView: React.FC = () => {
     };
   }, [id]);
 
-  const formatDate = (dateVal?: unknown) => {
-    if (!dateVal || (typeof dateVal !== 'string' && typeof dateVal !== 'number' && !(dateVal instanceof Date))) return null;
-    const d = new Date(dateVal as string);
-    if (isNaN(d.getTime())) return null;
-    return d.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
-
   const taskTitleStr = (task?.taskTitle as string) || '';
   const taskDescStr = (task?.taskDescription as string) || '';
   const taskCodeStr = (task?.taskCode as string) || (id ? `TSK-${id.slice(-4).toUpperCase()}` : 'TSK-N/A');
@@ -91,11 +79,25 @@ export const TaskView: React.FC = () => {
   const StatusIcon = colMeta.icon;
 
   const assignees: Member[] = useMemo(() => {
-    const rawArr = (task?.assignedMembers as unknown[]) || [];
+    const rawArr = (task?.assignedMembers as (Member | string)[]) || [];
     return rawArr.map((m) => {
-      const obj = typeof m === 'object' && m !== null ? (m as Record<string, unknown>) : { userId: m as string };
-      const mId = (obj.userId || obj._id || '') as string;
-      const mEmail = (obj.userEmail || '') as string;
+      if (typeof m === 'string') {
+        const match = orgMembers?.find((om) => om.userId === m);
+        return {
+          userId: m,
+          userName: match?.userName || m,
+          userEmail: match?.userEmail || '',
+          userRole: match?.userRole || 'Member',
+          userStatus: match?.userStatus || 'ACTIVE',
+          userCode: match?.userCode,
+          avatarUrl: match?.avatarUrl,
+          jobTitle: match?.jobTitle,
+          createdAt: match?.createdAt,
+        };
+      }
+
+      const mId = m.userId || '';
+      const mEmail = m.userEmail || '';
 
       const realMatch = (orgMembers?.find(
         (om) =>
@@ -103,30 +105,24 @@ export const TaskView: React.FC = () => {
           (Boolean(mEmail) && om.userEmail?.toLowerCase() === mEmail.toLowerCase())
       ) || (user?.userId === mId ? user : null)) as Partial<Member> | null;
 
-      const mName = realMatch?.userName || (obj.userName as string) || mEmail || mId;
-      const mRole = realMatch?.isSuperAdmin || realMatch?.userRole === 'SuperAdmin'
-        ? 'SuperAdmin'
-        : (realMatch?.userRole || (obj.userRole as MemberRole) || 'Member');
-      const mStatus = realMatch?.userStatus || (obj.userStatus as MemberStatus) || 'ACTIVE';
-
       return {
         userId: mId,
-        userName: mName,
+        userName: realMatch?.userName || m.userName,
         userEmail: realMatch?.userEmail || mEmail,
-        userRole: mRole as MemberRole,
-        userStatus: mStatus as MemberStatus,
-        userCode: realMatch?.userCode || (obj.userCode as string) || undefined,
-        avatarUrl: realMatch?.avatarUrl || (obj.avatarUrl as string) || undefined,
-        jobTitle: realMatch?.jobTitle || (obj.jobTitle as string) || undefined,
-        createdAt: (obj.createdAt as string) || '',
+        userRole: (realMatch?.userRole || m.userRole || 'Member') as MemberRole,
+        userStatus: (realMatch?.userStatus || m.userStatus || 'ACTIVE') as MemberStatus,
+        userCode: realMatch?.userCode || m.userCode,
+        avatarUrl: realMatch?.avatarUrl || m.avatarUrl,
+        jobTitle: realMatch?.jobTitle || m.jobTitle,
+        createdAt: m.createdAt || '',
       };
     });
   }, [task?.assignedMembers, orgMembers, user]);
 
-  const cObj = typeof task?.createdBy === 'object' && task?.createdBy !== null ? (task.createdBy as Record<string, unknown>) : null;
-  const creatorId = (cObj?.userId || cObj?._id || (typeof task?.createdBy === 'string' ? task.createdBy : '')) as string;
-  const creatorEmail = (cObj?.userEmail || '') as string;
-  const creatorNameRaw = (cObj?.userName || (typeof task?.createdBy === 'string' ? task.createdBy : '')) as string;
+  const creatorMember = typeof task?.createdBy === 'object' && task?.createdBy !== null ? (task.createdBy as Member) : null;
+  const creatorId = typeof task?.createdBy === 'string' ? task.createdBy : (creatorMember?.userId || '');
+  const creatorEmail = creatorMember?.userEmail || '';
+  const creatorNameRaw = creatorMember?.userName || (typeof task?.createdBy === 'string' ? task.createdBy : '');
 
   const realCreator = (orgMembers?.find(
     (om) =>
@@ -134,12 +130,12 @@ export const TaskView: React.FC = () => {
       (Boolean(creatorEmail) && om.userEmail?.toLowerCase() === creatorEmail.toLowerCase())
   ) || (user?.userId === creatorId ? user : null)) as Partial<Member> | null;
 
-  const resolvedCreatorName = realCreator?.userName || creatorNameRaw || 'User';
-  const resolvedCreatorRole = realCreator?.isSuperAdmin || realCreator?.userRole === 'SuperAdmin'
+  const resolvedCreatorName: string = realCreator?.userName || creatorNameRaw || 'User';
+  const resolvedCreatorRole: string = realCreator?.isSuperAdmin || realCreator?.userRole === 'SuperAdmin'
     ? 'SuperAdmin'
-    : (realCreator?.userRole || (cObj?.userRole as string) || 'Member');
-  const resolvedCreatorAvatar = realCreator?.avatarUrl || (cObj?.avatarUrl as string) || undefined;
-  const resolvedCreatorUserCode = realCreator?.userCode || (cObj?.userCode as string) || undefined;
+    : (realCreator?.userRole || creatorMember?.userRole || 'Member');
+  const resolvedCreatorAvatar = realCreator?.avatarUrl || creatorMember?.avatarUrl || undefined;
+  const resolvedCreatorUserCode = realCreator?.userCode || creatorMember?.userCode || undefined;
 
   const creatorProfilePath = resolvedCreatorUserCode
     ? `/organization/members/code/${resolvedCreatorUserCode}`

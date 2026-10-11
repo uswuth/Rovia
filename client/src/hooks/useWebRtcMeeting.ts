@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getMeetingSocket, disconnectMeetingSocket, type MeetingSocket } from '@/api/meeting/meeting-socket';
 import type { MeetingSignalPayload } from '@/api/meeting/webrtc.types';
+import { buildAudioConstraints } from '@/lib/audio-capture';
 
 const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
@@ -23,7 +24,13 @@ export interface PeerState {
 export const useWebRtcMeeting = (
   meetingId: string,
   enabled: boolean,
-  options?: { visitorId?: string; onPeerLeft?: (userId: string) => void }
+  options?: {
+    visitorId?: string;
+    initialAudioDeviceId?: string;
+    initialVideoDeviceId?: string;
+    onPeerLeft?: (userId: string) => void;
+    onPeerJoined?: (userId: string) => void;
+  }
 ) => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [peers, setPeers] = useState<Record<string, PeerState>>({});
@@ -36,9 +43,11 @@ export const useWebRtcMeeting = (
   // and re-rendering on every change would thrash the video elements.
   const connections = useRef<Record<string, RTCPeerConnection>>({});
   const onPeerLeftRef = useRef(options?.onPeerLeft);
+  const onPeerJoinedRef = useRef(options?.onPeerJoined);
   useEffect(() => {
     onPeerLeftRef.current = options?.onPeerLeft;
-  }, [options?.onPeerLeft]);
+    onPeerJoinedRef.current = options?.onPeerJoined;
+  }, [options?.onPeerLeft, options?.onPeerJoined]);
 
   const upsertPeer = useCallback((userId: string, patch: Partial<PeerState>) => {
     setPeers((prev) => ({
@@ -121,20 +130,35 @@ export const useWebRtcMeeting = (
 
     const start = async () => {
       setStatus('connecting');
+      const audioConstraint = buildAudioConstraints(options?.initialAudioDeviceId);
+      const videoConstraint = options?.initialVideoDeviceId
+        ? { deviceId: { exact: options.initialVideoDeviceId } }
+        : true;
+
       try {
-        // Camera/mic first: a denied permission should fail loudly, not
-        // silently produce a peer with no tracks.
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: audioConstraint });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
         localRef.current = stream;
         setLocalStream(stream);
-      } catch (err) {
-        setError((err as Error).message || 'Camera and microphone are required');
-        setStatus('failed');
-        return;
+      } catch {
+        // Fallback to audio-only if camera is unavailable or in use by another profile/window
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint });
+          if (cancelled) {
+            audioStream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          localRef.current = audioStream;
+          setLocalStream(audioStream);
+        } catch {
+          // If neither is available, proceed as listener with empty stream to maintain socket connection
+          const emptyStream = new MediaStream();
+          localRef.current = emptyStream;
+          setLocalStream(emptyStream);
+        }
       }
 
       const socket = getMeetingSocket(options?.visitorId);
@@ -144,6 +168,7 @@ export const useWebRtcMeeting = (
         // The newcomer offers; we just answer. One side offers, never both.
         createConnection(userId, false);
         upsertPeer(userId, {});
+        onPeerJoinedRef.current?.(userId);
       });
 
       socket.on('meeting:peer-left', ({ userId }) => {
@@ -304,6 +329,73 @@ export const useWebRtcMeeting = (
     }
   }, [meetingId]);
 
+  const switchDevice = useCallback(
+    async (kind: 'audio' | 'video', deviceId: string) => {
+      try {
+        const getStreamForDevice = async (constraint: boolean | MediaTrackConstraints) => {
+          // Audio keeps the capture DSP (echo/noise/high-pass) on every swap;
+          // video-only constraint carries no audio flags.
+          const audio = kind === 'audio' ? buildAudioConstraints(deviceId) : false;
+          return navigator.mediaDevices.getUserMedia(
+            kind === 'video'
+              ? { video: constraint, audio: false }
+              : { audio, video: false }
+          );
+        };
+
+        let newStream: MediaStream;
+        if (!deviceId || deviceId === 'default') {
+          newStream = await getStreamForDevice(true);
+        } else {
+          try {
+            newStream = await getStreamForDevice({ deviceId: { exact: deviceId } });
+          } catch {
+            newStream = await getStreamForDevice({ deviceId: { ideal: deviceId } });
+          }
+        }
+
+        const newTrack = kind === 'video' ? newStream.getVideoTracks()[0] : newStream.getAudioTracks()[0];
+        if (!newTrack) return;
+
+        if (!localRef.current) {
+          localRef.current = new MediaStream();
+        }
+
+        const replacementTrack = newTrack;
+
+        const oldTrack = kind === 'video' ? localRef.current.getVideoTracks()[0] : localRef.current.getAudioTracks()[0];
+        if (oldTrack) {
+          replacementTrack.enabled = oldTrack.enabled;
+          localRef.current.removeTrack(oldTrack);
+          oldTrack.stop();
+        }
+        localRef.current.addTrack(replacementTrack);
+
+        // Replace track on all active WebRTC peer connections
+        Object.values(connections.current).forEach((pc) => {
+          const transceiver = pc.getTransceivers?.().find(
+            (t) => t.sender.track?.kind === kind || t.receiver.track?.kind === kind
+          );
+          if (transceiver?.sender) {
+            void transceiver.sender.replaceTrack(replacementTrack);
+            return;
+          }
+          const sender = pc.getSenders().find((s) => s.track?.kind === kind);
+          if (sender) {
+            void sender.replaceTrack(replacementTrack);
+          } else if (localRef.current) {
+            pc.addTrack(replacementTrack, localRef.current);
+          }
+        });
+
+        setLocalStream(new MediaStream(localRef.current.getTracks()));
+      } catch (err) {
+        console.warn(`Failed to switch ${kind} device:`, err);
+      }
+    },
+    []
+  );
+
   return {
     localStream,
     peers,
@@ -313,6 +405,8 @@ export const useWebRtcMeeting = (
     isScreenSharing,
     setAudioEnabled: (on: boolean) => setTrackEnabled('audio', on),
     setVideoEnabled: (on: boolean) => setTrackEnabled('video', on),
+    switchMicrophone: (deviceId: string) => switchDevice('audio', deviceId),
+    switchCamera: (deviceId: string) => switchDevice('video', deviceId),
     startScreenShare,
     stopScreenShare,
   };

@@ -16,7 +16,9 @@ import { GroupedAvatars } from '@/components/members/GroupedAvatars';
 import type { Column } from '@/components/ui/data-table';
 import type { TaskStatusType } from '@/api/tasks/tasks.api';
 import type { BadgeTone } from '@/components/ui/badge-variants';
-import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
+import type { Member } from '@/types/member.types';
+import { normalizeMemberList } from '@/components/members/member-utils';
+import { formatDateOnly } from '@/lib/format-date';
 
 export const KANBAN_COLUMNS: {
   id: TaskStatusType;
@@ -25,12 +27,12 @@ export const KANBAN_COLUMNS: {
   tone: BadgeTone;
   iconColor: string;
 }[] = [
-  { id: 'backlog', label: 'Backlog', icon: CircleDashed, tone: 'accent', iconColor: 'text-purple-500 dark:text-purple-400' },
-  { id: 'to_do', label: 'Todo', icon: Circle, tone: 'info', iconColor: 'text-blue-500 dark:text-blue-400' },
-  { id: 'in_progress', label: 'In Progress', icon: Loader2, tone: 'warning', iconColor: 'text-amber-500 dark:text-amber-400' },
-  { id: 'bug', label: 'Bug / Issue', icon: AlertCircle, tone: 'danger', iconColor: 'text-rose-500 dark:text-rose-400' },
-  { id: 'completed', label: 'Done', icon: CheckCircle2, tone: 'success', iconColor: 'text-emerald-500 dark:text-emerald-400' },
-];
+    { id: 'backlog', label: 'Backlog', icon: CircleDashed, tone: 'accent', iconColor: 'text-purple-500 dark:text-purple-400' },
+    { id: 'to_do', label: 'Todo', icon: Circle, tone: 'info', iconColor: 'text-blue-500 dark:text-blue-400' },
+    { id: 'in_progress', label: 'In Progress', icon: Loader2, tone: 'warning', iconColor: 'text-amber-500 dark:text-amber-400' },
+    { id: 'bug', label: 'Bug / Issue', icon: AlertCircle, tone: 'danger', iconColor: 'text-rose-500 dark:text-rose-400' },
+    { id: 'completed', label: 'Done', icon: CheckCircle2, tone: 'success', iconColor: 'text-emerald-500 dark:text-emerald-400' },
+  ];
 
 export interface TaskColumnsOptions {
   navigate: NavigateFunction;
@@ -166,31 +168,8 @@ export const getTaskColumns = ({
       width: '150px',
       minWidth: '130px',
       cell: (t) => {
-        const assignedArr = (t.assignedMembers as unknown[]) || [];
-        const mappedMembers: Member[] = assignedArr.map((m) => {
-          if (typeof m === 'string') {
-            return {
-              userId: m,
-              userName: m,
-              userEmail: '',
-              userRole: 'Member' as MemberRole,
-              userStatus: 'ACTIVE' as MemberStatus,
-              createdAt: '',
-            };
-          }
-          const obj = m as Record<string, unknown>;
-          return {
-            userId: (obj.userId || obj._id || obj.id || '') as string,
-            userName: (obj.userName || obj.name || obj.userEmail || '') as string,
-            userEmail: (obj.userEmail || obj.email || '') as string,
-            userRole: ((obj.userRole || obj.role || 'Member') as MemberRole),
-            userStatus: ((obj.userStatus || obj.status || 'ACTIVE') as MemberStatus),
-            userCode: obj.userCode as string | undefined,
-            avatarUrl: obj.avatarUrl as string | undefined,
-            jobTitle: obj.jobTitle as string | undefined,
-            createdAt: (obj.createdAt || '') as string,
-          };
-        });
+        const assignedArr = (t.assignedMembers || []) as (Member | string)[];
+        const mappedMembers = normalizeMemberList(assignedArr);
 
         const taskTitleStr = (t.taskTitle as string) || 'Task';
 
@@ -226,8 +205,8 @@ export const getTaskColumns = ({
         const profilePath = userCode
           ? `/organization/members/code/${userCode}`
           : memberId
-          ? `/organization/members/${memberId}/profile`
-          : null;
+            ? `/organization/members/${memberId}/profile`
+            : null;
 
         return (
           <div className="flex items-center gap-2.5">
@@ -264,48 +243,50 @@ export const getTaskColumns = ({
       header: 'Created At',
       width: '120px',
       minWidth: '110px',
-      cell: (t) => {
-        const date = t.createdAt ? new Date(t.createdAt as string).toLocaleDateString() : 'N/A';
-        return <span className="text-xs text-muted-foreground font-mono">{date}</span>;
-      },
+      cell: (t) => (
+        <span className="text-xs text-muted-foreground font-mono">
+          {formatDateOnly(t.createdAt) || 'N/A'}
+        </span>
+      ),
     },
     {
       id: 'updatedAt',
       header: 'Updated At',
       width: '120px',
       minWidth: '110px',
-      cell: (t) => {
-        const date = t.updatedAt ? new Date(t.updatedAt as string).toLocaleDateString() : 'N/A';
-        return <span className="text-xs text-muted-foreground font-mono">{date}</span>;
-      },
+      cell: (t) => (
+        <span className="text-xs text-muted-foreground font-mono">
+          {formatDateOnly(t.updatedAt) || 'N/A'}
+        </span>
+      ),
     },
     ...(canManage
       ? [
-          {
-            id: 'actions',
-            header: 'Actions',
-            align: 'right' as const,
-            width: '60px',
-            minWidth: '60px',
-            cell: (t: Record<string, unknown>) => {
-              const taskIdStr = (t.taskId || t._id || t.id) as string;
-              const navId = ((t.taskCode || t.task_code || taskIdStr) as string) || '';
-              return (
-                <div className="flex justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate(`/tasks/${navId}/edit`)}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-                    title="Edit Task"
-                  >
-                    <Edit2 size={14} />
-                  </Button>
-                </div>
-              );
-            },
+        {
+          id: 'actions',
+          header: 'Actions',
+          align: 'right' as const,
+          width: '60px',
+          minWidth: '60px',
+          cell: (t: Record<string, unknown>) => {
+            const taskIdStr = (t.taskId || t._id || t.id) as string;
+            const navId = ((t.taskCode || t.task_code || taskIdStr) as string) || '';
+            return (
+              <div className="flex justify-end gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/tasks/${navId}/edit`)}
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                  title="Edit Task"
+                >
+                  <Edit2 size={14} />
+                </Button>
+              </div>
+            );
           },
-        ]
+        },
+      ]
       : []),
   ];
 };

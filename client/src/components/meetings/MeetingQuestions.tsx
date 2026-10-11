@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { MessageCircleQuestion, Send, X } from 'lucide-react';
+import { MessageCircleQuestion, SendHorizontal, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -145,6 +145,7 @@ export const MeetingQuestions = ({
     resolver: zodResolver(answerQuestionSchema),
     defaultValues: { answerText: '' },
   });
+  const questionText = askForm.watch('questionText');
 
   const submitQuestion = askForm.handleSubmit(async (values) => {
     await onAsk(values.questionText.trim());
@@ -159,8 +160,8 @@ export const MeetingQuestions = ({
     });
 
   return (
-    <div className="flex flex-col h-full space-y-3">
-      <div className="flex-1 overflow-y-auto space-y-3 min-h-[260px]">
+    <div className="flex flex-col h-full min-h-0 w-full justify-between">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 pb-3 no-scrollbar">
         {loading ? (
           <div className="space-y-2">
             <Skeleton className="h-14 w-full" />
@@ -192,17 +193,26 @@ export const MeetingQuestions = ({
       </div>
 
       {canPost && (
-        <form onSubmit={submitQuestion} className="flex items-center gap-2 pt-2 border-t border-border">
-          <Input
-            id={`ask-${meetingId}`}
-            placeholder="Type your question or message..."
-            {...askForm.register('questionText')}
-            className="flex-1 text-xs"
-          />
-          <Button type="submit" size="sm" disabled={posting} className="gap-1 text-xs font-semibold px-3">
-            <Send size={13} />
-            <span>Send</span>
-          </Button>
+        <form onSubmit={submitQuestion} className="shrink-0 pt-2 pb-1 border-t border-border w-full">
+          <div className="flex items-center gap-2 w-full py-1">
+            <Input
+              id={`ask-${meetingId}`}
+              type="text"
+              placeholder="Type your question or message..."
+              {...askForm.register('questionText')}
+              disabled={posting}
+              className="flex-1 min-w-0 h-9 px-3.5 text-xs"
+              aria-label="Question text"
+            />
+            <button
+              type="submit"
+              disabled={posting || !questionText?.trim()}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer active:scale-95 disabled:opacity-25 disabled:pointer-events-none transition-all"
+              title="Send Question"
+            >
+              <SendHorizontal size={15} className="translate-x-[0.5px]" />
+            </button>
+          </div>
         </form>
       )}
     </div>

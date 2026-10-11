@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "./button"
@@ -60,9 +61,9 @@ const Modal: React.FC<ModalProps> = ({
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/85 p-4 backdrop-blur-sm cursor-pointer transition-opacity"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 dark:bg-black/85 p-4 backdrop-blur-sm cursor-pointer transition-opacity"
       onClick={onClose}
     >
       <div
@@ -73,7 +74,7 @@ const Modal: React.FC<ModalProps> = ({
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
         className={cn(
-          "w-full max-w-md space-y-5 rounded-xl border border-border/80 bg-card p-6 shadow-2xl outline-none cursor-default animate-in fade-in-0 zoom-in-95 duration-150",
+          "w-full max-w-md space-y-5 rounded-xs border border-border/80 bg-card p-6 shadow-2xl outline-none cursor-default animate-in fade-in-0 zoom-in-95 duration-150",
           className
         )}
       >
@@ -106,7 +107,8 @@ const Modal: React.FC<ModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

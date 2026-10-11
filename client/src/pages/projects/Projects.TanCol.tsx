@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { GroupedAvatars } from '@/components/members/GroupedAvatars';
 import { getProjectStatusTone } from '@/lib/status-tone';
 import type { Column } from '@/components/ui/data-table';
-import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
+import type { Member } from '@/types/member.types';
+import { normalizeMemberList } from '@/components/members/member-utils';
+import { formatDateOnly } from '@/lib/format-date';
 import {
   getProjectName,
   getProjectCode,
@@ -105,32 +107,18 @@ export const getProjectColumns = ({
       width: '150px',
       minWidth: '130px',
       cell: (project) => {
-        const hostList = Array.isArray(project.hosts) ? project.hosts : [];
-        const memberList = Array.isArray(project.members) ? project.members : [];
-        const rawList = [...hostList, ...memberList];
-        const mappedMembers: Member[] = rawList.map((m) => {
-          if (typeof m === 'string') {
-            return { userId: m, userName: m, userEmail: '', userRole: 'Member', userStatus: 'ACTIVE', createdAt: '' };
-          }
-          const obj = m as Record<string, unknown>;
-          return {
-            userId: (obj.userId || obj._id || obj.id || '') as string,
-            userName: (obj.userName || obj.name || obj.userEmail || '') as string,
-            userEmail: (obj.userEmail || obj.email || '') as string,
-            userRole: ((obj.userRole || obj.role || 'Member') as MemberRole),
-            userStatus: ((obj.userStatus || obj.status || 'ACTIVE') as MemberStatus),
-            jobTitle: obj.jobTitle as string | undefined,
-            createdAt: (obj.createdAt || '') as string,
-          };
-        });
+        const hostList = (project.hosts || []) as (Member | string)[];
+        const memberList = (project.members || []) as (Member | string)[];
+
+        const mappedMembers = normalizeMemberList([...hostList, ...memberList]);
 
         const valueMap: Record<string, 'Host' | 'Member'> = {};
         hostList.forEach((h) => {
-          const id = typeof h === 'string' ? h : ((h as Record<string, string>).userId || (h as Record<string, string>)._id);
+          const id = typeof h === 'string' ? h : h.userId;
           if (id) valueMap[id] = 'Host';
         });
         memberList.forEach((m) => {
-          const id = typeof m === 'string' ? m : ((m as Record<string, string>).userId || (m as Record<string, string>)._id);
+          const id = typeof m === 'string' ? m : m.userId;
           if (id && !valueMap[id]) valueMap[id] = 'Member';
         });
 
@@ -195,7 +183,7 @@ export const getProjectColumns = ({
       minWidth: '110px',
       cell: (project) => (
         <span className="text-xs text-muted-foreground font-mono">
-          {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'N/A'}
+          {formatDateOnly(project.createdAt) || 'N/A'}
         </span>
       ),
     },
@@ -206,7 +194,7 @@ export const getProjectColumns = ({
       minWidth: '110px',
       cell: (project) => (
         <span className="text-xs text-muted-foreground font-mono">
-          {project.updatedAt ? new Date(project.updatedAt).toLocaleDateString() : 'N/A'}
+          {formatDateOnly(project.updatedAt) || 'N/A'}
         </span>
       ),
     },

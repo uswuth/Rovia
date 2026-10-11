@@ -1,23 +1,19 @@
 import React, { useEffect, useRef, useState, type FormEvent } from 'react';
-import { MessageSquare, Send, BarChart3, User as UserIcon } from 'lucide-react';
+import { MessageSquare, SendHorizontal, BarChart3, Pin, ChevronDown, Check, CheckCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal, ModalFooterCancel } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  Message,
-  MessageAvatar,
-  MessageBody,
-  MessageHeader,
-  MessageContent,
-  MessageFooter,
-  MessageStatus,
-} from '@/components/ui/message';
+import { MessageScroller } from '@/components/ui/message-scroller';
+import { cn } from '@/lib/utils';
 import { getMeetingSocket } from '@/api/meeting/meeting-socket';
+import { useAuth } from '@/context/AuthContext';
+import { useTimeFormat } from '@/context/TimeFormatContext';
 import type { MeetingChatMessage } from '@/api/meeting/webrtc.types';
 import type { MeetingParticipant } from '@/api/meeting/meeting.types';
+import type { MeetingPoll } from '@/api/meeting/meeting-poll.api';
 
 interface MeetingChatProps {
   meetingId: string;
@@ -27,10 +23,16 @@ interface MeetingChatProps {
   /** Failure sink — the room surfaces these as a toast. */
   onError: (message: string) => void;
   displayNameFor: (userId: string) => string;
+  emailFor?: (userId: string) => string | undefined;
+  meetingRoleFor?: (userId: string) => 'Host' | 'Moderator' | 'Member';
   participants?: MeetingParticipant[];
-  /** Only true for actual SuperAdmin / Admin (not regular members even if meeting host) */
   canViewProfile?: boolean;
+  canManage?: boolean;
   onOpenPolls?: () => void;
+  activePoll?: MeetingPoll | null;
+  onVotePoll?: (pollId: string, optionIds: string[]) => Promise<void>;
+  onClosePoll?: (pollId: string) => Promise<void>;
+  pollPending?: boolean;
 }
 
 /** Mirrors MAX_CHAT_MESSAGE_CHARS on the server. */
@@ -44,45 +46,119 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
   canPost,
   onError,
   displayNameFor,
+  emailFor,
+  meetingRoleFor,
   participants = [],
   canViewProfile = false,
+  canManage = false,
   onOpenPolls,
+  activePoll,
+  onVotePoll,
+  onClosePoll,
+  pollPending = false,
 }) => {
+  const { user } = useAuth();
+  const { formatTimeStr } = useTimeFormat();
   const [messages, setMessages] = useState<MeetingChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [selectedProfileUser, setSelectedProfileUser] = useState<{
     userId: string;
     userName: string;
+    email?: string;
     avatarUrl?: string;
     role?: string;
   } | null>(null);
-  const listRef = useRef<HTMLDivElement | null>(null);
+  const [pinnedExpanded, setPinnedExpanded] = useState(false);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    const scroll = () => {
+      bottomRef.current?.scrollIntoView({ behavior, block: 'end' });
+    };
+    requestAnimationFrame(scroll);
+    window.setTimeout(scroll, 50);
+  };
+
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
+  const typingTimeoutRef = useRef<number | null>(null);
 
   // Messages arrive only via the room broadcast, so every client (sender
   // included) renders from the same single source of truth.
   useEffect(() => {
     const socket = getMeetingSocket();
     const handleMessage = (message: MeetingChatMessage) => {
-      if (message.meetingId !== meetingId) return;
       setMessages((prev) => [...prev, message]);
+      setTypingUsers((prev) => {
+        const next = { ...prev };
+        delete next[message.from];
+        return next;
+      });
+      scrollToBottom('smooth');
     };
+
+    const handleTyping = (data: { userId: string; userName: string; isTyping: boolean }) => {
+      if (!data.userId || data.userId === currentUserId) return;
+      setTypingUsers((prev) => {
+        const next = { ...prev };
+        if (data.isTyping) {
+          next[data.userId] = data.userName || displayNameFor(data.userId) || 'Someone';
+        } else {
+          delete next[data.userId];
+        }
+        return next;
+      });
+    };
+
     socket.on('meeting:message', handleMessage);
+    socket.on('meeting:typing', handleTyping);
+
     return () => {
       socket.off('meeting:message', handleMessage);
+      socket.off('meeting:typing', handleTyping);
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current);
+      }
     };
-  }, [meetingId]);
+  }, [meetingId, currentUserId, displayNameFor]);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+    scrollToBottom('smooth');
   }, [messages.length]);
+
+  const handleDraftChange = (newText: string) => {
+    setDraft(newText);
+    const socket = getMeetingSocket();
+    const myName = displayNameFor(currentUserId);
+
+    if (newText.trim().length > 0) {
+      socket.emit('meeting:typing', { meetingId, isTyping: true, userName: myName });
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current);
+      }
+      typingTimeoutRef.current = window.setTimeout(() => {
+        socket.emit('meeting:typing', { meetingId, isTyping: false, userName: myName });
+      }, 1500);
+    } else {
+      socket.emit('meeting:typing', { meetingId, isTyping: false, userName: myName });
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current);
+      }
+    }
+  };
 
   const send = (event: FormEvent) => {
     event.preventDefault();
     const text = draft.trim();
     if (!text || sending) return;
 
+    if (typingTimeoutRef.current) {
+      window.clearTimeout(typingTimeoutRef.current);
+    }
+    getMeetingSocket().emit('meeting:typing', { meetingId, isTyping: false });
+
     setSending(true);
+    scrollToBottom('smooth');
     let settled = false;
     const timer = window.setTimeout(() => {
       if (settled) return;
@@ -98,6 +174,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
       setSending(false);
       if (result?.ok) {
         setDraft('');
+        scrollToBottom('smooth');
       } else {
         onError(result?.error ?? 'Message could not be sent');
       }
@@ -109,10 +186,19 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
     const matched = participants.find((p) => p.userId === userId);
     const name = displayNameFor(userId);
     const avatarUrl = matched && 'avatarUrl' in matched ? (matched.avatarUrl as string) : undefined;
-    const role = matched && 'participantRole' in matched ? (matched.participantRole as string) : 'Member';
+    const role = meetingRoleFor
+      ? meetingRoleFor(userId)
+      : matched?.participantRole === 'HOST'
+      ? 'Host'
+      : matched?.participantRole === 'MODERATOR'
+      ? 'Moderator'
+      : 'Member';
+    const email = emailFor ? emailFor(userId) : ((matched as any)?.userEmail || (matched as any)?.email);
+
     setSelectedProfileUser({
       userId,
       userName: name,
+      email,
       avatarUrl,
       role,
     });
@@ -124,94 +210,251 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-3">
-      {/* Messages Scroll Area */}
-      <div ref={listRef} className="flex-1 overflow-y-auto space-y-3 min-h-[260px] pr-1">
-        {messages.length === 0 ? (
-          <EmptyState
-            icon={MessageSquare}
-            title="No messages yet"
-            description="Chat messages are visible to everyone on the meeting roster."
-          />
-        ) : (
-          <div className="space-y-3">
-            {messages.map((message) => {
-              const isMe = message.from === currentUserId;
-              const senderName = isMe ? 'You' : displayNameFor(message.from);
-              const avatarSrc = getParticipantAvatar(message.from);
-              const formattedTime = new Date(message.at).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              });
-
-              return (
-                <Message key={message.messageId} alignment={isMe ? 'right' : 'left'}>
-                  <MessageAvatar
-                    name={senderName}
-                    src={avatarSrc}
-                    clickable={canViewProfile}
-                    onClick={() => handleAvatarClick(message.from)}
-                    title={canViewProfile ? `View ${senderName}'s Profile` : undefined}
-                  />
-                  <MessageBody>
-                    <MessageHeader sender={senderName} timestamp={formattedTime} />
-                    <MessageContent>{message.text}</MessageContent>
-                    {isMe && (
-                      <MessageFooter>
-                        <MessageStatus status="delivered" />
-                      </MessageFooter>
-                    )}
-                  </MessageBody>
-                </Message>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Chat Bottom Controls */}
-      <div className="pt-2 border-t border-border space-y-2">
-        {canPost ? (
-          <form onSubmit={send} className="space-y-2">
-            <div className="relative flex items-center w-full">
-              <Input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Type a message..."
-                maxLength={MAX_CHARS}
-                className="w-full text-xs pr-10 h-9 bg-background focus:ring-1 focus:ring-emerald-500"
-                aria-label="Chat message"
-              />
-              <button
-                type="submit"
-                disabled={sending || !draft.trim()}
-                className="absolute right-1.5 p-1 rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer transition-colors"
-                title="Send Message"
+    <div className="flex flex-col h-full min-h-0 w-full gap-2">
+      {/* Pinned Active Poll Indexed Banner above Chat */}
+      {activePoll && activePoll.pollStatus === 'OPEN' && (
+        <div className="shrink-0 rounded-md border border-emerald-500/30 bg-emerald-500/5 shadow-xs overflow-hidden transition-all">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-emerald-500/10 border-b border-emerald-500/20 text-xs">
+            <div
+              className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 min-w-0 flex-1 cursor-pointer select-none"
+              onClick={() => setPinnedExpanded((v) => !v)}
+            >
+              <Pin size={13} className="shrink-0 text-emerald-500 rotate-45" />
+              <span className="truncate">Pinned Poll: {activePoll.pollQuestion}</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-medium rounded-xs"
               >
-                <Send size={15} />
+                {activePoll.pollOptions.reduce((acc, o) => acc + o.voteCount, 0)} votes
+              </Badge>
+              <button
+                type="button"
+                onClick={() => setPinnedExpanded((v) => !v)}
+                className="p-1 hover:bg-emerald-500/20 rounded-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                aria-label="Toggle pinned poll details"
+              >
+                <ChevronDown
+                  size={14}
+                  className={cn('transition-transform duration-200', pinnedExpanded && 'rotate-180')}
+                />
               </button>
             </div>
+          </div>
 
-            {/* Bottom Actions Bar */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
-              <div className="flex items-center gap-1.5">
+          {pinnedExpanded && (
+            <div className="p-3 pb-3 space-y-2.5 bg-card/60 border-t border-emerald-500/15">
+              <p className="text-xs font-medium text-foreground leading-snug">{activePoll.pollQuestion}</p>
+              <ul className="space-y-1.5">
+                {(() => {
+                  const total = activePoll.pollOptions.reduce((acc, o) => acc + o.voteCount, 0);
+                  return activePoll.pollOptions.map((opt) => {
+                    const hasVoted = Boolean(opt.voterIds?.includes(currentUserId));
+                    const pct = total === 0 ? 0 : Math.round((opt.voteCount / total) * 100);
+                    return (
+                      <li key={opt.optionId}>
+                        <button
+                          type="button"
+                          onClick={() => onVotePoll?.(activePoll.pollId, [opt.optionId])}
+                          disabled={pollPending}
+                          className={cn(
+                            'relative w-full overflow-hidden rounded-xs border p-2 text-left text-xs transition-all cursor-pointer',
+                            hasVoted
+                              ? 'border-emerald-500 bg-emerald-500/10 font-medium'
+                              : 'border-border/80 bg-background/60 hover:border-emerald-500/50 hover:bg-muted/40'
+                          )}
+                        >
+                          <div
+                            className="absolute inset-y-0 left-0 bg-emerald-500/15 transition-all duration-300 rounded-xs"
+                            style={{ width: `${pct}%` }}
+                          />
+                          <div className="relative flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1.5 truncate text-xs text-foreground">
+                              {hasVoted && <Check size={12} className="text-emerald-500 shrink-0" />}
+                              <span className="truncate">{opt.optionText}</span>
+                            </span>
+                            <span className="text-[10px] text-muted-foreground shrink-0 font-medium">
+                              {opt.voteCount} ({pct}%)
+                            </span>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  });
+                })()}
+              </ul>
+              <div className="flex items-center justify-between pt-1 text-[11px]">
                 {onOpenPolls && (
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    size="xs"
                     onClick={onOpenPolls}
-                    className="h-6 gap-1 px-2 text-[11px] font-medium text-foreground hover:bg-accent cursor-pointer"
-                    title="Open In-Meeting Polls"
+                    className="text-xs text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
                   >
-                    <BarChart3 size={12} className="text-emerald-500 shrink-0" />
-                    <span>Poll</span>
+                    View in Polls tab →
+                  </button>
+                )}
+                {canManage && onClosePoll && (
+                  <Button
+                    variant="destructive"
+                    size="xs"
+                    className="h-6 px-2 text-[10px] cursor-pointer ml-auto rounded-xs"
+                    onClick={() => onClosePoll(activePoll.pollId)}
+                    disabled={pollPending}
+                  >
+                    Close poll
                   </Button>
                 )}
               </div>
-              <span className="text-[10px] text-muted-foreground/60">
-                {draft.length > 0 ? `${draft.length}/${MAX_CHARS}` : 'Press Enter to send'}
-              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Messages Transcript with MessageScroller */}
+      <MessageScroller.Provider autoScroll={true} defaultScrollPosition="end">
+        <MessageScroller.Root className="relative flex-1 min-h-0">
+          <MessageScroller.Viewport className="flex-1 min-h-0 pr-1 no-scrollbar">
+            <MessageScroller.Content className="space-y-3 min-h-full pb-6">
+              {messages.length === 0 ? (
+                <EmptyState
+                  icon={MessageSquare}
+                  title="No messages yet"
+                />
+              ) : (
+                messages.map((message) => {
+                  const isMe = message.from === currentUserId;
+                  const senderDisplayName = isMe ? 'You' : displayNameFor(message.from);
+                  const realUserName = isMe ? (user?.userName || 'User') : displayNameFor(message.from);
+                  const realInitial = (realUserName === 'You' ? (user?.userName || 'U') : realUserName).trim().charAt(0).toUpperCase() || 'U';
+                  const avatarSrc = isMe ? (user?.avatarUrl || getParticipantAvatar(message.from)) : getParticipantAvatar(message.from);
+                  const formattedTime = formatTimeStr(message.at);
+
+                  return (
+                    <MessageScroller.Item
+                      key={message.messageId}
+                      messageId={message.messageId}
+                      scrollAnchor={isMe}
+                    >
+                      <div
+                        className={cn(
+                          'flex flex-col w-full text-xs transition-colors group/message',
+                          isMe ? 'items-end' : 'items-start'
+                        )}
+                      >
+                        {/* Message Bubble */}
+                        <div
+                          className={cn(
+                            'px-3.5 pt-2 pb-1.5 text-xs break-words [overflow-wrap:anywhere] leading-relaxed max-w-[85%]',
+                            isMe
+                              ? 'bg-accent text-accent-foreground border border-accent/20 rounded-2xl rounded-tr-xs shadow-xs font-normal'
+                              : 'bg-muted/90 dark:bg-zinc-800/90 text-foreground border border-border/50 rounded-2xl rounded-tl-xs shadow-2xs'
+                          )}
+                        >
+                          <div className="whitespace-pre-wrap">{message.text}</div>
+
+                          {/* Reserved Bottom Line inside bubble: Time & Delivery Status */}
+                          <div
+                            className={cn(
+                              'flex items-center gap-1 mt-1 text-[10px] select-none',
+                              isMe ? 'justify-end text-accent-foreground/80' : 'justify-start text-muted-foreground/75'
+                            )}
+                          >
+                            <span>{formattedTime}</span>
+                            {isMe && <CheckCheck size={12} className="text-accent-foreground/90" />}
+                          </div>
+                        </div>
+
+                        {/* Message End Bar (Profile Avatar & Name placed beneath the bubble) */}
+                        {isMe ? (
+                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-muted-foreground/80 justify-end select-none pr-0.5">
+                            <span className="font-medium text-muted-foreground/90 truncate max-w-[120px]">{senderDisplayName}</span>
+                            <div
+                              onClick={canViewProfile ? () => handleAvatarClick(message.from) : undefined}
+                              className={cn(canViewProfile && 'cursor-pointer hover:opacity-85 transition-opacity')}
+                              title={canViewProfile ? 'View Your Profile' : undefined}
+                            >
+                              <Avatar className="size-5 text-[8px] shadow-2xs ring-1 ring-border/50 select-none">
+                                {avatarSrc && <AvatarImage src={avatarSrc} alt={realUserName} className="object-cover" />}
+                                <AvatarFallback name={realUserName} className="font-bold text-[8px] bg-secondary">
+                                  {realInitial}
+                                </AvatarFallback>
+                              </Avatar>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-muted-foreground/80 justify-start select-none pl-0.5">
+                            <div
+                              onClick={canViewProfile ? () => handleAvatarClick(message.from) : undefined}
+                              className={cn(canViewProfile && 'cursor-pointer hover:opacity-85 transition-opacity')}
+                              title={canViewProfile ? `View ${senderDisplayName}'s Profile` : undefined}
+                            >
+                              <Avatar className="size-5 text-[8px] shadow-2xs ring-1 ring-border/50 select-none">
+                                {avatarSrc && <AvatarImage src={avatarSrc} alt={realUserName} className="object-cover" />}
+                                <AvatarFallback name={realUserName} className="font-bold text-[8px] bg-secondary">
+                                  {realInitial}
+                                </AvatarFallback>
+                              </Avatar>
+                            </div>
+                            <span className="font-semibold text-foreground/90 truncate max-w-[120px]">{senderDisplayName}</span>
+                          </div>
+                        )}
+                      </div>
+                    </MessageScroller.Item>
+                  );
+                })
+              )}
+              <div ref={bottomRef} className="h-px shrink-0" aria-hidden="true" />
+            </MessageScroller.Content>
+          </MessageScroller.Viewport>
+          <MessageScroller.Button />
+        </MessageScroller.Root>
+      </MessageScroller.Provider>
+
+      {/* Chat Bottom Controls */}
+      <div className="shrink-0 pt-2 pb-1 space-y-1.5 mt-auto">
+        {/* Real-time Typing Indicator with official shadcn shimmer */}
+        {Object.keys(typingUsers).length > 0 && (
+          <div className="px-1 py-0.5 select-none">
+            <span className="shimmer text-[11px] font-normal text-muted-foreground select-none">
+              {Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length === 1 ? 'is' : 'are'} typing…
+            </span>
+          </div>
+        )}
+
+        {canPost ? (
+          <form onSubmit={send} className="w-full">
+            <div className="flex items-center gap-2 w-full py-1">
+              {canManage && onOpenPolls && (
+                <button
+                  type="button"
+                  onClick={onOpenPolls}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-xs border border-border bg-card text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-colors cursor-pointer shadow-xs active:scale-95"
+                  title="Create or Manage In-Meeting Polls"
+                >
+                  <BarChart3 size={16} className="text-emerald-500" />
+                </button>
+              )}
+
+              <Input
+                type="text"
+                value={draft}
+                onChange={(e) => handleDraftChange(e.target.value)}
+                placeholder="Type a message..."
+                maxLength={MAX_CHARS}
+                disabled={sending}
+                className="flex-1 min-w-0 h-9 px-3.5 text-xs"
+                aria-label="Chat message"
+              />
+
+              <button
+                type="submit"
+                disabled={sending || !draft.trim()}
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer active:scale-95 disabled:opacity-25 disabled:pointer-events-none transition-all"
+                title="Send Message"
+              >
+                <SendHorizontal size={15} className="translate-x-[0.5px]" />
+              </button>
             </div>
           </form>
         ) : (
@@ -221,13 +464,12 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
         )}
       </div>
 
-      {/* Member Profile Modal for SuperAdmin and Admin */}
+      {/* Member Profile Modal */}
       {selectedProfileUser && (
         <Modal
           open={Boolean(selectedProfileUser)}
           onClose={() => setSelectedProfileUser(null)}
           title="Member Profile"
-          description="Participant details visible to Administrators."
           className="max-w-sm"
         >
           <div className="space-y-4 py-2">
@@ -242,23 +484,17 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
               </Avatar>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-bold text-foreground truncate">{selectedProfileUser.userName}</h3>
+                {selectedProfileUser.email && (
+                  <p className="text-xs text-muted-foreground truncate">{selectedProfileUser.email}</p>
+                )}
                 <div className="flex items-center gap-1.5 mt-1">
-                  <Badge tone="neutral" className="text-[10px] py-0 px-1.5 font-semibold">
+                  <Badge
+                    tone={selectedProfileUser.role === 'Host' ? 'primary' : 'neutral'}
+                    className="text-[10px] py-0 px-1.5 font-semibold"
+                  >
                     {selectedProfileUser.role || 'Member'}
                   </Badge>
                 </div>
-              </div>
-            </div>
-
-            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2 text-xs">
-              <div className="flex items-center justify-between text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <UserIcon size={12} />
-                  User ID:
-                </span>
-                <span className="font-mono text-[11px] text-foreground truncate max-w-[150px]">
-                  {selectedProfileUser.userId}
-                </span>
               </div>
             </div>
           </div>

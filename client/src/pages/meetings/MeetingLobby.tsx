@@ -5,6 +5,7 @@ import {
   ArrowRight, AlertCircle, ShieldCheck, RefreshCw, Share2, FolderGit2, Settings2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { buildAudioConstraints } from '@/lib/audio-capture';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -17,10 +18,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useTimeFormat } from '@/context/TimeFormatContext';
 import { useProject } from '@/context/ProjectContext';
 import { getProjectName, getProjectId } from '@/types/project.types';
-import { previewMeetingByJoinCode } from '@/api/meeting/meeting.api';
+import { previewMeetingByJoinCode, joinMeeting } from '@/api/meeting/meeting.api';
 import type { MeetingPreview } from '@/api/meeting/meeting.types';
 import { parseApiError } from '@/utils/apiError';
 import { formatCountdown } from '@/lib/format-countdown';
+import { shareOrCopy } from '@/lib/share';
 
 const getCleanDeviceLabel = (
   device: MediaDeviceInfo | undefined,
@@ -78,24 +80,14 @@ export const MeetingLobby: React.FC = () => {
   // Native share or copy link
   const handleShare = async () => {
     const shareUrl = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: preview?.meetingTitle || 'IntellMeet Meeting',
-          text: `Join IntellMeet video meeting: ${preview?.meetingTitle || ''}`,
-          url: shareUrl,
-        });
-        return;
-      } catch {
-        // User cancelled or share failed, fallback to copy
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(shareUrl);
+    const res = await shareOrCopy({
+      title: preview?.meetingTitle || 'IntellMeet Meeting',
+      text: `Join IntellMeet video meeting: ${preview?.meetingTitle || ''}`,
+      url: shareUrl,
+    });
+    if (res === 'shared' || res === 'copied') {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
     }
   };
 
@@ -167,9 +159,7 @@ export const MeetingLobby: React.FC = () => {
         stream.getTracks().forEach((t) => t.stop());
       }
 
-      const audioConstraint: boolean | MediaTrackConstraints = micId
-        ? { deviceId: { exact: micId } }
-        : true;
+      const audioConstraint = buildAudioConstraints(micId);
       const videoConstraint: boolean | MediaTrackConstraints = camId
         ? { deviceId: { exact: camId }, width: { ideal: 1280 }, height: { ideal: 720 } }
         : { width: { ideal: 1280 }, height: { ideal: 720 } };
@@ -289,11 +279,16 @@ export const MeetingLobby: React.FC = () => {
       stream.getTracks().forEach((t) => t.stop());
     }
 
+    joinMeeting(preview.meetingId).catch(() => {});
+
     navigate(`/meetings/${preview.meetingId}/room`, {
       state: {
         fromLobby: true,
         initialCamera: cameraEnabled,
         initialMic: micEnabled,
+        selectedMic,
+        selectedCamera,
+        selectedSpeaker,
         preview,
       },
     });
@@ -342,23 +337,13 @@ export const MeetingLobby: React.FC = () => {
     audioOutputs.findIndex((d) => d.deviceId === selectedSpeaker)
   );
 
-  // Meeting opening / countdown status
-  const scheduledDate = preview ? new Date(preview.meetingScheduledAt) : new Date();
-  const scheduledMs = scheduledDate.getTime();
-  const earlyJoinMs = !isNaN(scheduledMs) ? scheduledMs - 5 * 60 * 1000 : 0;
-  const durationMinutes = preview?.meetingDurationMinutes || 30;
-  const endMs = !isNaN(scheduledMs) ? scheduledMs + durationMinutes * 60 * 1000 : Infinity;
-
-  const isPastDuration = !isNaN(scheduledMs) && now > endMs;
-  const isTooEarly = !isNaN(scheduledMs) && now < earlyJoinMs;
-  const isEndedOrCancelled = preview?.meetingStatus === 'ENDED' || preview?.meetingStatus === 'CANCELLED' || isPastDuration;
-  const canJoin = Boolean(preview) && !isEndedOrCancelled && !isTooEarly;
+  // Meeting status: Google Meet model (Link stays valid and joinable until host ends it)
+  const isEndedOrCancelled = preview?.meetingStatus === 'ENDED' || preview?.meetingStatus === 'CANCELLED';
+  const canJoin = Boolean(preview) && !isEndedOrCancelled;
 
   let buttonText = 'Join Meeting';
   if (isEndedOrCancelled) {
     buttonText = 'Meeting Ended';
-  } else if (isTooEarly) {
-    buttonText = `Opens in ${formatCountdown(scheduledMs, now)}`;
   }
 
   const isUserAssignedToMeeting = useMemo(() => {
@@ -714,11 +699,11 @@ export const MeetingLobby: React.FC = () => {
                   onClick={handleJoin}
                   className="w-full h-11 text-sm font-semibold justify-center gap-2 rounded-md shadow-xs disabled:opacity-50"
                 >
-                  {isTooEarly ? (
-                    <Clock size={16} />
-                  ) : !isEndedOrCancelled ? (
+                  {!isEndedOrCancelled ? (
                     <Video size={16} />
-                  ) : null}
+                  ) : (
+                    <PhoneOff size={16} />
+                  )}
                   <span>{buttonText}</span>
                   {canJoin && <ArrowRight size={16} />}
                 </Button>

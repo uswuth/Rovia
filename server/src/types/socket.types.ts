@@ -19,6 +19,14 @@ export interface ServerToClientEvents {
     text: string;
     at: string;
   }) => void;
+  'meeting:ended'?: (data: { meetingId: string }) => void;
+  'meeting:typing'?: (data: { userId: string; userName: string; isTyping: boolean }) => void;
+  'meeting:poll-updated'?: (data: { meetingId: string }) => void;
+  'meeting:participant-updated'?: (data: {
+    meetingId: string;
+    participantId: string;
+    permissions?: Record<string, boolean>;
+  }) => void;
   'webrtc:offer': (data: MeetingSignalPayload) => void;
   'webrtc:answer': (data: MeetingSignalPayload) => void;
   'webrtc:ice': (data: MeetingSignalPayload) => void;
@@ -42,7 +50,9 @@ export interface ClientToServerEvents {
 
   'meeting:join': (meetingId: string, ack?: (result: { ok: boolean; peers?: string[]; error?: string }) => void) => void;
   'meeting:leave': (meetingId: string) => void;
+  'meeting:end'?: (meetingId: string) => void;
   'meeting:state': (payload: { meetingId: string; state: Record<string, boolean | string> }) => void;
+  'meeting:typing'?: (payload: { meetingId: string; isTyping: boolean; userName?: string }) => void;
   'meeting:message': (
     payload: { meetingId: string; text: string },
     ack?: (result: { ok: boolean; error?: string }) => void

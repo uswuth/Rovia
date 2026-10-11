@@ -53,7 +53,7 @@ export class MeetingParticipantClass {
 
 /** Default ceiling. An organization may lower it per meeting, never raise it. */
 export const MEETING_DEFAULT_PARTICIPANT_LIMIT = 50;
-export const MEETING_MAX_DURATION_MINUTES = 480;
+export const MEETING_MAX_DURATION_MINUTES = 1440;
 
 @modelOptions({
   schemaOptions: {
@@ -200,7 +200,7 @@ export class MeetingClass {
     this.meeting_scheduled_at = val;
   }
 
-  @prop({ type: () => Number, default: 30, alias: 'meetingDurationMinutes' })
+  @prop({ type: () => Number, default: 360, alias: 'meetingDurationMinutes' })
   public meeting_duration_minutes!: number;
 
   public get meetingDurationMinutes(): number {

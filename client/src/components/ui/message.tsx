@@ -22,8 +22,8 @@ export const Message = React.forwardRef<HTMLDivElement, MessageProps>(
         <div
           ref={ref}
           className={cn(
-            'flex gap-2.5 w-full text-xs transition-colors group/message',
-            alignment === 'right' ? 'flex-row-reverse items-end justify-start' : 'flex-row items-start justify-start',
+            'flex gap-2.5 w-full text-xs transition-colors group/message items-start',
+            alignment === 'right' ? 'flex-row-reverse justify-start' : 'flex-row justify-start',
             className
           )}
           {...props}
@@ -46,21 +46,22 @@ export interface MessageAvatarProps extends React.HTMLAttributes<HTMLDivElement>
 
 export const MessageAvatar = React.forwardRef<HTMLDivElement, MessageAvatarProps>(
   ({ className, src, name = 'User', fallback, onClick, clickable = false, ...props }, ref) => {
+    const initial = (fallback || (name ? name.trim().charAt(0) : 'U')).toUpperCase() || 'U';
     return (
       <div
         ref={ref}
         onClick={clickable && onClick ? onClick : undefined}
         className={cn(
-          'shrink-0 mt-0.5',
+          'shrink-0 mt-0.5 select-none',
           clickable ? 'cursor-pointer hover:opacity-85 transition-opacity' : 'cursor-default',
           className
         )}
         {...props}
       >
-        <Avatar className="size-6 text-[10px] shadow-2xs">
-          {src && <AvatarImage src={src} alt={name} />}
+        <Avatar className="size-7 text-[11px] shadow-2xs font-bold">
+          {src && <AvatarImage src={src} alt={name} className="object-cover" />}
           <AvatarFallback name={name} className="font-bold">
-            {fallback || name.charAt(0).toUpperCase() || 'U'}
+            {initial}
           </AvatarFallback>
         </Avatar>
       </div>
@@ -131,8 +132,8 @@ export const MessageContent = React.forwardRef<HTMLDivElement, MessageContentPro
         className={cn(
           'px-3 py-2 text-xs break-words [overflow-wrap:anywhere] break-all leading-relaxed',
           alignment === 'right'
-            ? 'bg-emerald-600 text-white dark:bg-emerald-600 dark:text-white rounded-2xl rounded-br-xs shadow-xs'
-            : 'bg-muted text-foreground border border-border/60 rounded-2xl rounded-bl-xs shadow-2xs',
+            ? 'bg-blue-600 text-white dark:bg-blue-600 dark:text-white rounded-2xl rounded-tr-xs shadow-xs'
+            : 'bg-muted/90 dark:bg-zinc-800/90 text-foreground border border-border/50 rounded-2xl rounded-tl-xs shadow-2xs',
           className
         )}
         {...props}

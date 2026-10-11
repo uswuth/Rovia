@@ -30,7 +30,7 @@ export const createMeetingSchema = z.object({
     .number()
     .int('Duration must be a whole number')
     .min(1, 'Duration must be at least 1 minute')
-    .max(480, 'Duration cannot exceed 8 hours'),
+    .max(1440, 'Duration cannot exceed 24 hours'),
   meetingJoinMode: z.literal('INVITE_ONLY'),
   meetingParticipantLimit: z
     .number()

@@ -30,11 +30,11 @@ export class MeetingPollOptionClass {
           pollQuestion: ret.poll_question as string,
           pollStatus: ret.poll_status as string,
           pollMultipleChoice: ret.poll_multiple_choice,
-          // Vote counts only. The list of voter ids is never exposed publicly.
           pollOptions: options.map((option) => ({
             optionId: option.optionId,
             optionText: option.optionText,
-            voteCount: ((option.voterIds as string[]) ?? []).length
+            voteCount: ((option.voterIds as string[]) ?? []).length,
+            voterIds: ((option.voterIds as string[]) ?? [])
           })),
           organizationId: ret.organization_id,
           meetingId: ret.meeting_id,

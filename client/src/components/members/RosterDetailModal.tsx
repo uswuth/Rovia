@@ -9,7 +9,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { Member } from '@/types/member.types';
 import { useAuth } from '@/context/AuthContext';
-import { getMemberId, getRoleCategory } from './member-utils';
+import { getMemberId, getRoleCategory, normalizeMemberList } from './member-utils';
 import { getUserStatusTone } from '@/lib/status-tone';
 
 export interface RosterDetailModalProps {
@@ -48,16 +48,20 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
   const [search, setSearch] = useState('');
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
 
+  const deduplicatedMembers = useMemo(() => {
+    return normalizeMemberList(members);
+  }, [members]);
+
   const filteredMembers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return members;
-    return members.filter((m) => {
+    if (!q) return deduplicatedMembers;
+    return deduplicatedMembers.filter((m) => {
       const name = m.userName || '';
       const email = m.userEmail || '';
       const role = m.userRole || '';
       return name.toLowerCase().includes(q) || email.toLowerCase().includes(q) || role.toLowerCase().includes(q);
     });
-  }, [members, search]);
+  }, [deduplicatedMembers, search]);
 
   const columns: Column<Member>[] = [
     {
@@ -244,7 +248,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
           <div className="flex items-center gap-2 text-xs">
             <Badge tone="success" className="gap-1">
               <Users size={12} />
-              <span>{members.length} Members Total</span>
+              <span>{deduplicatedMembers.length} Members Total</span>
             </Badge>
           </div>
         </div>

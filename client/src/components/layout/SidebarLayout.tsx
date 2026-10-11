@@ -235,7 +235,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
 
         {/* Main View Area */}
         <main className="relative flex-1 flex flex-col w-full min-w-0 max-w-full overflow-x-hidden bg-background text-foreground min-h-0">
-          <div className="relative z-10 flex-1 flex flex-col w-full min-w-0 max-w-full min-h-0">{children}</div>
+          <div className="relative flex-1 flex flex-col w-full min-w-0 max-w-full min-h-0">{children}</div>
         </main>
       </SidebarInset>
 

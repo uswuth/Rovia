@@ -1,30 +1,64 @@
 import React from 'react';
-import { Mic, MicOff, Shield, User, Crown } from 'lucide-react';
+import {
+  Mic,
+  MicOff,
+  Shield,
+  MoreVertical,
+  Settings,
+  UserMinus,
+  MonitorOff,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarColorByName } from '@/components/ui/avatar-colors';
+import { Tooltip } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { getMemberId } from '@/components/members/member-utils';
+import { cn } from '@/lib/utils';
 import type { MeetingParticipant } from '@/api/meeting/meeting.types';
 
 interface MeetingParticipantsProps {
   participants: MeetingParticipant[];
   /** Only a host or moderator may change permissions. */
   canManage: boolean;
+  isHost?: boolean;
   onEditSettings: (participant: MeetingParticipant) => void;
   currentUserId?: string;
   currentUserName?: string;
+  activeScreenShareUserId?: string;
+  onToggleMuteParticipant?: (participant: MeetingParticipant) => void;
+  onEndParticipantScreenShare?: (userId: string) => void;
+  onRemoveParticipant?: (userId: string) => void;
+  localMicOn?: boolean;
+  peers?: Record<string, { audioEnabled?: boolean; videoEnabled?: boolean }>;
 }
 
 export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
   participants,
   canManage,
+  isHost,
   onEditSettings,
   currentUserId,
   currentUserName,
+  activeScreenShareUserId,
+  onToggleMuteParticipant,
+  onEndParticipantScreenShare,
+  onRemoveParticipant,
+  localMicOn,
+  peers,
 }) => {
   const { user } = useAuth();
   const { members: orgMembers } = useOrganization();
+  const hasHostPrivilege = isHost !== undefined ? isHost : canManage;
 
   // Filter out participants who have left
   const activeParticipants = (participants ?? []).filter(
@@ -64,23 +98,23 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
           displayName = uId.length > 20 ? `Participant (${uId.slice(-4)})` : uId;
         }
 
-        const isMuted = !participant.canSendAudio;
+        const isMuted = isYou
+          ? !(localMicOn ?? true)
+          : (!participant.canSendAudio || peers?.[uId]?.audioEnabled === false);
+        const isScreenSharing = activeScreenShareUserId === uId || Boolean(participant.canShareScreen && participant.canSendVideo);
 
         return (
           <li
             key={`${uId}-${index}`}
-            className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-xs"
+            className="group relative flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-xs hover:border-emerald-500/30 transition-colors"
           >
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-muted-foreground border border-border">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={displayName} className="size-full object-cover" />
-                ) : role === 'HOST' ? (
-                  <Crown size={15} className="text-amber-500" />
-                ) : (
-                  <User size={15} />
-                )}
-              </span>
+              <Avatar className="size-8 shrink-0">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+                <AvatarFallback name={displayName} className={cn("text-xs font-bold", getAvatarColorByName(displayName))}>
+                  {displayName.charAt(0).toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-semibold text-foreground">
@@ -97,20 +131,98 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
               </div>
             </div>
 
-            {/* Active audio status icon ONLY */}
-            <div className="flex items-center gap-2 shrink-0">
-              <span title={isMuted ? 'Muted' : 'Microphone Active'}>
-                {isMuted ? (
-                  <MicOff size={15} className="text-red-500" />
-                ) : (
-                  <Mic size={15} className="text-emerald-500" />
-                )}
-              </span>
+            {/* Active audio status icon & Hover actions */}
+            <div className="flex items-center gap-1 shrink-0">
+              <Tooltip content={hasHostPrivilege || isYou ? (isMuted ? 'Click to unmute' : 'Click to mute') : (isMuted ? 'Muted' : 'Microphone Active')} side="left">
+                <button
+                  type="button"
+                  disabled={!hasHostPrivilege && !isYou}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (hasHostPrivilege || isYou) {
+                      onToggleMuteParticipant?.(participant);
+                    }
+                  }}
+                  className={cn(
+                    "flex size-6 shrink-0 items-center justify-center rounded-xs transition-colors",
+                    (hasHostPrivilege || isYou)
+                      ? "cursor-pointer hover:bg-secondary text-muted-foreground hover:text-foreground"
+                      : "cursor-default"
+                  )}
+                  aria-label={isMuted ? `Unmute ${displayName}` : `Mute ${displayName}`}
+                >
+                  {isMuted ? (
+                    <MicOff size={14} className="text-red-500" />
+                  ) : (
+                    <Mic size={14} className="text-emerald-500" />
+                  )}
+                </button>
+              </Tooltip>
 
-              {canManage && !isYou && (
-                <Button variant="outline" size="xs" onClick={() => onEditSettings(participant)}>
-                  Settings
-                </Button>
+              {hasHostPrivilege && !isYou ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="flex size-6 shrink-0 items-center justify-center rounded-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                        aria-label={`Actions for ${displayName}`}
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+                    }
+                  />
+                  <DropdownMenuContent align="end" className="w-52 p-1.5 space-y-1">
+                    <DropdownMenuLabel className="flex items-center justify-between border-b border-border pb-1.5 mb-1 px-2">
+                      <span className="truncate font-semibold text-foreground text-xs">{displayName}</span>
+                      <Badge tone="accent" className="text-[9px] py-0 px-1 shrink-0 ml-1">
+                        {(role || 'Member').toLowerCase()}
+                      </Badge>
+                    </DropdownMenuLabel>
+
+                    <DropdownMenuItem onClick={() => onEditSettings(participant)} className="cursor-pointer gap-2 text-xs">
+                      <Settings size={14} className="text-muted-foreground shrink-0" />
+                      <span>Permissions & Settings</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem onClick={() => onToggleMuteParticipant?.(participant)} className="cursor-pointer gap-2 text-xs">
+                      {isMuted ? (
+                        <>
+                          <Mic size={14} className="text-emerald-500 shrink-0" />
+                          <span>Unmute Participant</span>
+                        </>
+                      ) : (
+                        <>
+                          <MicOff size={14} className="text-amber-500 shrink-0" />
+                          <span>Mute / Deafen</span>
+                        </>
+                      )}
+                    </DropdownMenuItem>
+
+                    {isScreenSharing && (
+                      <DropdownMenuItem
+                        onClick={() => onEndParticipantScreenShare?.(uId)}
+                        className="cursor-pointer gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium"
+                      >
+                        <MonitorOff size={14} className="text-amber-500 shrink-0" />
+                        <span>End Screen Sharing</span>
+                      </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuSeparator className="my-1" />
+
+                    <DropdownMenuItem
+                      onClick={() => onRemoveParticipant?.(uId)}
+                      variant="destructive"
+                      className="cursor-pointer gap-2 text-xs text-red-500 focus:text-red-600"
+                    >
+                      <UserMinus size={14} className="shrink-0" />
+                      <span>Remove from Meeting</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <div className="size-6 shrink-0" aria-hidden="true" />
               )}
             </div>
           </li>

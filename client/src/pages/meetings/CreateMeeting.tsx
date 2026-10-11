@@ -23,13 +23,14 @@ import { createMeetingSchema, type CreateMeetingFormValues } from '@/schemas/mee
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { MemberRoster } from '@/components/members/MemberRoster';
 import { getRoleCategory, getMemberId } from '@/components/members/member-utils';
+import { cn } from '@/lib/utils';
 
 
 export const CreateMeeting: React.FC = () => {
   const [params] = useSearchParams();
   const lockedProjectId = params.get('projectId');
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { members } = useOrganization();
   const [assignedRoles, setAssignedRoles] = useState<Record<string, 'Host' | 'Member'>>({});
 
@@ -67,7 +68,7 @@ export const CreateMeeting: React.FC = () => {
       meetingTitle: '',
       meetingDescription: '',
       meetingScheduledAt: defaultStart,
-      meetingDurationMinutes: 30,
+      meetingDurationMinutes: 360,
       meetingJoinMode: 'INVITE_ONLY',
       meetingParticipantLimit: 50,
     },
@@ -75,6 +76,7 @@ export const CreateMeeting: React.FC = () => {
 
   const watchedProjectId = useWatch({ control, name: 'projectId' });
   const watchedTeamId = useWatch({ control, name: 'teamId' });
+  const watchedDuration = useWatch({ control, name: 'meetingDurationMinutes' }) || 360;
   const selectedProjectId = lockedProjectId || watchedProjectId;
 
   const projectOptions = useMemo<SearchableSelectOption[]>(() => {
@@ -205,7 +207,7 @@ export const CreateMeeting: React.FC = () => {
   const defaultEnd = useMemo(() => {
     const startDate = new Date(defaultStart);
     const baseTime = !isNaN(startDate.getTime()) ? startDate.getTime() : 0;
-    return new Date(baseTime + 30 * 60 * 1000).toISOString();
+    return new Date(baseTime + 6 * 60 * 60 * 1000).toISOString();
   }, [defaultStart]);
 
   const [meetingEndAt, setMeetingEndAt] = useState<string>(defaultEnd);
@@ -214,44 +216,45 @@ export const CreateMeeting: React.FC = () => {
     setValue('meetingScheduledAt', defaultStart);
   }, [defaultStart, setValue]);
 
-  // Pre-assign SuperAdmins & Admins as Host by default
-  const topAdminRoles = useMemo<Record<string, 'Host' | 'Member'>>(() => {
-    const roleMap: Record<string, 'Host' | 'Member'> = {};
-    projectFilteredMembers.forEach((m) => {
-      const cat = getRoleCategory(m);
-      if (cat === 'SUPER_ADMIN' || cat === 'ADMIN' || m.isSuperAdmin) {
-        const mId = getMemberId(m);
-        if (mId) roleMap[mId] = 'Host';
-      }
-    });
-    return roleMap;
-  }, [projectFilteredMembers]);
-
-  const [seededRoles, setSeededRoles] = useState(topAdminRoles);
-  if (seededRoles !== topAdminRoles) {
-    setSeededRoles(topAdminRoles);
-    setAssignedRoles((prev) => ({ ...topAdminRoles, ...prev }));
-  }
+  // Only pre-assign creator as Host by default
+  const [seededCreator, setSeededCreator] = useState(false);
+  useEffect(() => {
+    if (!seededCreator && user?.userId) {
+      setAssignedRoles((prev) => ({ [user.userId]: 'Host', ...prev }));
+      setSeededCreator(true);
+    }
+  }, [seededCreator, user?.userId]);
 
   const handleStartChange = (newStartIso: string) => {
     setValue('meetingScheduledAt', newStartIso);
     const start = new Date(newStartIso);
     if (!isNaN(start.getTime())) {
-      const end = new Date(start.getTime() + 30 * 60 * 1000);
-      setMeetingEndAt(end.toISOString());
-      setValue('meetingDurationMinutes', 30);
+      const currentDuration = getValues('meetingDurationMinutes') || 360;
+      const newEnd = new Date(start.getTime() + currentDuration * 60 * 1000);
+      setMeetingEndAt(newEnd.toISOString());
     }
   };
 
   const handleEndChange = (newEndIso: string) => {
-    setMeetingEndAt(newEndIso);
+    let end = new Date(newEndIso);
     const startVal = getValues('meetingScheduledAt');
     const start = new Date(startVal);
-    const end = new Date(newEndIso);
     if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-      const diffMs = end.getTime() - start.getTime();
-      const durationMins = Math.max(5, Math.round(diffMs / (60 * 1000)));
-      setValue('meetingDurationMinutes', durationMins);
+      let diffMs = end.getTime() - start.getTime();
+      // Auto-advance by 1 day if selected time on the same date is earlier than start time (e.g. crossing midnight)
+      if (diffMs <= 0 && end.toDateString() === start.toDateString()) {
+        end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+        diffMs = end.getTime() - start.getTime();
+      }
+      setMeetingEndAt(end.toISOString());
+      if (diffMs > 0) {
+        const durationMins = Math.min(1440, Math.max(1, Math.round(diffMs / (60 * 1000))));
+        setValue('meetingDurationMinutes', durationMins, { shouldValidate: true });
+      } else {
+        setValue('meetingDurationMinutes', 0, { shouldValidate: true });
+      }
+    } else {
+      setMeetingEndAt(newEndIso);
     }
   };
 
@@ -439,6 +442,30 @@ export const CreateMeeting: React.FC = () => {
                     onChange={handleEndChange}
                   />
                 </FormField>
+
+                <div
+                  className={cn(
+                    'flex items-center justify-between text-xs px-3.5 py-2.5 rounded-md border',
+                    watchedDuration > 0
+                      ? 'bg-muted/40 border-border/70'
+                      : 'bg-destructive/10 border-destructive/30 text-destructive'
+                  )}
+                >
+                  <span className="font-medium">
+                    {watchedDuration > 0 ? 'Calculated Duration:' : 'Invalid Time Selection:'}
+                  </span>
+                  {watchedDuration > 0 ? (
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      {Math.floor(watchedDuration / 60) > 0 ? `${Math.floor(watchedDuration / 60)}h ` : ''}
+                      {watchedDuration % 60 > 0 || Math.floor(watchedDuration / 60) === 0 ? `${watchedDuration % 60}m` : ''}
+                      {' '}({watchedDuration} minutes)
+                    </span>
+                  ) : (
+                    <span className="font-bold text-destructive">
+                      End date & time must be after start date & time
+                    </span>
+                  )}
+                </div>
               </div>
 
               {isProjectReadOnly && (
@@ -468,7 +495,11 @@ export const CreateMeeting: React.FC = () => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={create.pending || isProjectReadOnly} className="gap-2">
+                <Button
+                  type="submit"
+                  disabled={create.pending || isProjectReadOnly || watchedDuration <= 0}
+                  className="gap-2"
+                >
                   <Video size={15} />
                   <span>{create.pending ? 'Scheduling…' : 'Schedule Meeting'}</span>
                 </Button>

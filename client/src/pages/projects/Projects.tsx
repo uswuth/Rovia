@@ -31,6 +31,8 @@ import { queryKeys } from '@/api/queryClient';
 import { getMeetings } from '@/api/meeting/meeting.api';
 import type { Meeting } from '@/api/meeting/meeting.types';
 import { RosterDetailModal } from '@/components/members/RosterDetailModal';
+import { normalizeMemberList } from '@/components/members/member-utils';
+import type { Member } from '@/types/member.types';
 import { getProjectColumns, type ProjectRosterModalState } from './Projects.TanCol';
 
 export const Projects: React.FC = () => {
@@ -181,13 +183,10 @@ export const Projects: React.FC = () => {
                 const pDesc = getProjectDesc(project);
                 const pStatus = getProjectStatus(project);
 
-                const hostList = Array.isArray(project.hosts) ? project.hosts : [];
-                const memberList = Array.isArray(project.members) ? project.members : [];
-                const uniqueTeam = new Set([...hostList, ...memberList]);
-                const teamCount =
-                  uniqueTeam.size > 0
-                    ? uniqueTeam.size
-                    : (project.memberCount || (hostList.length + memberList.length) || 1);
+                const hostList = (project.hosts || []) as (Member | string)[];
+                const memberList = (project.members || []) as (Member | string)[];
+                const teamMembers = normalizeMemberList([...hostList, ...memberList]);
+                const teamCount = teamMembers.length || (project.memberCount || 1);
 
                 const projectMeetingsCount = (meetings || []).filter((m) => {
                   const mProjId = m.projectId || (m as unknown as Record<string, string>).project;
@@ -201,7 +200,7 @@ export const Projects: React.FC = () => {
                 return (
                   <div
                     key={pId || pName}
-                    className="group relative rounded-md border border-border bg-card text-card-foreground p-5 hover:border-emerald-500/40 transition-all shadow-xs space-y-4 flex flex-col justify-between"
+                    className="group relative rounded-xs border border-border bg-card text-card-foreground p-5 hover:border-emerald-500/40 transition-all shadow-xs space-y-4 flex flex-col justify-between"
                   >
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between gap-2">

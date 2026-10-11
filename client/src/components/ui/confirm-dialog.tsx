@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -97,10 +98,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const isAnchored = Boolean(anchorRect);
 
-  return (
+  return createPortal(
     <div
       className={cn(
-        'fixed inset-0 z-50',
+        'fixed inset-0 z-[110]',
         isAnchored ? 'bg-transparent' : 'flex items-center justify-center bg-transparent p-4',
         overlayClassName
       )}
@@ -113,7 +114,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         style={positionStyle}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'w-full max-w-[315px] rounded-xl border border-border/90 dark:border-zinc-700/90 bg-card/95 dark:bg-zinc-900/95 backdrop-blur-md p-3.5 shadow-2xl dark:shadow-[0_12px_40px_rgba(0,0,0,0.9)] outline-none animate-in fade-in-0 zoom-in-95',
+          'w-full max-w-[315px] rounded-xs border border-border/90 dark:border-zinc-700/90 bg-card/95 dark:bg-zinc-900/95 backdrop-blur-md p-3.5 shadow-2xl dark:shadow-[0_12px_40px_rgba(0,0,0,0.9)] outline-none animate-in fade-in-0 zoom-in-95',
           className
         )}
       >
@@ -162,6 +163,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

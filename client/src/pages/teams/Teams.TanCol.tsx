@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { GroupedAvatars } from '@/components/members/GroupedAvatars';
 import { getProjectStatusTone } from '@/lib/status-tone';
 import type { Column } from '@/components/ui/data-table';
-import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
+import type { Member } from '@/types/member.types';
+import { normalizeMemberList } from '@/components/members/member-utils';
+import { formatDateOnly } from '@/lib/format-date';
 
 export interface TeamRosterModalState {
   open: boolean;
@@ -94,33 +96,18 @@ export const getTeamColumns = ({
       width: '150px',
       minWidth: '130px',
       cell: (t) => {
-        const hostsArr = (t.hosts as unknown[]) || [];
-        const membersArr = (t.members as unknown[]) || [];
-        const rawList = [...hostsArr, ...membersArr];
+        const hostsArr = (t.hosts || []) as (Member | string)[];
+        const membersArr = (t.members || []) as (Member | string)[];
 
-        const memberList: Member[] = rawList.map((m) => {
-          if (typeof m === 'string') {
-            return { userId: m, userName: m, userEmail: '', userRole: 'Member', userStatus: 'ACTIVE', createdAt: '' };
-          }
-          const obj = m as Record<string, unknown>;
-          return {
-            userId: (obj.userId || obj._id || obj.id || '') as string,
-            userName: (obj.userName || obj.name || obj.userEmail || '') as string,
-            userEmail: (obj.userEmail || obj.email || '') as string,
-            userRole: ((obj.userRole || obj.role || 'Member') as MemberRole),
-            userStatus: ((obj.userStatus || obj.status || 'ACTIVE') as MemberStatus),
-            jobTitle: obj.jobTitle as string | undefined,
-            createdAt: (obj.createdAt || '') as string,
-          };
-        });
+        const memberList = normalizeMemberList([...hostsArr, ...membersArr]);
 
         const valueMap: Record<string, 'Host' | 'Member'> = {};
         hostsArr.forEach((h) => {
-          const id = typeof h === 'string' ? h : ((h as Record<string, string>).userId || (h as Record<string, string>)._id);
+          const id = typeof h === 'string' ? h : h.userId;
           if (id) valueMap[id] = 'Host';
         });
         membersArr.forEach((m) => {
-          const id = typeof m === 'string' ? m : ((m as Record<string, string>).userId || (m as Record<string, string>)._id);
+          const id = typeof m === 'string' ? m : m.userId;
           if (id && !valueMap[id]) valueMap[id] = 'Member';
         });
 
@@ -162,7 +149,7 @@ export const getTeamColumns = ({
       minWidth: '110px',
       cell: (t) => (
         <span className="text-xs text-muted-foreground font-mono">
-          {t.createdAt ? new Date(t.createdAt as string).toLocaleDateString() : 'N/A'}
+          {formatDateOnly(t.createdAt) || 'N/A'}
         </span>
       ),
     },
@@ -173,7 +160,7 @@ export const getTeamColumns = ({
       minWidth: '110px',
       cell: (t) => (
         <span className="text-xs text-muted-foreground font-mono">
-          {t.updatedAt ? new Date(t.updatedAt as string).toLocaleDateString() : 'N/A'}
+          {formatDateOnly(t.updatedAt) || 'N/A'}
         </span>
       ),
     },

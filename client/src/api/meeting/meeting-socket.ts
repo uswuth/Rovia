@@ -14,8 +14,11 @@ export type MeetingSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 let socket: MeetingSocket | null = null;
 
 export const getMeetingSocket = (visitorId?: string): MeetingSocket => {
-  if (socket?.connected) return socket;
-  socket?.disconnect();
+  if (socket && !socket.disconnected) return socket;
+  if (socket?.disconnected) {
+    socket.connect();
+    return socket;
+  }
 
   const token = getAccessToken();
   socket = io('/', {

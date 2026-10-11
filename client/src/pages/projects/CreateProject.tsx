@@ -88,8 +88,8 @@ export const CreateProject: React.FC = () => {
     });
 
     if (existingProject) {
-      const toId = (entry: string | { _id?: string; id?: string; userId?: string }): string | undefined =>
-        typeof entry === 'string' ? entry : entry._id || entry.id || entry.userId;
+      const toId = (entry: string | { userId?: string }): string | undefined =>
+        typeof entry === 'string' ? entry : entry.userId;
       (existingProject.hosts || []).forEach((h) => {
         const hId = toId(h);
         if (hId) roleMap[hId] = 'Host';

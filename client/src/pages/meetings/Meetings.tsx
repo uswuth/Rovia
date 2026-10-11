@@ -19,6 +19,7 @@ import { getMeetings } from '@/api/meeting/meeting.api';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { Meeting, MeetingStatus } from '@/api/meeting/meeting.types';
 import { formatCountdown } from '@/lib/format-countdown';
+import { shareOrCopy } from '@/lib/share';
 
 /**
  * `IN_PROGRESS` is a client-derived display state for a meeting inside its
@@ -34,12 +35,7 @@ export const Meetings: React.FC = () => {
   const { formatDateTimeStr } = useTimeFormat();
 
   const [searchInput, setSearchInput] = useState('');
-  const [activeSearch, setActiveSearch] = useState('');
   const debouncedSearch = useDebounce(searchInput, 300);
-
-  useEffect(() => {
-    setActiveSearch(debouncedSearch);
-  }, [debouncedSearch]);
   const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
 
   const handleCopyLink = (joinCode: string, meetingId: string) => {
@@ -49,20 +45,16 @@ export const Meetings: React.FC = () => {
     setTimeout(() => setCopiedMeetingId(null), 2000);
   };
 
-  const handleShareLink = async (joinCode: string, meetingTitle: string) => {
+  const handleShareLink = async (joinCode: string, meetingTitle: string, meetingId?: string) => {
     const joinUrl = `${window.location.origin}/meetings/join/${joinCode}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: meetingTitle,
-          text: `Join meeting "${meetingTitle}" on IntellMeet`,
-          url: joinUrl,
-        });
-      } catch {
-        await navigator.clipboard.writeText(joinUrl);
-      }
-    } else {
-      await navigator.clipboard.writeText(joinUrl);
+    const res = await shareOrCopy({
+      title: meetingTitle || 'IntellMeet Meeting',
+      text: `Join meeting "${meetingTitle}" on IntellMeet`,
+      url: joinUrl,
+    });
+    if ((res === 'copied' || res === 'shared') && meetingId) {
+      setCopiedMeetingId(meetingId);
+      setTimeout(() => setCopiedMeetingId(null), 2000);
     }
   };
 
@@ -112,9 +104,9 @@ export const Meetings: React.FC = () => {
     });
   }, [meetings]);
 
-  // Filter meetings based on active search query and tab selection
+  // Filter meetings based on debounced search query and tab selection
   const displayedMeetings = useMemo(() => {
-    const q = activeSearch.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     return sortedMeetings.filter((m) => {
       if (q) {
         const titleMatch = (m.meetingTitle || '').toLowerCase().includes(q);
@@ -128,7 +120,7 @@ export const Meetings: React.FC = () => {
       const durationMinutes = m.meetingDurationMinutes || 30;
       const endMs = !isNaN(scheduledMs) ? scheduledMs + durationMinutes * 60 * 1000 : Infinity;
 
-      const isEnded = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED' || (!isNaN(scheduledMs) && now > endMs);
+      const isEnded = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED';
 
       if (currentTab === 'upcoming') {
         return !isEnded;
@@ -138,7 +130,7 @@ export const Meetings: React.FC = () => {
       }
       return true;
     });
-  }, [sortedMeetings, activeSearch, currentTab, now]);
+  }, [sortedMeetings, debouncedSearch, currentTab, now]);
 
   const [meetingPage, setMeetingPage] = React.useState(1);
   const [meetingPageSize, setMeetingPageSize] = React.useState(5);
@@ -218,12 +210,11 @@ export const Meetings: React.FC = () => {
               value={searchInput}
               onChange={(e) => {
                 setSearchInput(e.target.value);
-                if (!e.target.value) setActiveSearch('');
+                setMeetingPage(1);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  setActiveSearch(searchInput);
                   setMeetingPage(1);
                 }
               }}
@@ -235,7 +226,6 @@ export const Meetings: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setSearchInput('');
-                  setActiveSearch('');
                   setMeetingPage(1);
                 }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-0.5 rounded-xs"
@@ -248,7 +238,6 @@ export const Meetings: React.FC = () => {
             size="sm"
             variant="secondary"
             onClick={() => {
-              setActiveSearch(searchInput);
               setMeetingPage(1);
             }}
             className="h-9 px-3 gap-1.5 text-xs cursor-pointer shrink-0 border border-border"

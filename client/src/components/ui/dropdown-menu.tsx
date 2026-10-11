@@ -9,7 +9,7 @@ interface DropdownMenuContextType {
 
 const DropdownMenuContext = React.createContext<DropdownMenuContextType>({
   open: false,
-  setOpen: () => {},
+  setOpen: () => { },
 })
 
 function DropdownMenu({
@@ -154,7 +154,7 @@ function DropdownMenuContent({
       data-slot="dropdown-menu-content"
       style={offsetStyle}
       className={cn(
-        "absolute z-50 min-w-48 rounded-lg border border-border bg-card p-1.5 text-card-foreground shadow-2xl animate-in fade-in-0 zoom-in-95",
+        "absolute z-50 min-w-48 rounded-xs border border-border bg-card p-1.5 text-card-foreground shadow-2xl animate-in fade-in-0 zoom-in-95",
         sideClasses[side],
         side === "top" || side === "bottom" ? alignClasses[align] : "",
         className
@@ -209,7 +209,7 @@ function DropdownMenuItem({
       className: cn(
         "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer select-none",
         variant === "destructive" &&
-          "text-destructive hover:bg-destructive/10 hover:text-destructive",
+        "text-destructive hover:bg-destructive/10 hover:text-destructive",
         className,
         render.props?.className
       ),
@@ -228,7 +228,7 @@ function DropdownMenuItem({
       className={cn(
         "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-left text-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer select-none",
         variant === "destructive" &&
-          "text-destructive hover:bg-destructive/10 hover:text-destructive",
+        "text-destructive hover:bg-destructive/10 hover:text-destructive",
         className
       )}
       onClick={handleClick}
@@ -335,12 +335,15 @@ function DropdownMenuRadioItem({
   )
 }
 
+const DropdownMenuGroupLabel = DropdownMenuLabel
+
 export {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuLabel,
+  DropdownMenuGroupLabel,
   DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,

@@ -11,8 +11,10 @@ import {
 import { Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+import { normalizeMemberList } from './member-utils';
+
 interface GroupedAvatarsProps {
-  members?: (Member | string | Record<string, unknown>)[];
+  members?: (Member | string)[];
   maxDisplay?: number;
   onClick?: () => void;
   className?: string;
@@ -35,21 +37,9 @@ export const GroupedAvatars: React.FC<GroupedAvatarsProps> = ({
     );
   }
 
-  const normalizeItem = (item: Member | string | Record<string, unknown>) => {
-    if (typeof item === 'string') {
-      return { id: item, name: item, email: '', avatarUrl: '' };
-    }
-    const obj = item as Record<string, unknown>;
-    const id = (obj.userId || obj._id || obj.id || '') as string;
-    const name = (obj.userName || obj.name || obj.userEmail || id || 'Member') as string;
-    const email = (obj.userEmail || obj.email || '') as string;
-    const avatarUrl = (obj.avatarUrl || obj.avatar || '') as string;
-    return { id, name, email, avatarUrl };
-  };
-
-  const normalized = members.map(normalizeItem);
-  const visible = normalized.slice(0, maxDisplay);
-  const remainingCount = Math.max(0, normalized.length - maxDisplay);
+  const normalizedMembers = normalizeMemberList(members);
+  const visible = normalizedMembers.slice(0, maxDisplay);
+  const remainingCount = Math.max(0, normalizedMembers.length - maxDisplay);
 
   const avatarSizeClass =
     size === 'xs'
@@ -74,20 +64,21 @@ export const GroupedAvatars: React.FC<GroupedAvatarsProps> = ({
     >
       <AvatarGroup>
         {visible.map((item, idx) => {
+          const mName = item.userName || 'Member';
           return (
-            <Tooltip key={item.id || idx}>
+            <Tooltip key={item.userId || idx}>
               <TooltipTrigger asChild>
                 <Avatar className={cn(avatarSizeClass, 'rounded-full ring-2 ring-background')}>
                   {item.avatarUrl ? (
-                    <AvatarImage src={item.avatarUrl} alt={item.name} />
+                    <AvatarImage src={item.avatarUrl} alt={mName} />
                   ) : null}
-                  <AvatarFallback name={item.name} className="font-bold rounded-full select-none">
-                    {(item.name.charAt(0) || 'M').toUpperCase()}
+                  <AvatarFallback name={mName} className="font-bold rounded-full select-none">
+                    {(mName.charAt(0) || 'M').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs">
-                <p className="font-semibold">{item.name}</p>
+                <p className="font-semibold">{mName}</p>
               </TooltipContent>
             </Tooltip>
           );

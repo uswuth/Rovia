@@ -59,10 +59,28 @@ export function PopoverTrigger({
 
   if (render) {
     return React.cloneElement(render, {
-      onClick: (e: React.MouseEvent<HTMLElement>) => {
+      ...props,
+      onClick: (e: React.MouseEvent<any>) => {
         e.stopPropagation()
+        props.onClick?.(e)
         render.props?.onClick?.(e)
         toggleOpen()
+      },
+      onMouseEnter: (e: React.MouseEvent<any>) => {
+        props.onMouseEnter?.(e)
+        render.props?.onMouseEnter?.(e)
+      },
+      onMouseLeave: (e: React.MouseEvent<any>) => {
+        props.onMouseLeave?.(e)
+        render.props?.onMouseLeave?.(e)
+      },
+      onFocus: (e: React.FocusEvent<any>) => {
+        props.onFocus?.(e)
+        render.props?.onFocus?.(e)
+      },
+      onBlur: (e: React.FocusEvent<any>) => {
+        props.onBlur?.(e)
+        render.props?.onBlur?.(e)
       },
       "aria-expanded": open,
       className: cn(render.props?.className, className),
@@ -89,17 +107,20 @@ export function PopoverContent({
   align = "start",
   side = "bottom",
   sideOffset = 4,
+  closeOnClickOutside = true,
   ...props
 }: React.ComponentProps<"div"> & {
   align?: "start" | "center" | "end"
   side?: "top" | "bottom" | "left" | "right"
   sideOffset?: number
+  closeOnClickOutside?: boolean
 }) {
   const { open, setOpen } = React.useContext(PopoverContext)
   const contentRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (!closeOnClickOutside) return
       if (contentRef.current && !contentRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
@@ -116,7 +137,7 @@ export function PopoverContent({
         document.removeEventListener("keydown", handleKeyDown)
       }
     }
-  }, [open, setOpen])
+  }, [open, setOpen, closeOnClickOutside])
 
   if (!open) return null
 

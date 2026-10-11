@@ -30,18 +30,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
+import { formatDateOnly } from '@/lib/format-date';
 import { getTaskColumns, KANBAN_COLUMNS } from './Tasks.TanCol';
-
-const formatTaskDate = (dateVal?: unknown) => {
-  if (!dateVal || (typeof dateVal !== 'string' && typeof dateVal !== 'number' && !(dateVal instanceof Date))) return null;
-  const d = new Date(dateVal as string);
-  if (isNaN(d.getTime())) return null;
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-};
 
 const mapTaskMembers = (
   assignedArr: unknown[],
@@ -50,44 +40,32 @@ const mapTaskMembers = (
 ): Member[] => {
   return assignedArr.map((m) => {
     if (typeof m === 'string') {
-      const match = orgMembers?.find((om) => om.userId === m || om.userName === m);
+      const orgMatch = orgMembers?.find((om) => om.userId === m || om.userName === m);
       return {
         userId: m,
-        userName: match?.userName || m,
-        userEmail: match?.userEmail || '',
-        userRole: (match?.userRole || 'Member') as MemberRole,
-        userStatus: (match?.userStatus || 'ACTIVE') as MemberStatus,
-        avatarUrl: match?.avatarUrl,
-        createdAt: match?.createdAt || '',
+        userName: orgMatch?.userName || m,
+        userEmail: orgMatch?.userEmail || '',
+        userRole: (orgMatch?.userRole || 'Member') as MemberRole,
+        userStatus: (orgMatch?.userStatus || 'ACTIVE') as MemberStatus,
+        avatarUrl: orgMatch?.avatarUrl,
+        createdAt: orgMatch?.createdAt || '',
       };
     }
-    const obj = m as Record<string, unknown>;
-    const uid = (obj.userId || obj._id || obj.id || '') as string;
-    const uEmail = (obj.userEmail || obj.email || '') as string;
-    const match =
-      orgMembers?.find((om) => (uid && om.userId === uid) || (uEmail && om.userEmail === uEmail)) ||
-      (currentUser && (currentUser.userId === uid || (uEmail && currentUser.userEmail === uEmail))
-        ? {
-            userId: currentUser.userId || uid,
-            userName: currentUser.userName || (obj.userName as string) || '',
-            userEmail: currentUser.userEmail || uEmail,
-            userRole: (currentUser.userRole as MemberRole) || 'Member',
-            userStatus: 'ACTIVE' as MemberStatus,
-            avatarUrl: currentUser.avatarUrl,
-            createdAt: '',
-          }
-        : null);
+    const mem = m as Member;
+    const uid = mem.userId;
+    const orgMatch = orgMembers?.find((om) => om.userId === uid);
+    const isCurrent = Boolean(currentUser && currentUser.userId === uid);
 
     return {
       userId: uid,
-      userName: match?.userName || (obj.userName as string) || (obj.name as string) || (obj.userEmail as string) || '',
-      userEmail: match?.userEmail || uEmail,
-      userRole: (match?.userRole || obj.userRole || obj.role || 'Member') as MemberRole,
-      userStatus: (match?.userStatus || obj.userStatus || obj.status || 'ACTIVE') as MemberStatus,
-      userCode: obj.userCode as string | undefined,
-      avatarUrl: match?.avatarUrl || (obj.avatarUrl as string | undefined),
-      jobTitle: obj.jobTitle as string | undefined,
-      createdAt: (obj.createdAt || '') as string,
+      userName: orgMatch?.userName || (isCurrent && currentUser ? currentUser.userName : '') || mem.userName,
+      userEmail: orgMatch?.userEmail || (isCurrent && currentUser ? currentUser.userEmail : '') || mem.userEmail,
+      userRole: (orgMatch?.userRole || (isCurrent && currentUser ? currentUser.userRole : '') || mem.userRole || 'Member') as MemberRole,
+      userStatus: orgMatch?.userStatus || mem.userStatus || 'ACTIVE',
+      userCode: orgMatch?.userCode || mem.userCode,
+      avatarUrl: orgMatch?.avatarUrl || (isCurrent && currentUser ? currentUser.avatarUrl : '') || mem.avatarUrl,
+      jobTitle: orgMatch?.jobTitle || mem.jobTitle,
+      createdAt: orgMatch?.createdAt || mem.createdAt,
     };
   });
 };
@@ -481,26 +459,26 @@ export const Tasks: React.FC = () => {
                       const projName = projObj ? ((projObj.projectName || projObj.name) as string) : (typeof task.projectId === 'string' ? task.projectId : null);
                       const teamName = teamObj ? (teamObj.teamName as string) : null;
 
-                      const cObj = typeof task.createdBy === 'object' && task.createdBy !== null ? (task.createdBy as Record<string, unknown>) : null;
-                      const creatorId = cObj ? ((cObj.userId || cObj._id || cObj.id) as string) : (typeof task.createdBy === 'string' ? task.createdBy : '');
+                      const cObj = typeof task.createdBy === 'object' && task.createdBy !== null ? (task.createdBy as Member) : null;
+                      const creatorId = cObj ? (cObj.userId || '') : (typeof task.createdBy === 'string' ? task.createdBy : '');
                       const liveCreator =
                         orgMembers?.find((m) => (creatorId && m.userId === creatorId) || (m.userEmail && cObj && m.userEmail === cObj.userEmail)) ||
                         (user && ((creatorId && user.userId === creatorId) || (cObj && user.userEmail === cObj.userEmail))
                           ? {
-                              userId: user.userId,
-                              userName: user.userName,
-                              userEmail: user.userEmail,
-                              userRole: user.userRole,
-                              avatarUrl: user.avatarUrl,
-                            }
+                            userId: user.userId,
+                            userName: user.userName,
+                            userEmail: user.userEmail,
+                            userRole: user.userRole,
+                            avatarUrl: user.avatarUrl,
+                          }
                           : null);
 
                       const creatorName =
-                        liveCreator?.userName || (cObj ? ((cObj.userName || cObj.name || cObj.userEmail) as string) : (typeof task.createdBy === 'string' ? task.createdBy : null));
-                      const creatorRole = liveCreator?.userRole || (cObj ? ((cObj.userRole || cObj.role || 'Member') as string) : 'Member');
-                      const creatorAvatar = liveCreator?.avatarUrl || (cObj ? (cObj.avatarUrl as string) : undefined);
-                      const createdAtStr = formatTaskDate(task.createdAt || task.created_at);
-                      const updatedAtStr = formatTaskDate(task.updatedAt || task.updated_at);
+                        liveCreator?.userName || (cObj ? (cObj.userName || cObj.userEmail) : (typeof task.createdBy === 'string' ? task.createdBy : null));
+                      const creatorRole = liveCreator?.userRole || cObj?.userRole || 'Member';
+                      const creatorAvatar = liveCreator?.avatarUrl || cObj?.avatarUrl;
+                      const createdAtStr = formatDateOnly(task.createdAt);
+                      const updatedAtStr = formatDateOnly(task.updatedAt);
 
                       return (
                         <div
