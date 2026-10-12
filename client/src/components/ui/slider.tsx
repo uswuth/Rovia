@@ -33,7 +33,10 @@ export const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
     const values = isControlled ? controlledValue : uncontrolledValue
     const currentVal = values[0] ?? min
 
-    const clamp = (val: number) => Math.min(Math.max(val, min), max)
+    const clamp = React.useCallback(
+      (val: number) => Math.min(Math.max(val, min), max),
+      [min, max]
+    )
     const percent = Math.max(0, Math.min(100, ((clamp(currentVal) - min) / (max - min)) * 100))
 
     const trackRef = React.useRef<HTMLDivElement>(null)
@@ -50,7 +53,7 @@ export const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
         if (!isControlled) setUncontrolledValue(next)
         onValueChange?.(next)
       },
-      [disabled, min, max, step, isControlled, onValueChange]
+      [disabled, min, max, step, isControlled, onValueChange, clamp]
     )
 
     const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -74,7 +77,7 @@ export const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (disabled) return
-      let nextVal = currentVal
+      let nextVal: number
       if (e.key === "ArrowRight" || e.key === "ArrowUp") {
         nextVal = clamp(currentVal + step)
       } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {

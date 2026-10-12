@@ -5,7 +5,7 @@ import { MeetingParticipants } from './MeetingParticipants';
 import { MeetingChat } from './MeetingChat';
 import { MeetingQuestions } from './MeetingQuestions';
 import { MeetingPolls } from './MeetingPolls';
-import { PANELS, type PanelKey } from './MeetingControls';
+import { PANELS, type PanelKey } from './meetingPanels';
 import type { MeetingParticipant } from '@/api/meeting/meeting.types';
 import type { MeetingQuestion } from '@/api/meeting/meeting-qa.api';
 import type { MeetingPoll } from '@/api/meeting/meeting-poll.api';
@@ -78,7 +78,6 @@ export const MeetingSidebar: React.FC<MeetingSidebarProps> = ({
   getParticipantEmail,
   getParticipantMeetingRole,
   participants,
-  isTopAdmin,
   questions,
   qaPending,
   onAskQuestion,

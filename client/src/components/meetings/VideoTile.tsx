@@ -47,7 +47,6 @@ export const VideoTile: React.FC<VideoTileProps> = ({
 
   useEffect(() => {
     if (!cameraOn || !stream) {
-      setHasLiveTrack(false);
       return;
     }
 
@@ -56,7 +55,6 @@ export const VideoTile: React.FC<VideoTileProps> = ({
       setHasLiveTrack(active);
     };
 
-    check();
     const tracks = stream.getVideoTracks();
     tracks.forEach((track) => {
       track.addEventListener('mute', check);
@@ -70,6 +68,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
         track.removeEventListener('unmute', check);
         track.removeEventListener('ended', check);
       });
+      setHasLiveTrack(false);
     };
   }, [cameraOn, stream]);
 
@@ -88,14 +87,10 @@ export const VideoTile: React.FC<VideoTileProps> = ({
   }, [isYou, speakerMuted]);
 
   useEffect(() => {
-    if (
-      videoRef.current &&
-      !isYou &&
-      'setSinkId' in videoRef.current &&
-      typeof (videoRef.current as any).setSinkId === 'function'
-    ) {
+    const videoEl = videoRef.current as (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }) | null;
+    if (videoEl && !isYou && typeof videoEl.setSinkId === 'function') {
       const sinkId = !selectedSpeaker || selectedSpeaker === 'default' ? '' : selectedSpeaker;
-      (videoRef.current as any).setSinkId(sinkId).catch(() => {});
+      void videoEl.setSinkId(sinkId).catch(() => {});
     }
   }, [selectedSpeaker, isYou]);
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -32,7 +32,9 @@ export const CreateMeeting: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { members } = useOrganization();
-  const [assignedRoles, setAssignedRoles] = useState<Record<string, 'Host' | 'Member'>>({});
+  const [assignedRoles, setAssignedRoles] = useState<Record<string, 'Host' | 'Member'>>(() => (
+    user?.userId ? { [user.userId]: 'Host' } : {}
+  ));
 
   const { data: projects, loading: projectsLoading } = useQuery<Project[]>(
     queryKeys.projects.list(),
@@ -217,13 +219,16 @@ export const CreateMeeting: React.FC = () => {
   }, [defaultStart, setValue]);
 
   // Only pre-assign creator as Host by default
-  const [seededCreator, setSeededCreator] = useState(false);
+  const seededCreatorRef = useRef(Boolean(user?.userId));
   useEffect(() => {
-    if (!seededCreator && user?.userId) {
-      setAssignedRoles((prev) => ({ [user.userId]: 'Host', ...prev }));
-      setSeededCreator(true);
+    if (!seededCreatorRef.current && user?.userId) {
+      seededCreatorRef.current = true;
+      const timer = setTimeout(() => {
+        setAssignedRoles((prev) => (user.userId in prev ? prev : { [user.userId]: 'Host', ...prev }));
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [seededCreator, user?.userId]);
+  }, [user?.userId]);
 
   const handleStartChange = (newStartIso: string) => {
     setValue('meetingScheduledAt', newStartIso);

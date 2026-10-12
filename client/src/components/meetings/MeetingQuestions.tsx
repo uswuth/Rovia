@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { MessageCircleQuestion, SendHorizontal, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -145,7 +145,7 @@ export const MeetingQuestions = ({
     resolver: zodResolver(answerQuestionSchema),
     defaultValues: { answerText: '' },
   });
-  const questionText = askForm.watch('questionText');
+  const questionText = useWatch({ control: askForm.control, name: 'questionText' });
 
   const submitQuestion = askForm.handleSubmit(async (values) => {
     await onAsk(values.questionText.trim());

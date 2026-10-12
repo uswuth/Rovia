@@ -35,6 +35,7 @@ export interface ServerToClientEvents {
   'meeting:message': (data: MeetingChatMessage) => void;
   'meeting:ended'?: (data: { meetingId: string }) => void;
   'meeting:typing'?: (data: { userId: string; userName: string; isTyping: boolean }) => void;
+  'meeting:poll-updated'?: (data: { meetingId: string }) => void;
   'meeting:participant-updated'?: (data: {
     meetingId: string;
     participantId: string;

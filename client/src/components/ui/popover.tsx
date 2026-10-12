@@ -60,27 +60,32 @@ export function PopoverTrigger({
   if (render) {
     return React.cloneElement(render, {
       ...props,
-      onClick: (e: React.MouseEvent<any>) => {
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation()
         props.onClick?.(e)
-        render.props?.onClick?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onClick?.(e)
         toggleOpen()
       },
-      onMouseEnter: (e: React.MouseEvent<any>) => {
+      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
         props.onMouseEnter?.(e)
-        render.props?.onMouseEnter?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onMouseEnter?.(e)
       },
-      onMouseLeave: (e: React.MouseEvent<any>) => {
+      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
         props.onMouseLeave?.(e)
-        render.props?.onMouseLeave?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onMouseLeave?.(e)
       },
-      onFocus: (e: React.FocusEvent<any>) => {
+      onFocus: (e: React.FocusEvent<HTMLButtonElement>) => {
         props.onFocus?.(e)
-        render.props?.onFocus?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onFocus?.(e)
       },
-      onBlur: (e: React.FocusEvent<any>) => {
+      onBlur: (e: React.FocusEvent<HTMLButtonElement>) => {
         props.onBlur?.(e)
-        render.props?.onBlur?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onBlur?.(e)
       },
       "aria-expanded": open,
       className: cn(render.props?.className, className),

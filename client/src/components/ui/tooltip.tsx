@@ -79,7 +79,7 @@ function Tooltip({
 
   const contextValue = React.useMemo(() => ({ open: disabled ? false : open, setOpen, show, hide }), [open, show, hide, disabled])
 
-  if (!disabled && content !== undefined && content !== null && content !== false) {
+  if (!disabled && Boolean(content)) {
     return (
       <TooltipContext.Provider value={contextValue}>
         <div className={cn("relative inline-flex items-center justify-center shrink-0", className)} {...props}>

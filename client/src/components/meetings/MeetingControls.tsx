@@ -18,9 +18,6 @@ import {
   Sparkles,
   Maximize2,
   Minimize2,
-  Users,
-  MessageSquare,
-  MessageCircleQuestion,
   Play,
   X,
   LayoutGrid,
@@ -48,19 +45,9 @@ const getCleanDeviceLabel = (
   return `${type} ${index >= 0 ? index + 1 : 1}`;
 };
 
-const getVolumeIcon = (volume: number, enabled: boolean = true) => {
-  if (!enabled || volume === 0) return VolumeX;
-  if (volume <= 50) return Volume1;
-  return Volume2;
-};
+import { PANELS, type PanelKey } from './meetingPanels';
 
-export const PANELS = [
-  { key: 'people', label: 'People', icon: Users },
-  { key: 'chat', label: 'Chat', icon: MessageSquare },
-  { key: 'qa', label: 'Q&A', icon: MessageCircleQuestion },
-] as const;
-
-export type PanelKey = (typeof PANELS)[number]['key'] | 'polls';
+export type { PanelKey };
 
 export interface MeetingControlsProps {
   localStream?: MediaStream | null;
@@ -187,7 +174,6 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   // Real-time microphone input metering attached to the selected mic device
   useEffect(() => {
     if (activeShelf !== 'mic' || !micOn) {
-      setLiveMicLevel(0);
       return;
     }
 
@@ -250,16 +236,11 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   // Real-time camera preview stream for the video settings shelf
   useEffect(() => {
     if (activeShelf !== 'camera') {
-      setPreviewStream(null);
-      setIsCameraLoading(false);
-      setCameraPreviewError(null);
       return;
     }
 
     let isCancelled = false;
     let localTempStream: MediaStream | null = null;
-    setIsCameraLoading(true);
-    setCameraPreviewError(null);
 
     // If localStream from WebRTC already has a live video track matching current camera, use it directly
     const hasLiveLocalVideo =
@@ -268,14 +249,23 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
       localStream!.getVideoTracks().some((t) => t.readyState === 'live' && t.enabled !== false);
 
     if (hasLiveLocalVideo && localStream) {
-      setPreviewStream(localStream);
-      setIsCameraLoading(false);
+      const timer = setTimeout(() => {
+        if (!isCancelled) {
+          setPreviewStream(localStream);
+          setIsCameraLoading(false);
+        }
+      }, 0);
       return () => {
-        // Do not stop localStream tracks as they belong to the live call
+        isCancelled = true;
+        clearTimeout(timer);
+        setPreviewStream(null);
       };
     }
 
-    const startCameraPreview = async () => {
+    const timer = setTimeout(async () => {
+      if (isCancelled) return;
+      setIsCameraLoading(true);
+      setCameraPreviewError(null);
       try {
         const constraints: MediaStreamConstraints = {
           video:
@@ -298,16 +288,17 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
           setCameraPreviewError('Camera preview unavailable');
         }
       }
-    };
-
-    void startCameraPreview();
+    }, 0);
 
     return () => {
       isCancelled = true;
+      clearTimeout(timer);
       if (localTempStream) {
         localTempStream.getTracks().forEach((track) => track.stop());
       }
       setPreviewStream(null);
+      setIsCameraLoading(false);
+      setCameraPreviewError(null);
     };
   }, [activeShelf, selectedCamera, cameraOn, localStream]);
 
@@ -338,7 +329,9 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
       if (selectedSpeaker && typeof (audioCtx as unknown as { setSinkId?: (id: string) => Promise<void> }).setSinkId === 'function') {
         try {
           await (audioCtx as unknown as { setSinkId: (id: string) => Promise<void> }).setSinkId(selectedSpeaker);
-        } catch {}
+        } catch {
+          // Ignore setSinkId failure on unsupported browsers
+        }
       }
 
       const masterGain = audioCtx.createGain();
@@ -396,7 +389,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
 
   // Cleanup mic test timers, recording or playback on unmount or when shelf closes
   useEffect(() => {
-    if (activeShelf !== 'mic') {
+    return () => {
       if (micCountdownTimerRef.current) {
         window.clearInterval(micCountdownTimerRef.current);
         micCountdownTimerRef.current = null;
@@ -404,7 +397,9 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
       if (micRecorderRef.current && micRecorderRef.current.state === 'recording') {
         try {
           micRecorderRef.current.stop();
-        } catch {}
+        } catch {
+          // Ignore recorder stop error
+        }
       }
       if (micAudioRef.current) {
         micAudioRef.current.pause();
@@ -415,7 +410,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
       }
       setMicTestStage('idle');
       setMicCountdown(3);
-    }
+    };
   }, [activeShelf]);
 
   // Test microphone: 3-2-1 countdown, 5 seconds recording with countdown, and manual user click to play
@@ -718,10 +713,13 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                       </Button>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {(() => {
-                          const VolIcon = getVolumeIcon(micVolume, micOn);
-                          return <VolIcon size={13} className="text-muted-foreground shrink-0" />;
-                        })()}
+                        {!micOn || micVolume === 0 ? (
+                          <VolumeX size={13} className="text-muted-foreground shrink-0" />
+                        ) : micVolume <= 50 ? (
+                          <Volume1 size={13} className="text-muted-foreground shrink-0" />
+                        ) : (
+                          <Volume2 size={13} className="text-muted-foreground shrink-0" />
+                        )}
                         <Slider
                           value={[micVolume]}
                           min={0}
@@ -759,10 +757,13 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                             className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-medium cursor-pointer transition-colors max-w-48 sm:max-w-52 shrink-0"
                           >
                             <span className="flex items-center gap-2 truncate">
-                              {(() => {
-                                const VolIcon = getVolumeIcon(speakerVolume, speakerOn);
-                                return <VolIcon size={14} className="text-emerald-500 shrink-0" />;
-                              })()}
+                              {!speakerOn || speakerVolume === 0 ? (
+                                <VolumeX size={14} className="text-emerald-500 shrink-0" />
+                              ) : speakerVolume <= 50 ? (
+                                <Volume1 size={14} className="text-emerald-500 shrink-0" />
+                              ) : (
+                                <Volume2 size={14} className="text-emerald-500 shrink-0" />
+                              )}
                               <span className="truncate">{currentSpeakerLabel}</span>
                             </span>
                             <ChevronDown size={13} className="text-muted-foreground shrink-0 ml-1" />
@@ -820,10 +821,13 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                       </Button>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {(() => {
-                          const VolIcon = getVolumeIcon(speakerVolume, speakerOn);
-                          return <VolIcon size={13} className="text-muted-foreground shrink-0" />;
-                        })()}
+                        {!speakerOn || speakerVolume === 0 ? (
+                          <VolumeX size={13} className="text-muted-foreground shrink-0" />
+                        ) : speakerVolume <= 50 ? (
+                          <Volume1 size={13} className="text-muted-foreground shrink-0" />
+                        ) : (
+                          <Volume2 size={13} className="text-muted-foreground shrink-0" />
+                        )}
                         <Slider
                           value={[speakerVolume]}
                           min={0}
@@ -1005,10 +1009,13 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                     speakerOn && speakerVolume > 0 ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
                   }`}
                 >
-                  {(() => {
-                    const VolIcon = getVolumeIcon(speakerVolume, speakerOn);
-                    return <VolIcon size={16} />;
-                  })()}
+                  {!speakerOn || speakerVolume === 0 ? (
+                    <VolumeX size={16} />
+                  ) : speakerVolume <= 50 ? (
+                    <Volume1 size={16} />
+                  ) : (
+                    <Volume2 size={16} />
+                  )}
                 </button>
               </Tooltip>
               <Tooltip content={activeShelf === 'speaker' ? 'Close Speaker Settings' : 'Speaker Settings'} side="top">

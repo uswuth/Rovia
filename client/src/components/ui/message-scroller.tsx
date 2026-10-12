@@ -2,62 +2,12 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { ChevronDown } from "lucide-react"
 
-export interface MessageScrollerContextValue {
-  viewportRef: React.RefObject<HTMLDivElement | null>
-  contentRef: React.RefObject<HTMLDivElement | null>
-  scrollable: { start: boolean; end: boolean }
-  isAutoScrolling: boolean
-  isPendingScroll: boolean
-  scrollToEnd: (options?: { behavior?: ScrollBehavior }) => boolean
-  scrollToStart: (options?: { behavior?: ScrollBehavior }) => boolean
-  scrollToMessage: (
-    messageId: string,
-    options?: {
-      align?: "start" | "center" | "end" | "nearest"
-      behavior?: ScrollBehavior
-    }
-  ) => boolean
-  currentAnchorId: string | null
-  visibleMessageIds: string[]
-  updateScrollState: () => void
-}
+import {
+  MessageScrollerContext,
+  type MessageScrollerContextValue,
+} from "@/context/MessageScrollerContext"
 
-const MessageScrollerContext = React.createContext<MessageScrollerContextValue | null>(null)
-
-export function useMessageScroller(): Pick<
-  MessageScrollerContextValue,
-  "scrollToEnd" | "scrollToStart" | "scrollToMessage"
-> {
-  const ctx = React.useContext(MessageScrollerContext)
-  if (!ctx) {
-    return {
-      scrollToEnd: () => false,
-      scrollToStart: () => false,
-      scrollToMessage: () => false,
-    }
-  }
-  return {
-    scrollToEnd: ctx.scrollToEnd,
-    scrollToStart: ctx.scrollToStart,
-    scrollToMessage: ctx.scrollToMessage,
-  }
-}
-
-export function useMessageScrollerScrollable(): { start: boolean; end: boolean } {
-  const ctx = React.useContext(MessageScrollerContext)
-  return ctx?.scrollable ?? { start: false, end: false }
-}
-
-export function useMessageScrollerVisibility(): {
-  currentAnchorId: string | null
-  visibleMessageIds: string[]
-} {
-  const ctx = React.useContext(MessageScrollerContext)
-  return {
-    currentAnchorId: ctx?.currentAnchorId ?? null,
-    visibleMessageIds: ctx?.visibleMessageIds ?? [],
-  }
-}
+export type { MessageScrollerContextValue }
 
 export interface MessageScrollerProviderProps {
   children: React.ReactNode
@@ -73,15 +23,14 @@ function MessageScrollerProvider({
   autoScroll = true,
   defaultScrollPosition = "end",
   scrollEdgeThreshold = 36,
-  scrollMargin = 0,
 }: MessageScrollerProviderProps) {
   const viewportRef = React.useRef<HTMLDivElement | null>(null)
   const contentRef = React.useRef<HTMLDivElement | null>(null)
   const [scrollable, setScrollable] = React.useState({ start: false, end: false })
   const [isAutoScrolling, setIsAutoScrolling] = React.useState(false)
   const [isPendingScroll, setIsPendingScroll] = React.useState(true)
-  const [currentAnchorId, setCurrentAnchorId] = React.useState<string | null>(null)
-  const [visibleMessageIds, setVisibleMessageIds] = React.useState<string[]>([])
+  const [currentAnchorId] = React.useState<string | null>(null)
+  const [visibleMessageIds] = React.useState<string[]>([])
   const isAtBottomRef = React.useRef(true)
 
   const updateScrollState = React.useCallback(() => {
@@ -236,19 +185,20 @@ function MessageScrollerProvider({
   )
 }
 
-export interface MessageScrollerRootProps extends React.ComponentProps<"div"> {}
+export type MessageScrollerRootProps = React.ComponentProps<"div">
 
 function MessageScrollerRoot({ className, children, ...props }: MessageScrollerRootProps) {
   const ctx = React.useContext(MessageScrollerContext)
-
-  const scrollableAttr = React.useMemo(() => {
-    if (!ctx) return undefined
-    const { start, end } = ctx.scrollable
-    if (start && end) return "start end"
-    if (start) return "start"
-    if (end) return "end"
-    return undefined
-  }, [ctx?.scrollable])
+  const scrollable = ctx?.scrollable
+  const scrollableAttr = scrollable
+    ? scrollable.start && scrollable.end
+      ? "start end"
+      : scrollable.start
+      ? "start"
+      : scrollable.end
+      ? "end"
+      : undefined
+    : undefined
 
   return (
     <div
@@ -314,7 +264,7 @@ function MessageScrollerViewport({
   )
 }
 
-export interface MessageScrollerContentProps extends React.ComponentProps<"div"> {}
+export type MessageScrollerContentProps = React.ComponentProps<"div">
 
 function MessageScrollerContent({
   className,
@@ -375,7 +325,6 @@ function MessageScrollerButton({
   direction = "end",
   className,
   children,
-  render,
   ...props
 }: MessageScrollerButtonProps) {
   const ctx = React.useContext(MessageScrollerContext)

@@ -193,7 +193,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
       : matched?.participantRole === 'MODERATOR'
       ? 'Moderator'
       : 'Member';
-    const email = emailFor ? emailFor(userId) : ((matched as any)?.userEmail || (matched as any)?.email);
+    const email = emailFor ? emailFor(userId) : ((matched as unknown as Record<string, string | undefined>)?.userEmail || (matched as unknown as Record<string, string | undefined>)?.email);
 
     setSelectedProfileUser({
       userId,
@@ -224,7 +224,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
             </div>
             <div className="flex items-center gap-1.5 shrink-0 ml-2">
               <Badge
-                variant="outline"
+                tone="success"
                 className="text-[10px] px-1.5 py-0 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-medium rounded-xs"
               >
                 {activePoll.pollOptions.reduce((acc, o) => acc + o.voteCount, 0)} votes
@@ -320,6 +320,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                 <EmptyState
                   icon={MessageSquare}
                   title="No messages yet"
+                  description="Send a message to start the conversation."
                 />
               ) : (
                 messages.map((message) => {
@@ -489,7 +490,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                 )}
                 <div className="flex items-center gap-1.5 mt-1">
                   <Badge
-                    tone={selectedProfileUser.role === 'Host' ? 'primary' : 'neutral'}
+                    tone={selectedProfileUser.role === 'Host' ? 'accent' : 'neutral'}
                     className="text-[10px] py-0 px-1.5 font-semibold"
                   >
                     {selectedProfileUser.role || 'Member'}

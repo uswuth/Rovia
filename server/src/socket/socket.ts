@@ -13,7 +13,6 @@ import {
   InterServerEvents,
   SocketData
 } from '../types/index.js';
-import { assertMeetingCanChat } from '../services/meeting.service.js';
 import { randomUUID } from 'node:crypto';
 
 type TypedSocketServer = SocketIOServer<
@@ -87,7 +86,7 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
     // (`io.to(user:<id>)`) always has a live target room to land in.
     void socket.join(`user:${identity.userId}`);
 
-    socket.on('meeting:join', async (meetingId: string, ack?) => {
+    socket.on('meeting:join', async (meetingId: string, ack?: (result: { ok: boolean; peers?: string[]; error?: string }) => void) => {
       const userId = socket.data.userId ?? '';
       try {
         let meeting;
@@ -224,12 +223,12 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
     // SDP and ICE are relayed untouched. The server never inspects media.
     // Only a sender that actually joined this meeting may relay, and the target
     // is the receiver's per-user room — never an arbitrary room name.
-    const relay = (event: 'webrtc:offer' | 'webrtc:answer' | 'webrtc:ice', field: string) => {
+    const relay = (event: 'webrtc:offer' | 'webrtc:answer' | 'webrtc:ice', field: 'webrtc:offer' | 'webrtc:answer' | 'webrtc:ice') => {
       socket.on(event, (payload: { meetingId: string; to: string; [key: string]: unknown }) => {
         if (!payload?.meetingId || !payload?.to) return;
         const meetingCode = (socket.data as Record<string, unknown>).meetingCode;
         if (payload.meetingId !== socket.data.meetingId && payload.meetingId !== meetingCode) return;
-        io?.to(`user:${payload.to}`).emit(field as keyof ServerToClientEvents, {
+        io?.to(`user:${payload.to}`).emit(field, {
           from: socket.data.userId ?? '',
           ...payload,
         } as never);

@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Video, VideoOff, Mic, MicOff, Clock, Calendar,
-  ArrowRight, AlertCircle, ShieldCheck, RefreshCw, Share2, FolderGit2, Settings2
+  ArrowRight, AlertCircle, ShieldCheck, RefreshCw, Share2, FolderGit2, Settings2,
+  PhoneOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buildAudioConstraints } from '@/lib/audio-capture';
@@ -21,7 +22,6 @@ import { getProjectName, getProjectId } from '@/types/project.types';
 import { previewMeetingByJoinCode, joinMeeting } from '@/api/meeting/meeting.api';
 import type { MeetingPreview } from '@/api/meeting/meeting.types';
 import { parseApiError } from '@/utils/apiError';
-import { formatCountdown } from '@/lib/format-countdown';
 import { shareOrCopy } from '@/lib/share';
 
 const getCleanDeviceLabel = (
@@ -46,12 +46,6 @@ export const MeetingLobby: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Time state for countdown
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 10_000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Media states
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -279,7 +273,7 @@ export const MeetingLobby: React.FC = () => {
       stream.getTracks().forEach((t) => t.stop());
     }
 
-    joinMeeting(preview.meetingId).catch(() => {});
+    joinMeeting(preview.meetingId).catch(() => { });
 
     navigate(`/meetings/${preview.meetingId}/room`, {
       state: {
@@ -476,11 +470,10 @@ export const MeetingLobby: React.FC = () => {
                   <button
                     type="button"
                     onClick={toggleMic}
-                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${
-                      micEnabled
+                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${micEnabled
                         ? 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
                         : 'bg-red-600 text-white hover:bg-red-700 shadow-red-600/30'
-                    }`}
+                      }`}
                     title={micEnabled ? 'Mute Mic' : 'Unmute Mic'}
                   >
                     {micEnabled ? <Mic size={18} /> : <MicOff size={18} />}
@@ -489,11 +482,10 @@ export const MeetingLobby: React.FC = () => {
                   <button
                     type="button"
                     onClick={toggleCamera}
-                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${
-                      cameraEnabled
+                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${cameraEnabled
                         ? 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
                         : 'bg-red-600 text-white hover:bg-red-700 shadow-red-600/30'
-                    }`}
+                      }`}
                     title={cameraEnabled ? 'Turn Camera Off' : 'Turn Camera On'}
                   >
                     {cameraEnabled ? <Video size={18} /> : <VideoOff size={18} />}
@@ -502,11 +494,10 @@ export const MeetingLobby: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowDeviceSettings(!showDeviceSettings)}
-                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${
-                      showDeviceSettings
+                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${showDeviceSettings
                         ? 'bg-emerald-600 text-white shadow-emerald-600/30'
                         : 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
-                    }`}
+                      }`}
                     title="Device Preferences"
                   >
                     <Settings2 size={18} />

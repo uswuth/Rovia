@@ -74,16 +74,11 @@ function Accordion({
         const collapsible = (props as AccordionSingleProps).collapsible ?? true
         const isCurrentlyOpen = activeValues.includes(itemValue)
 
-        let nextValue = ""
-        if (isCurrentlyOpen) {
-          if (collapsible) {
-            nextValue = ""
-          } else {
-            return
-          }
-        } else {
-          nextValue = itemValue
+        if (isCurrentlyOpen && !collapsible) {
+          return
         }
+
+        const nextValue = isCurrentlyOpen ? "" : itemValue
 
         if (!isControlled) {
           setUncontrolledValue(nextValue ? [nextValue] : [])

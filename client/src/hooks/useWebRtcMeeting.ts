@@ -255,7 +255,7 @@ export const useWebRtcMeeting = (
       setPeers({});
       disconnectMeetingSocket();
     };
-  }, [enabled, meetingId, createConnection, upsertPeer, options?.visitorId]);
+  }, [enabled, meetingId, createConnection, upsertPeer, options?.visitorId, options?.initialAudioDeviceId, options?.initialVideoDeviceId]);
 
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);

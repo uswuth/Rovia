@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,11 +57,13 @@ export const MeetingRoom: React.FC = () => {
   // Active view states
   const [panel, setPanel] = useState<PanelKey | null>('people');
   const [renderedPanel, setRenderedPanel] = useState<PanelKey | null>('people');
-  useEffect(() => {
-    if (panel) {
-      setRenderedPanel(panel);
+
+  const handleSetPanel = useCallback((p: PanelKey | null) => {
+    setPanel(p);
+    if (p) {
+      setRenderedPanel(p);
     }
-  }, [panel]);
+  }, []);
   const [layoutMode, setLayoutMode] = useState<LayoutViewMode>('grid');
   const [editing, setEditing] = useState<MeetingParticipant | null>(null);
   const [copied, setCopied] = useState(false);
@@ -102,10 +104,10 @@ export const MeetingRoom: React.FC = () => {
   const [selectedCamera, setSelectedCamera] = useState<string>(() => locationState?.selectedCamera || '');
   const [speakerOn, setSpeakerOn] = useState<boolean>(true);
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
-  };
+  }, []);
 
   const { members: orgMembers } = useOrganization();
 
@@ -153,7 +155,7 @@ export const MeetingRoom: React.FC = () => {
 
   const getParticipantEmail = (participant: { userId?: string }): string | undefined => {
     const pId = participant.userId || '';
-    if (pId === user?.userId) return user?.userEmail || (user as any)?.email;
+    if (pId === user?.userId) return user?.userEmail || (user as unknown as Record<string, string>)?.email;
 
     const matchedMember = (orgMembers || []).find((m) => {
       const mId = getMemberId(m);
@@ -162,13 +164,18 @@ export const MeetingRoom: React.FC = () => {
 
     if (matchedMember) {
       const mRaw = matchedMember as unknown as Record<string, string>;
-      return mRaw.email || mRaw.userEmail || (matchedMember as any).email;
+      return mRaw.email || mRaw.userEmail || (matchedMember as unknown as Record<string, string>).email;
     }
 
-    const meetingPart = meeting?.participants?.find((mp: any) => mp.userId === pId || mp.user_id === pId);
+    const meetingPart = meeting?.participants?.find((mp) => mp.userId === pId || (mp as unknown as MeetingParticipantRaw).user_id === pId);
     if (meetingPart) {
-      const mpAny = meetingPart as any;
-      return mpAny.userEmail || mpAny.email || mpAny.user?.email || mpAny.user?.userEmail;
+      const mpRaw = meetingPart as unknown as MeetingParticipantRaw & { email?: string; userEmail?: string; user?: { email?: string; userEmail?: string } };
+      return (
+        mpRaw.userEmail ||
+        mpRaw.email ||
+        mpRaw.user?.email ||
+        mpRaw.user?.userEmail
+      );
     }
 
     return undefined;
@@ -177,8 +184,8 @@ export const MeetingRoom: React.FC = () => {
   const getParticipantMeetingRole = (participant: { userId?: string }): 'Host' | 'Moderator' | 'Member' => {
     const pId = participant.userId || '';
     const isCreator = meeting?.createdBy && meeting.createdBy === pId;
-    const meetingPart = meeting?.participants?.find((mp: any) => mp.userId === pId || mp.user_id === pId);
-    const role = (meetingPart?.participantRole || (meetingPart as any)?.participant_role || '').toUpperCase();
+    const meetingPart = meeting?.participants?.find((mp) => mp.userId === pId || (mp as unknown as MeetingParticipantRaw).user_id === pId);
+    const role = (meetingPart?.participantRole || (meetingPart as unknown as MeetingParticipantRaw)?.participant_role || '').toString().toUpperCase();
 
     if (isCreator || role === 'HOST') return 'Host';
     if (role === 'MODERATOR') return 'Moderator';
@@ -271,7 +278,7 @@ export const MeetingRoom: React.FC = () => {
   // Listen for meeting:ended, meeting:poll-updated, and meeting:participant-updated broadcast from socket
   useEffect(() => {
     if (!id || !isAuthenticated) return;
-    let s: any = null;
+    let s: ReturnType<typeof import('@/api/meeting/meeting-socket').getMeetingSocket> | null = null;
     import('@/api/meeting/meeting-socket').then((m) => {
       s = m.getMeetingSocket();
       s.on('meeting:ended', () => {
@@ -526,7 +533,7 @@ export const MeetingRoom: React.FC = () => {
 
   const participants = useMemo(() => {
     return normalizeParticipants((meeting?.participants ?? []) as unknown as MeetingParticipantRaw[]);
-  }, [meeting?.participants]);
+  }, [meeting]);
 
   const joined = useMemo(() => {
     const list: MeetingParticipant[] = [];
@@ -566,7 +573,7 @@ export const MeetingRoom: React.FC = () => {
     }
 
     return list;
-  }, [user, meeting?.createdBy, participants, rtc.peers]);
+  }, [user, meeting, participants, rtc.peers]);
 
   if (loading) {
     return (
@@ -634,7 +641,7 @@ export const MeetingRoom: React.FC = () => {
         <div
           className={cn(
             "overflow-hidden transition-all duration-300 ease-in-out flex flex-col shrink-0 origin-right border-border",
-            Boolean(panel)
+            panel
               ? "w-full lg:w-96 opacity-100 scale-100 translate-x-0 border-t lg:border-t-0 lg:border-l"
               : "w-0 lg:w-0 max-h-0 lg:max-h-none opacity-0 scale-95 translate-x-12 pointer-events-none border-0"
           )}
@@ -643,8 +650,8 @@ export const MeetingRoom: React.FC = () => {
             <div className="w-full lg:w-96 h-full min-h-0 flex flex-col shrink-0">
               <MeetingSidebar
                 panel={renderedPanel}
-                onSetPanel={setPanel}
-                onClose={() => setPanel(null)}
+                onSetPanel={handleSetPanel}
+                onClose={() => handleSetPanel(null)}
                 joined={joined}
                 canManage={canManage}
                 isHost={isHost}
@@ -769,8 +776,9 @@ export const MeetingRoom: React.FC = () => {
             const mediaElements = Array.from(document.querySelectorAll<HTMLMediaElement>('video, audio'));
             const sinkId = !deviceId || deviceId === 'default' ? '' : deviceId;
             for (const el of mediaElements) {
-              if ('setSinkId' in el && typeof (el as any).setSinkId === 'function') {
-                await (el as any).setSinkId(sinkId);
+              const audioSinkEl = el as HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> };
+              if (typeof audioSinkEl.setSinkId === 'function') {
+                await audioSinkEl.setSinkId(sinkId);
               }
             }
           } catch (err) {
@@ -814,7 +822,7 @@ export const MeetingRoom: React.FC = () => {
         onToggleFullscreen={toggleFullscreen}
         onLeaveClick={() => setShowLeaveModal(true)}
         panel={panel}
-        onSelectPanel={setPanel}
+        onSelectPanel={handleSetPanel}
         layoutMode={layoutMode}
         onSelectLayoutMode={setLayoutMode}
         showSettingsModal={showSettingsModal}

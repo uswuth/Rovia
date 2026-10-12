@@ -115,11 +115,6 @@ export const Meetings: React.FC = () => {
         if (!titleMatch && !descMatch && !codeMatch) return false;
       }
 
-      const scheduledDate = new Date(m.meetingScheduledAt);
-      const scheduledMs = scheduledDate.getTime();
-      const durationMinutes = m.meetingDurationMinutes || 30;
-      const endMs = !isNaN(scheduledMs) ? scheduledMs + durationMinutes * 60 * 1000 : Infinity;
-
       const isEnded = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED';
 
       if (currentTab === 'upcoming') {
@@ -130,7 +125,7 @@ export const Meetings: React.FC = () => {
       }
       return true;
     });
-  }, [sortedMeetings, debouncedSearch, currentTab, now]);
+  }, [sortedMeetings, debouncedSearch, currentTab]);
 
   const [meetingPage, setMeetingPage] = React.useState(1);
   const [meetingPageSize, setMeetingPageSize] = React.useState(5);

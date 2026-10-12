@@ -44,6 +44,10 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
 }) => {
   const [speakingMap, setSpeakingMap] = React.useState<Record<string, boolean>>({});
   const [speakerQueue, setSpeakerQueue] = React.useState<string[]>([]);
+  const speakerQueueRef = React.useRef(speakerQueue);
+  React.useEffect(() => {
+    speakerQueueRef.current = speakerQueue;
+  }, [speakerQueue]);
 
   // Active speaker sound detection via Web Audio Analyser
   React.useEffect(() => {
@@ -99,7 +103,7 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
     const voiceEnergy: Record<string, number> = {};
     const speechStartTime: Record<string, number> = {};
     const hangover: Record<string, number> = {};
-    let currentDominantSpeaker: string | null = speakerQueue[0] || null;
+    let currentDominantSpeaker: string | null = speakerQueueRef.current[0] || null;
     let dominantPromotedAt = 0;
 
     const MIN_HOLD_DURATION_MS = 2500;
@@ -202,7 +206,9 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
       sources.forEach((s) => {
         try {
           s.disconnect();
-        } catch {}
+        } catch {
+          // Ignore disconnect error on tear down
+        }
       });
       if (audioCtx && audioCtx.state !== 'closed') {
         void audioCtx.close().catch(() => {});
