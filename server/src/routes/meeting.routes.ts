@@ -21,6 +21,37 @@ const router: Router = Router();
  * Public preview of a meeting from its shareable join link.
  * Allows visitors and guests without an existing session to see meeting info in the lobby.
  * Redirects direct browser navigations (Accept: text/html) to the client SPA route.
+ *
+ * @openapi
+ * /api/v1/meetings/join/{code}:
+ *   get:
+ *     summary: Public meeting preview by join code
+ *     description: >
+ *       Unauthenticated. Returns the lobby preview for a meeting's shareable
+ *       join code, including title, status, join mode, participant counts and
+ *       the full participant roster with per-user permissions. Intended for
+ *       guests with no session, so it deliberately exposes roster and permission
+ *       detail — do not treat the join code as a secret. If the caller does send
+ *       a bearer token, the lookup is additionally scoped to that token's
+ *       organization, so a code from another tenant will not resolve. Browser
+ *       navigations (Accept: text/html) are redirected to the equivalent client
+ *       SPA route instead of returning JSON.
+ *     tags:
+ *       - Meetings
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The meeting's shareable join code.
+ *     responses:
+ *       200:
+ *         description: Meeting preview retrieved successfully
+ *       400:
+ *         description: Validation failed (invalid or missing join code)
+ *       404:
+ *         description: No meeting matches that join code in this organization
  */
 router.get(
   '/join/:code',

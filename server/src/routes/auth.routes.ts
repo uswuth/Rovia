@@ -132,6 +132,52 @@ router.post('/logout', asyncHandler(logoutUser));
  *         description: Unauthorized / Missing token
  */
 router.get('/me', authenticateUser, asyncHandler(getCurrentUser));
+
+/**
+ * @openapi
+ * /api/v1/auth/change-password:
+ *   post:
+ *     summary: Change Password For Current User
+ *     description: >
+ *       Changes the authenticated user's own password. Both fields are
+ *       required, and `currentPassword` must match the stored hash. `newPassword`
+ *       must be at least 8 characters and contain at least one uppercase
+ *       letter, one lowercase letter, one digit, and one special character from
+ *       @$!%*?& — otherwise the request is rejected with a field-level error.
+ *       Returns a null data payload on success.
+ *     tags:
+ *       - Authentication
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currentPassword, newPassword]
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 format: password
+ *                 description: The user's existing password.
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 description: Must satisfy the complexity policy described above.
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *       400:
+ *         description: >
+ *           Validation failed — missing fields, incorrect current password, or
+ *           new password failing the complexity policy. Field-level detail is
+ *           returned in the `errors` array.
+ *       401:
+ *         description: Unauthorized / Missing token
+ *       404:
+ *         description: User not found
+ */
 router.post('/change-password', authenticateUser, asyncHandler(changePassword));
 
 export default router;
