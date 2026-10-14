@@ -6,6 +6,11 @@ export interface ICreateRecordingInput {
   projectId?: string;
   /** Opaque id only; the Meeting domain does not exist yet. */
   meetingId?: string;
+  /**
+   * One entry per participant whose audio is captured. Each becomes its own
+   * stored object so the tracks can be transcribed without crosstalk.
+   */
+  speakers?: Array<{ speakerId: string; speakerName?: string }>;
 }
 
 export interface IRecordingListQuery extends Record<string, unknown> {

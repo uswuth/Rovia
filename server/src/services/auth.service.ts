@@ -21,6 +21,14 @@ export const registerUserService = async (
   const userEmail = input.userEmail.toLowerCase().trim();
   const password = input.password;
 
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(password)) {
+    throw ApiError.badRequest(
+      'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)',
+      [{ field: 'password', message: 'Password does not meet complexity requirements' }]
+    );
+  }
+
   const existingUser = await User.findOne({ user_email: userEmail });
   if (existingUser) {
     throw ApiError.badRequest('User with this email already exists', [
@@ -144,9 +152,33 @@ export const loginUserService = async (input: IUserLoginInput): Promise<IAuthTok
     throw ApiError.unauthorized('Invalid email or password');
   }
 
+  // Check if account is temporarily locked
+  if (user.locked_until && user.locked_until.getTime() > Date.now()) {
+    const remainingMinutes = Math.ceil((user.locked_until.getTime() - Date.now()) / (60 * 1000));
+    throw ApiError.tooManyRequests(
+      `Account is temporarily locked due to repeated failed login attempts. Please try again in ${remainingMinutes} minute(s).`
+    );
+  }
+
   const isPasswordValid = await user.comparePassword(password);
   if (!isPasswordValid) {
+    user.failed_login_attempts = (user.failed_login_attempts || 0) + 1;
+    if (user.failed_login_attempts >= 5) {
+      user.locked_until = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes lockout
+      user.failed_login_attempts = 0;
+      await user.save();
+      throw ApiError.tooManyRequests(
+        'Account is locked due to too many failed attempts. Please try again in 15 minutes.'
+      );
+    }
+    await user.save();
     throw ApiError.unauthorized('Invalid email or password');
+  }
+
+  // Reset lockout counters on successful authentication
+  if (user.failed_login_attempts > 0 || user.locked_until) {
+    user.failed_login_attempts = 0;
+    user.locked_until = null;
   }
 
   // Ensure organization owner is guaranteed SuperAdmin role
@@ -240,10 +272,12 @@ export const changePasswordService = async (
     throw ApiError.badRequest('Current password and new password are required');
   }
 
-  if (newPassword.length < 6) {
-    throw ApiError.badRequest('New password must be at least 6 characters long', [
-      { field: 'newPassword', message: 'Password must be at least 6 characters' }
-    ]);
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    throw ApiError.badRequest(
+      'New password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)',
+      [{ field: 'newPassword', message: 'Password does not meet complexity requirements' }]
+    );
   }
 
   const user = await User.findById(userId).select('+password');

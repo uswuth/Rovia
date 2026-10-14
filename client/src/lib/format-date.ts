@@ -45,3 +45,15 @@ export const formatDate = (
  */
 export const formatDateOnly = (dateVal?: unknown): string | null =>
   formatDate(dateVal, { includeTime: false });
+
+/**
+ * Formats duration in minutes to human readable string (e.g., 360 -> "6h", 90 -> "1h 30m", 45 -> "45m")
+ */
+export const formatDuration = (minutes?: number | null): string => {
+  if (!minutes || minutes <= 0) return '0m';
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hrs > 0 && mins > 0) return `${hrs}h ${mins}m`;
+  if (hrs > 0) return `${hrs}h`;
+  return `${mins}m`;
+};

@@ -26,8 +26,8 @@ const startServer = async (): Promise<void> => {
 
     writeOpenApiFile(path.resolve(__dirname, '../openapi.json'));
 
-    httpServer.listen(env.PORT, () => {
-      logger.info(`IntellMeet Server listening on port ${env.PORT} [${env.NODE_ENV}]`);
+    httpServer.listen(env.PORT, '0.0.0.0', () => {
+      logger.info(`IntellMeet Server listening on port ${env.PORT} [${env.NODE_ENV}] on 0.0.0.0`);
       logger.info(`Health check available at: http://localhost:${env.PORT}/api/v1/health`);
       logger.info(`Swagger API Docs available at: http://localhost:${env.PORT}/api/docs`);
     });

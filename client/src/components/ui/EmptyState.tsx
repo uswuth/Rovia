@@ -12,11 +12,12 @@ interface EmptyStateProps {
    * Data-status accent only (live, warning, priority). Never a second brand
    * color, and never applied as a background behind the icon.
    */
-  accentColor?: 'emerald' | 'purple' | 'blue' | 'amber';
+  accentColor?: 'primary' | 'emerald' | 'purple' | 'blue' | 'amber';
 }
 
 const accentTextClass: Record<NonNullable<EmptyStateProps['accentColor']>, string> = {
-  emerald: 'text-emerald-600 dark:text-emerald-400',
+  primary: 'text-primary',
+  emerald: 'text-primary',
   purple: 'text-purple-600 dark:text-purple-400',
   blue: 'text-blue-600 dark:text-blue-400',
   amber: 'text-amber-600 dark:text-amber-400',
@@ -28,7 +29,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   description,
   actionLabel,
   onAction,
-  accentColor = 'emerald',
+  accentColor = 'primary',
 }) => {
   return (
     <div className="w-full max-w-xl mx-auto p-8 sm:p-12 text-center my-4">

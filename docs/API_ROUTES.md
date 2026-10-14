@@ -82,11 +82,6 @@ Every list endpoint returns:
 | 14 | POST | `/api/v1/organizations/invite/regenerate` | SuperAdmin | Rotate invite code |
 | 15 | GET | `/api/v1/organizations/me` | Bearer | Own organization |
 | 16 | GET | `/api/v1/organizations/members` | Bearer | Org members (paginated) |
-| 17 | GET | `/api/v1/job-titles` | Bearer | List job titles |
-| 18 | POST | `/api/v1/job-titles` | SuperAdmin/Admin | Create job title |
-| 19 | PUT | `/api/v1/job-titles/:id` | SuperAdmin/Admin | Update job title |
-| 20 | DELETE | `/api/v1/job-titles/:id` | SuperAdmin/Admin | Delete job title |
-| 21 | POST | `/api/v1/job-titles/assign` | SuperAdmin/Admin | Assign title to a member |
 | 22 | POST | `/api/v1/projects` | SuperAdmin | Create project |
 | 23 | GET | `/api/v1/projects` | Bearer | List projects (paginated) |
 | 24 | GET | `/api/v1/projects/:id` | Bearer | Project detail |
@@ -326,42 +321,6 @@ rotates it and returns `{ "data": { "accessToken": "eyJ..." } }`.
 
 **`GET /api/v1/organizations/members?page=1&limit=10`** returns paginated
 user objects (the user `toJSON` shape shown under auth).
-
----
-
-### Job Titles — `/api/v1/job-titles`
-
-**`GET /api/v1/job-titles`** — returns a plain array (not paginated) under `data`:
-
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "message": "Job titles retrieved successfully",
-  "data": [
-    {
-      "id": "6742a1b2c3d4e5f678901240",
-      "title": "Product Manager",
-      "organizationId": "6742a1b2c3d4e5f678901235",
-      "createdBy": "6742a1b2c3d4e5f678901234",
-      "createdAt": "2026-10-06T12:00:00.000Z",
-      "updatedAt": "2026-10-06T12:00:00.000Z"
-    }
-  ],
-  "timestamp": "2026-10-06T12:00:00.000Z"
-}
-```
-
-**`POST /api/v1/job-titles`** body `{ "title": "Product Manager" }` → `201` with the
-job title object. **`PUT /api/v1/job-titles/:id`** same body → `200`.
-**`DELETE /api/v1/job-titles/:id`** →
-
-```json
-{ "data": { "message": "Job title removed successfully", "id": "6742a1b2c3d4e5f678901240" } }
-```
-
-**`POST /api/v1/job-titles/assign`** body `{ "userId": "…", "title": "Product Manager" }`
-→ `200` with the updated user object.
 
 ---
 
@@ -805,6 +764,6 @@ membership and `can_use_chat` against the database on every message.
 - Refresh token: `refreshToken` httpOnly cookie, rotated on every refresh
   (`sameSite=strict`).
 - Socket.io uses the same access token in `handshake.auth.token`.
-- Role gates: `SuperAdmin`, `Admin` (job titles), plus meeting-scoped
+- Role gates: `SuperAdmin`, `Admin` (work roles), plus meeting-scoped
   `HOST` / `MODERATOR` roles checked against the meeting roster.
 - Tenant scope always comes from the verified JWT — never from the payload.

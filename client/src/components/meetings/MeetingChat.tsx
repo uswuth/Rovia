@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal, ModalFooterCancel } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarColorByName } from '@/components/ui/avatar-colors';
 import { MessageScroller } from '@/components/ui/message-scroller';
 import { cn } from '@/lib/utils';
 import { getMeetingSocket } from '@/api/meeting/meeting-socket';
@@ -33,6 +34,8 @@ interface MeetingChatProps {
   onVotePoll?: (pollId: string, optionIds: string[]) => Promise<void>;
   onClosePoll?: (pollId: string) => Promise<void>;
   pollPending?: boolean;
+  messages?: MeetingChatMessage[];
+  setMessages?: React.Dispatch<React.SetStateAction<MeetingChatMessage[]>>;
 }
 
 /** Mirrors MAX_CHAT_MESSAGE_CHARS on the server. */
@@ -56,10 +59,14 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
   onVotePoll,
   onClosePoll,
   pollPending = false,
+  messages: propMessages,
+  setMessages: propSetMessages,
 }) => {
   const { user } = useAuth();
   const { formatTimeStr } = useTimeFormat();
-  const [messages, setMessages] = useState<MeetingChatMessage[]>([]);
+  const [internalMessages, setInternalMessages] = useState<MeetingChatMessage[]>([]);
+  const messages = propMessages ?? internalMessages;
+  const setMessages = propSetMessages ?? setInternalMessages;
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [selectedProfileUser, setSelectedProfileUser] = useState<{
@@ -88,7 +95,10 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
   useEffect(() => {
     const socket = getMeetingSocket();
     const handleMessage = (message: MeetingChatMessage) => {
-      setMessages((prev) => [...prev, message]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.messageId === message.messageId)) return prev;
+        return [...prev, message];
+      });
       setTypingUsers((prev) => {
         const next = { ...prev };
         delete next[message.from];
@@ -120,7 +130,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
         window.clearTimeout(typingTimeoutRef.current);
       }
     };
-  }, [meetingId, currentUserId, displayNameFor]);
+  }, [meetingId, currentUserId, displayNameFor, setMessages]);
 
   useEffect(() => {
     scrollToBottom('smooth');
@@ -213,26 +223,26 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
     <div className="flex flex-col h-full min-h-0 w-full gap-2">
       {/* Pinned Active Poll Indexed Banner above Chat */}
       {activePoll && activePoll.pollStatus === 'OPEN' && (
-        <div className="shrink-0 rounded-md border border-emerald-500/30 bg-emerald-500/5 shadow-xs overflow-hidden transition-all">
-          <div className="flex items-center justify-between px-3 py-1.5 bg-emerald-500/10 border-b border-emerald-500/20 text-xs">
+        <div className="shrink-0 rounded-md border border-border/80 bg-card/95 shadow-xs overflow-hidden transition-all">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b border-border/60 text-xs">
             <div
-              className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 min-w-0 flex-1 cursor-pointer select-none"
+              className="flex items-center gap-1.5 font-medium text-foreground min-w-0 flex-1 cursor-pointer select-none"
               onClick={() => setPinnedExpanded((v) => !v)}
             >
               <Pin size={13} className="shrink-0 text-emerald-500 rotate-45" />
-              <span className="truncate">Pinned Poll: {activePoll.pollQuestion}</span>
+              <span className="truncate text-xs font-semibold">{activePoll.pollQuestion}</span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0 ml-2">
               <Badge
-                tone="success"
-                className="text-[10px] px-1.5 py-0 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-medium rounded-xs"
+                tone="neutral"
+                className="text-[10px] px-1.5 py-0 border-border/60 text-muted-foreground font-normal rounded-xs"
               >
                 {activePoll.pollOptions.reduce((acc, o) => acc + o.voteCount, 0)} votes
               </Badge>
               <button
                 type="button"
                 onClick={() => setPinnedExpanded((v) => !v)}
-                className="p-1 hover:bg-emerald-500/20 rounded-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                className="p-1 hover:bg-muted rounded-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 aria-label="Toggle pinned poll details"
               >
                 <ChevronDown
@@ -244,14 +254,18 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
           </div>
 
           {pinnedExpanded && (
-            <div className="p-3 pb-3 space-y-2.5 bg-card/60 border-t border-emerald-500/15">
+            <div className="p-3 pb-3 space-y-2.5 bg-card/40 border-t border-border/40">
               <p className="text-xs font-medium text-foreground leading-snug">{activePoll.pollQuestion}</p>
               <ul className="space-y-1.5">
                 {(() => {
                   const total = activePoll.pollOptions.reduce((acc, o) => acc + o.voteCount, 0);
+                  const maxVotes = Math.max(0, ...activePoll.pollOptions.map((o) => o.voteCount));
                   return activePoll.pollOptions.map((opt) => {
                     const hasVoted = Boolean(opt.voterIds?.includes(currentUserId));
                     const pct = total === 0 ? 0 : Math.round((opt.voteCount / total) * 100);
+                    const isLeader = opt.voteCount > 0 && opt.voteCount === maxVotes;
+                    const isTrailing = opt.voteCount > 0 && opt.voteCount < maxVotes;
+
                     return (
                       <li key={opt.optionId}>
                         <button
@@ -261,12 +275,16 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                           className={cn(
                             'relative w-full overflow-hidden rounded-xs border p-2 text-left text-xs transition-all cursor-pointer',
                             hasVoted
-                              ? 'border-emerald-500 bg-emerald-500/10 font-medium'
-                              : 'border-border/80 bg-background/60 hover:border-emerald-500/50 hover:bg-muted/40'
+                              ? 'border-emerald-500/50 bg-emerald-500/5 font-medium'
+                              : 'border-border/60 bg-muted/20 hover:border-border hover:bg-muted/40'
                           )}
                         >
                           <div
-                            className="absolute inset-y-0 left-0 bg-emerald-500/15 transition-all duration-300 rounded-xs"
+                            className={cn(
+                              'absolute inset-y-0 left-0 transition-all duration-300 rounded-xs pointer-events-none',
+                              isLeader && 'bg-emerald-500/20 border-r border-emerald-400/60',
+                              isTrailing && 'bg-zinc-500/25 dark:bg-zinc-700/50 border-r border-zinc-400/50 dark:border-zinc-500/60'
+                            )}
                             style={{ width: `${pct}%` }}
                           />
                           <div className="relative flex items-center justify-between gap-2">
@@ -285,7 +303,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                 })()}
               </ul>
               <div className="flex items-center justify-between pt-1 text-[11px]">
-                {onOpenPolls && (
+                {canManage && onOpenPolls && (
                   <button
                     type="button"
                     onClick={onOpenPolls}
@@ -314,8 +332,8 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
       {/* Messages Transcript with MessageScroller */}
       <MessageScroller.Provider autoScroll={true} defaultScrollPosition="end">
         <MessageScroller.Root className="relative flex-1 min-h-0">
-          <MessageScroller.Viewport className="flex-1 min-h-0 pr-1 no-scrollbar">
-            <MessageScroller.Content className="space-y-3 min-h-full pb-6">
+          <MessageScroller.Viewport className="flex-1 min-h-0 pr-1 no-scrollbar overflow-x-hidden">
+            <MessageScroller.Content className="space-y-3 min-h-full pb-6 px-2">
               {messages.length === 0 ? (
                 <EmptyState
                   icon={MessageSquare}
@@ -366,9 +384,9 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                           </div>
                         </div>
 
-                        {/* Message End Bar (Profile Avatar & Name placed beneath the bubble) */}
+                        {/* Message End Bar (Profile Avatar & Name placed beneath the bubble with directional depth offset) */}
                         {isMe ? (
-                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-muted-foreground/80 justify-end select-none pr-0.5">
+                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-muted-foreground/80 justify-end select-none pr-0.5 translate-x-2">
                             <span className="font-medium text-muted-foreground/90 truncate max-w-[120px]">{senderDisplayName}</span>
                             <div
                               onClick={canViewProfile ? () => handleAvatarClick(message.from) : undefined}
@@ -377,14 +395,14 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                             >
                               <Avatar className="size-5 text-[8px] shadow-2xs ring-1 ring-border/50 select-none">
                                 {avatarSrc && <AvatarImage src={avatarSrc} alt={realUserName} className="object-cover" />}
-                                <AvatarFallback name={realUserName} className="font-bold text-[8px] bg-secondary">
+                                <AvatarFallback name={realUserName} className={cn("font-bold text-[8px]", getAvatarColorByName(realUserName))}>
                                   {realInitial}
                                 </AvatarFallback>
                               </Avatar>
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-muted-foreground/80 justify-start select-none pl-0.5">
+                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-muted-foreground/80 justify-start select-none pl-0.5 -translate-x-2">
                             <div
                               onClick={canViewProfile ? () => handleAvatarClick(message.from) : undefined}
                               className={cn(canViewProfile && 'cursor-pointer hover:opacity-85 transition-opacity')}
@@ -392,7 +410,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                             >
                               <Avatar className="size-5 text-[8px] shadow-2xs ring-1 ring-border/50 select-none">
                                 {avatarSrc && <AvatarImage src={avatarSrc} alt={realUserName} className="object-cover" />}
-                                <AvatarFallback name={realUserName} className="font-bold text-[8px] bg-secondary">
+                                <AvatarFallback name={realUserName} className={cn("font-bold text-[8px]", getAvatarColorByName(realUserName))}>
                                   {realInitial}
                                 </AvatarFallback>
                               </Avatar>
@@ -413,10 +431,10 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
       </MessageScroller.Provider>
 
       {/* Chat Bottom Controls */}
-      <div className="shrink-0 pt-2 pb-1 space-y-1.5 mt-auto">
+      <div className="shrink-0 pt-1 pb-1 mt-auto flex flex-col justify-end">
         {/* Real-time Typing Indicator with official shadcn shimmer */}
         {Object.keys(typingUsers).length > 0 && (
-          <div className="px-1 py-0.5 select-none">
+          <div className="px-1.5 pb-1 select-none">
             <span className="shimmer text-[11px] font-normal text-muted-foreground select-none">
               {Object.values(typingUsers).join(', ')} {Object.keys(typingUsers).length === 1 ? 'is' : 'are'} typing…
             </span>
@@ -425,7 +443,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
 
         {canPost ? (
           <form onSubmit={send} className="w-full">
-            <div className="flex items-center gap-2 w-full py-1">
+            <div className="flex items-center gap-2 w-full">
               {canManage && onOpenPolls && (
                 <button
                   type="button"
@@ -479,7 +497,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                 {selectedProfileUser.avatarUrl && (
                   <AvatarImage src={selectedProfileUser.avatarUrl} alt={selectedProfileUser.userName} />
                 )}
-                <AvatarFallback name={selectedProfileUser.userName} className="text-sm font-bold">
+                <AvatarFallback name={selectedProfileUser.userName} className={cn("text-sm font-bold", getAvatarColorByName(selectedProfileUser.userName))}>
                   {selectedProfileUser.userName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>

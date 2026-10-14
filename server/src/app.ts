@@ -14,7 +14,29 @@ import { tolerantJsonParser } from './middlewares/tolerantJson.js';
 const app: Application = express();
 
 // Security Middlewares
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: env.NODE_ENV === 'production' ? {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        connectSrc: ["'self'", 'ws:', 'wss:'],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"]
+      }
+    } : false, // allow Swagger UI and dev tooling in local development
+    frameguard: { action: 'deny' },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true
+    }
+  })
+);
 app.use(cors(corsOptions));
 
 // Body Parsers & Cookie Parser
@@ -33,17 +55,18 @@ app.get('/favicon.ico', (_req: Request, res: Response) => {
   res.status(204).end();
 });
 
-// Raw OpenAPI JSON Spec Route
-app.get('/api/docs/json', (_req: Request, res: Response) => {
-  res.json(swaggerSpec);
-});
+// OpenAPI Spec and Swagger UI Documentation (Disabled in production)
+if (env.NODE_ENV !== 'production') {
+  app.get('/api/docs/json', (_req: Request, res: Response) => {
+    res.json(swaggerSpec);
+  });
 
-// Dynamic Swagger / OpenAPI UI Documentation
-try {
-  const swaggerUi = await import('swagger-ui-express');
-  app.use('/api/docs', swaggerUi.default.serve, swaggerUi.default.setup(swaggerSpec));
-} catch {
-  // Graceful fallback
+  try {
+    const swaggerUi = await import('swagger-ui-express');
+    app.use('/api/docs', swaggerUi.default.serve, swaggerUi.default.setup(swaggerSpec));
+  } catch {
+    // Graceful fallback
+  }
 }
 
 // Friendly API Root Welcome Endpoints

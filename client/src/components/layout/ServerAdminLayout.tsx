@@ -79,7 +79,7 @@ export const ServerAdminLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
+    <div className="flex h-dvh w-full bg-background text-foreground overflow-hidden">
       {/* ── Server Admin Sidebar ── */}
       <aside className="w-64 border-r border-border bg-card flex flex-col justify-between shrink-0 select-none">
         <div className="flex flex-col">
@@ -103,7 +103,7 @@ export const ServerAdminLayout: React.FC = () => {
               className={({ isActive }) =>
                 `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
                   isActive
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
+                    ? 'bg-primary/10 text-primary font-bold'
                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 }`
               }
@@ -117,7 +117,7 @@ export const ServerAdminLayout: React.FC = () => {
               className={({ isActive }) =>
                 `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
                   isActive
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
+                    ? 'bg-primary/10 text-primary font-bold'
                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 }`
               }
@@ -131,7 +131,7 @@ export const ServerAdminLayout: React.FC = () => {
               className={({ isActive }) =>
                 `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
                   isActive
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
+                    ? 'bg-primary/10 text-primary font-bold'
                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 }`
               }
@@ -146,7 +146,7 @@ export const ServerAdminLayout: React.FC = () => {
         <div className="p-3 border-t border-border bg-muted/20">
           <div className="flex items-center justify-between gap-2 px-1">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0">
+              <div className="w-7 h-7 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary font-bold text-xs shrink-0">
                 SA
               </div>
               <div className="flex flex-col min-w-0 leading-tight">
@@ -176,8 +176,8 @@ export const ServerAdminLayout: React.FC = () => {
               <span>/</span>
               <span className="text-foreground font-semibold">{getBreadcrumbLabel()}</span>
             </div>
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold border border-primary/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
               <span>Prometheus: {prometheusStatus}</span>
             </div>
           </div>

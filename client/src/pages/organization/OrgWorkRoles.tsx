@@ -130,7 +130,7 @@ export const OrgWorkRoles: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <Briefcase className="text-emerald-500 dark:text-emerald-400" size={24} />
+            <Briefcase className="text-primary" size={24} />
             <span>Organization Work Roles</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
@@ -186,7 +186,7 @@ export const OrgWorkRoles: React.FC = () => {
           <div className="bg-card border border-border rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-border/50 pb-3">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <Briefcase size={18} className="text-emerald-500" />
+                <Briefcase size={18} className="text-primary" />
                 <span>{editingRole ? 'Edit Work Role' : 'Create Work Role'}</span>
               </h3>
               <button

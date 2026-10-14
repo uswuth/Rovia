@@ -51,18 +51,21 @@ interface AppQueryOptions {
    * object, and any `.map` / `.filter` on it throws.
    */
   list?: boolean;
+  /** Optional polling interval in milliseconds, or false to disable. */
+  refetchInterval?: number | false;
 }
 
 export const useQuery = <T,>(
   queryKey: readonly unknown[],
   fetcher: Fetcher,
-  { enabled = true, staleTime, list = false }: AppQueryOptions = {}
+  { enabled = true, staleTime, list = false, refetchInterval }: AppQueryOptions = {}
 ): QueryResult<T> => {
   const result = useTanstackQuery({
     queryKey,
     queryFn: async () => (list ? unwrapList<T>(await fetcher()) : unwrapOne<T>(await fetcher())),
     enabled,
     staleTime,
+    refetchInterval,
   }) as UseQueryResult<T, unknown>;
 
   return useMemo(

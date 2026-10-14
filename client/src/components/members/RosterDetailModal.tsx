@@ -72,7 +72,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
         const email = m.userEmail || '';
         return (
           <div className="flex items-center gap-2.5 min-w-[180px]">
-            <div className="w-8 h-8 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0 border border-emerald-500/30">
+            <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0 border border-primary/30">
               {name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
@@ -164,7 +164,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
             <div className="flex justify-end items-center gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30 inline-flex items-center gap-1 cursor-default">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-primary/15 text-primary border border-primary/30 inline-flex items-center gap-1 cursor-default">
                     <Check size={12} />
                     <span>Locked Host</span>
                   </span>
@@ -189,7 +189,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
                   type="button"
                   onClick={() => onUpdateRole(mId, 'Member')}
                   className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer ${currentRole === 'Member'
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                     }`}
                 >
@@ -199,7 +199,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
                   type="button"
                   onClick={() => onUpdateRole(mId, 'Host')}
                   className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer ${currentRole === 'Host'
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                     }`}
                 >

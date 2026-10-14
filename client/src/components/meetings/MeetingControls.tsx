@@ -8,7 +8,6 @@ import {
   Volume2,
   VolumeX,
   Check,
-  MonitorUp,
   PhoneOff,
   Hand,
   Settings,
@@ -20,9 +19,13 @@ import {
   Minimize2,
   Play,
   X,
-  LayoutGrid,
+  Keyboard,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/kbd';
 import {
   Popover,
   PopoverContent,
@@ -32,7 +35,10 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { buildAudioConstraints } from '@/lib/audio-capture';
-import type { LayoutViewMode } from './MeetingVideoStage';
+import { useTheme } from '@/context/theme-context';
+import { PANELS, type PanelKey } from './meetingPanels';
+
+export type { PanelKey };
 
 const getCleanDeviceLabel = (
   device: MediaDeviceInfo | undefined,
@@ -45,16 +51,16 @@ const getCleanDeviceLabel = (
   return `${type} ${index >= 0 ? index + 1 : 1}`;
 };
 
-import { PANELS, type PanelKey } from './meetingPanels';
-
-export type { PanelKey };
-
 export interface MeetingControlsProps {
   localStream?: MediaStream | null;
 
   // Recording & AI Summary
   isRecording: boolean;
   onToggleRecording: () => void;
+  /** Records where the AI pipeline is: Recording, Uploading or Processing. */
+  recordingStage?: 'idle' | 'recording' | 'uploading' | 'processing' | 'ready' | 'failed';
+  /** mm:ss of captured audio, shown only while recording. */
+  recordingElapsedMs?: number;
   showRecordModal: boolean;
   setShowRecordModal: (open: boolean) => void;
   aiSummaryEnabled: boolean;
@@ -82,9 +88,7 @@ export interface MeetingControlsProps {
   selectedCamera: string;
   onSelectCamera: (deviceId: string) => void;
 
-  // Screen share & Hand
-  isScreenSharing: boolean;
-  onToggleScreenShare: () => void;
+  // Hand
   handRaised: boolean;
   onToggleHandRaise: () => void;
 
@@ -96,8 +100,6 @@ export interface MeetingControlsProps {
   // Panels & View settings
   panel: PanelKey | null;
   onSelectPanel: (panel: PanelKey | null) => void;
-  layoutMode: LayoutViewMode;
-  onSelectLayoutMode: (mode: LayoutViewMode) => void;
   showSettingsModal: boolean;
   setShowSettingsModal: (open: boolean) => void;
 }
@@ -107,6 +109,8 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   localStream,
   isRecording,
   onToggleRecording,
+  recordingStage = 'idle',
+  recordingElapsedMs = 0,
   showRecordModal,
   setShowRecordModal,
   aiSummaryEnabled,
@@ -127,8 +131,6 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   videoInputs,
   selectedCamera,
   onSelectCamera,
-  isScreenSharing,
-  onToggleScreenShare,
   handRaised,
   onToggleHandRaise,
   isFullscreen,
@@ -136,11 +138,10 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   onLeaveClick,
   panel,
   onSelectPanel,
-  layoutMode,
-  onSelectLayoutMode,
   showSettingsModal,
   setShowSettingsModal,
 }) => {
+  const { theme, setTheme } = useTheme();
   const [activeShelf, setActiveShelf] = useState<'mic' | 'camera' | 'speaker' | null>(null);
   const [deviceDropdownOpen, setDeviceDropdownOpen] = useState<boolean>(false);
   const [micVolume, setMicVolume] = useState<number>(100);
@@ -157,7 +158,39 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [cameraPreviewError, setCameraPreviewError] = useState<string | null>(null);
+
+  // The recorder button reports pipeline progress, so the user is never left
+  // guessing whether "Stop Recording" actually saved anything.
+  const recordingStageLabel =
+    recordingStage === 'recording'
+      ? 'Recording'
+      : recordingStage === 'uploading'
+        ? 'Uploading'
+        : recordingStage === 'processing'
+          ? 'Processing'
+          : recordingStage === 'failed'
+            ? 'Failed'
+            : 'Record';
+
+  const recordingElapsedLabel = React.useMemo(() => {
+    if (recordingStage !== 'recording' || recordingElapsedMs <= 0) return '';
+    const totalSeconds = Math.floor(recordingElapsedMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }, [recordingStage, recordingElapsedMs]);
   const [isCameraLoading, setIsCameraLoading] = useState<boolean>(false);
+  const [isTestingCamera, setIsTestingCamera] = useState<boolean>(false);
+
+  const handleToggleShelf = (shelf: 'mic' | 'camera' | 'speaker') => {
+    setActiveShelf((prev) => {
+      const next = prev === shelf ? null : shelf;
+      if (next !== 'camera') {
+        setIsTestingCamera(false);
+      }
+      return next;
+    });
+  };
 
   const currentMicIndex = audioInputs.findIndex((d) => d.deviceId === selectedMic);
   const currentMicDevice = audioInputs.find((d) => d.deviceId === selectedMic || (!selectedMic && d.deviceId === 'default'));
@@ -228,44 +261,41 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
       if (animId) cancelAnimationFrame(animId);
       if (stream) stream.getTracks().forEach((t) => t.stop());
       if (audioCtx && audioCtx.state !== 'closed') {
-        void audioCtx.close().catch(() => {});
+        void audioCtx.close().catch(() => { });
       }
     };
   }, [activeShelf, selectedMic, micOn, micVolume]);
 
-  // Real-time camera preview stream for the video settings shelf
+  // Real-time camera preview stream for the video settings shelf:
+  // ONLY runs when user explicitly clicks the "Test Live Preview" button!
   useEffect(() => {
-    if (activeShelf !== 'camera') {
+    if (activeShelf !== 'camera' || !isTestingCamera) {
       return;
     }
 
     let isCancelled = false;
     let localTempStream: MediaStream | null = null;
 
-    // If localStream from WebRTC already has a live video track matching current camera, use it directly
-    const hasLiveLocalVideo =
-      cameraOn &&
-      Boolean(localStream) &&
-      localStream!.getVideoTracks().some((t) => t.readyState === 'live' && t.enabled !== false);
+    const startCamera = async () => {
+      // If localStream from WebRTC already has a live video track matching current camera, use it directly
+      const hasLiveLocalVideo =
+        cameraOn &&
+        Boolean(localStream) &&
+        localStream!.getVideoTracks().some((t) => t.readyState === 'live' && t.enabled !== false);
 
-    if (hasLiveLocalVideo && localStream) {
-      const timer = setTimeout(() => {
+      if (hasLiveLocalVideo && localStream) {
         if (!isCancelled) {
           setPreviewStream(localStream);
           setIsCameraLoading(false);
         }
-      }, 0);
-      return () => {
-        isCancelled = true;
-        clearTimeout(timer);
-        setPreviewStream(null);
-      };
-    }
+        return;
+      }
 
-    const timer = setTimeout(async () => {
-      if (isCancelled) return;
-      setIsCameraLoading(true);
-      setCameraPreviewError(null);
+      if (!isCancelled) {
+        setIsCameraLoading(true);
+        setCameraPreviewError(null);
+      }
+
       try {
         const constraints: MediaStreamConstraints = {
           video:
@@ -288,11 +318,12 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
           setCameraPreviewError('Camera preview unavailable');
         }
       }
-    }, 0);
+    };
+
+    void startCamera();
 
     return () => {
       isCancelled = true;
-      clearTimeout(timer);
       if (localTempStream) {
         localTempStream.getTracks().forEach((track) => track.stop());
       }
@@ -300,7 +331,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
       setIsCameraLoading(false);
       setCameraPreviewError(null);
     };
-  }, [activeShelf, selectedCamera, cameraOn, localStream]);
+  }, [activeShelf, isTestingCamera, selectedCamera, cameraOn, localStream]);
 
   // Attach preview stream to video element whenever stream or shelf changes
   useEffect(() => {
@@ -310,7 +341,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
       videoEl.srcObject = previewStream;
       const playPromise = videoEl.play();
       if (playPromise !== undefined) {
-        playPromise.catch(() => {});
+        playPromise.catch(() => { });
       }
     } else {
       videoEl.srcObject = null;
@@ -379,7 +410,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
         setIsTestingSpeaker(false);
         setLiveSpeakerLevel(0);
         if (testAnimId) cancelAnimationFrame(testAnimId);
-        void audioCtx.close().catch(() => {});
+        void audioCtx.close().catch(() => { });
       }, 900);
     } catch {
       setIsTestingSpeaker(false);
@@ -491,7 +522,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
         audio.volume = Math.max(0, Math.min(1, micVolume / 100));
 
         if (selectedSpeaker && typeof (audio as unknown as { setSinkId?: (id: string) => Promise<void> }).setSinkId === 'function') {
-          void (audio as unknown as { setSinkId: (id: string) => Promise<void> }).setSinkId(selectedSpeaker).catch(() => {});
+          void (audio as unknown as { setSinkId: (id: string) => Promise<void> }).setSinkId(selectedSpeaker).catch(() => { });
         }
 
         setMicTestStage('ready_to_play');
@@ -536,7 +567,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   };
 
   return (
-    <footer className="shrink-0 flex items-center justify-between border-t border-border px-6 h-16 bg-background relative z-30">
+    <footer className="shrink-0 flex items-center justify-between border-t border-border/80 px-6 h-16 bg-card shadow-xs relative z-30">
       {/* Left: Record Button with Popover */}
       <div className="flex items-center gap-3 shrink-0">
         <Popover open={showRecordModal} onOpenChange={setShowRecordModal}>
@@ -548,7 +579,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                 className="gap-1.5 font-bold text-xs h-9 cursor-pointer"
               >
                 <Radio size={14} className={isRecording ? 'animate-pulse' : ''} />
-                <span>{isRecording ? 'Recording' : 'Record'}</span>
+                <span>{recordingStageLabel}</span>
               </Button>
             }
           />
@@ -557,6 +588,11 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               <h4 className="font-bold text-xs text-foreground flex items-center gap-1.5">
                 <Radio size={14} className="text-red-500" />
                 <span>Recording</span>
+                {recordingElapsedLabel && (
+                  <span className="ml-1 font-normal tabular-nums text-muted-foreground">
+                    {recordingElapsedLabel}
+                  </span>
+                )}
               </h4>
               <button
                 type="button"
@@ -572,14 +608,23 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               variant={isRecording ? 'destructive' : 'default'}
               size="sm"
               className="w-full text-xs font-semibold cursor-pointer"
+              // Uploading and summarising are not interruptible: stopping
+              // mid-upload would leave an orphaned object in storage.
+              disabled={recordingStage === 'uploading' || recordingStage === 'processing'}
               onClick={onToggleRecording}
             >
-              {isRecording ? 'Stop Recording' : 'Start Recording'}
+              {recordingStage === 'uploading'
+                ? 'Uploading…'
+                : recordingStage === 'processing'
+                  ? 'Generating summary…'
+                  : isRecording
+                    ? 'Stop Recording'
+                    : 'Start Recording'}
             </Button>
 
             <div className="border-t border-border pt-2 flex items-center justify-between">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Sparkles size={13} className="text-emerald-500" />
+                <Sparkles size={13} className="text-primary" />
                 <span>AI Summary</span>
               </span>
               <input
@@ -597,9 +642,9 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
       {/* Center: Controls Container (Mic to Leave) with Attached Matching-Width Shelf Above */}
       <div className="flex-1 flex justify-center px-4">
         <div className="relative flex flex-col items-center">
-          {/* Setting Shelf: Attached directly above center controls, matching width, xs radius */}
+          {/* Setting Shelf: Attached directly above center controls, uniform width across all settings, xs radius */}
           {activeShelf && (
-            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-max min-w-[540px] max-w-[92vw] bg-card/95 backdrop-blur-md border border-border shadow-xl rounded-xs px-3.5 py-2.5 z-40 animate-in slide-in-from-bottom-2 duration-150">
+            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-[540px] max-w-[92vw] bg-card/95 backdrop-blur-md border border-border shadow-xl rounded-xs px-3.5 py-2.5 z-40 animate-in slide-in-from-bottom-2 duration-150">
               <div className="flex items-center justify-between gap-3 w-full">
                 {/* 1. Microphone Shelf */}
                 {activeShelf === 'mic' && (
@@ -733,7 +778,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
 
                       {/* Vertical input level with color indicators (green -> yellow -> red) */}
                       <div
-                        className="relative h-7 w-2 bg-zinc-800 rounded-xs overflow-hidden flex flex-col-reverse border border-zinc-700/80 shrink-0"
+                        className="relative h-7 w-2 bg-muted dark:bg-zinc-800 rounded-xs overflow-hidden flex flex-col-reverse border border-border dark:border-zinc-700/80 shrink-0"
                         title={`Live Input Level: ${liveMicLevel}%`}
                       >
                         <div
@@ -841,7 +886,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
 
                       {/* Vertical output level with color indicators */}
                       <div
-                        className="relative h-7 w-2 bg-zinc-800 rounded-xs overflow-hidden flex flex-col-reverse border border-zinc-700/80 shrink-0"
+                        className="relative h-7 w-2 bg-muted dark:bg-zinc-800 rounded-xs overflow-hidden flex flex-col-reverse border border-border dark:border-zinc-700/80 shrink-0"
                         title={`Live Output Level: ${liveSpeakerLevel}%`}
                       >
                         <div
@@ -855,93 +900,117 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
 
                 {/* 3. Camera Shelf */}
                 {activeShelf === 'camera' && (
-                  <>
-                    {/* Left: Camera device select dropdown */}
-                    <Popover open={deviceDropdownOpen} onOpenChange={setDeviceDropdownOpen}>
-                      <PopoverTrigger
-                        render={
-                          <button
-                            type="button"
-                            className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-medium cursor-pointer transition-colors max-w-56"
-                          >
-                            <span className="flex items-center gap-2 truncate">
-                              <Video size={14} className="text-emerald-500 shrink-0" />
-                              <span className="truncate">{currentCameraLabel}</span>
-                            </span>
-                            <ChevronDown size={13} className="text-muted-foreground shrink-0 ml-1" />
-                          </button>
-                        }
-                      />
-                      <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-card shadow-xl rounded-xs" align="start">
-                        <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border mb-1">
-                          Select Camera
-                        </div>
-                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                          {videoInputs.length > 0 ? (
-                            videoInputs.map((d, idx) => {
-                              const lbl = getCleanDeviceLabel(d, 'Camera', idx);
-                              const isSelected = selectedCamera === d.deviceId || (!selectedCamera && d.deviceId === 'default');
-                              return (
-                                <button
-                                  key={d.deviceId || idx}
-                                  type="button"
-                                  onClick={() => {
-                                    onSelectCamera(d.deviceId);
-                                    setDeviceDropdownOpen(false);
-                                  }}
-                                  className={cn(
-                                    "w-full flex items-center justify-between px-2 py-1.5 rounded-xs text-xs transition-colors text-left cursor-pointer",
-                                    isSelected
-                                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
-                                      : "text-foreground hover:bg-muted"
-                                  )}
-                                >
-                                  <span className="truncate flex-1 mr-2">{lbl}</span>
-                                  {isSelected && <Check size={14} className="text-emerald-500 shrink-0" />}
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <div className="text-xs text-muted-foreground p-2">Default Camera</div>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-
-                    {/* Right: Live camera video preview box */}
-                    <div className="flex items-center shrink-0">
-                      <div className="relative w-44 h-24 bg-zinc-950 rounded-xs overflow-hidden border border-border shadow-xs flex items-center justify-center shrink-0">
+                  <div className="flex flex-col gap-2.5 w-full">
+                    {/* Live camera video preview box (shown ONLY when user clicks Test Live Preview) */}
+                    {isTestingCamera && (
+                      <div className="relative w-full h-44 bg-zinc-950 rounded-xs overflow-hidden border border-border shadow-xs flex items-center justify-center animate-in fade-in duration-200">
                         <video
                           ref={videoPreviewRef}
                           autoPlay
                           playsInline
                           muted
                           className={cn(
-                            "w-full h-full object-cover scale-x-[-1]",
+                            "w-full h-full object-contain scale-x-[-1]",
                             (isCameraLoading || cameraPreviewError || !previewStream) && "opacity-0"
                           )}
                         />
 
                         {isCameraLoading && (
-                          <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground gap-1.5 bg-zinc-950">
+                          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground gap-2 bg-zinc-950">
                             <span className="size-2 rounded-full bg-emerald-500 animate-ping" />
-                            <span>Loading...</span>
+                            <span>Starting camera preview...</span>
                           </div>
                         )}
 
                         {!isCameraLoading && cameraPreviewError && (
-                          <div className="absolute inset-0 flex items-center justify-center text-[10px] text-red-400 p-2 text-center bg-zinc-950">
+                          <div className="absolute inset-0 flex items-center justify-center text-xs text-red-400 p-2 text-center bg-zinc-950">
                             {cameraPreviewError}
                           </div>
                         )}
 
-                        <div className="absolute bottom-1 right-1 bg-black/80 backdrop-blur-xs text-[9px] text-white px-1.5 py-0.5 rounded-xs font-medium flex items-center gap-1 pointer-events-none">
+                        <div className="absolute bottom-1.5 right-1.5 bg-black/80 backdrop-blur-xs text-[9px] text-white px-1.5 py-0.5 rounded-xs font-medium flex items-center gap-1 pointer-events-none">
                           <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                           <span>Live Preview</span>
                         </div>
                       </div>
+                    )}
+
+                    {/* Controls Row: [Select Camera dropdown] and [Test live preview button] */}
+                    <div className="flex items-center justify-between gap-3 w-full">
+                      {/* Left: Camera device select dropdown */}
+                      <Popover open={deviceDropdownOpen} onOpenChange={setDeviceDropdownOpen}>
+                        <PopoverTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-medium cursor-pointer transition-colors max-w-56"
+                            >
+                              <span className="flex items-center gap-2 truncate">
+                                <Video size={14} className="text-emerald-500 shrink-0" />
+                                <span className="truncate">{currentCameraLabel}</span>
+                              </span>
+                              <ChevronDown size={13} className="text-muted-foreground shrink-0 ml-1" />
+                            </button>
+                          }
+                        />
+                        <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-card shadow-xl rounded-xs" align="start">
+                          <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border mb-1">
+                            Select Camera
+                          </div>
+                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                            {videoInputs.length > 0 ? (
+                              videoInputs.map((d, idx) => {
+                                const lbl = getCleanDeviceLabel(d, 'Camera', idx);
+                                const isSelected = selectedCamera === d.deviceId || (!selectedCamera && d.deviceId === 'default');
+                                return (
+                                  <button
+                                    key={d.deviceId || idx}
+                                    type="button"
+                                    onClick={() => {
+                                      onSelectCamera(d.deviceId);
+                                      setDeviceDropdownOpen(false);
+                                    }}
+                                    className={cn(
+                                      "w-full flex items-center justify-between px-2 py-1.5 rounded-xs text-xs transition-colors text-left cursor-pointer",
+                                      isSelected
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
+                                        : "text-foreground hover:bg-muted"
+                                    )}
+                                  >
+                                    <span className="truncate flex-1 mr-2">{lbl}</span>
+                                    {isSelected && <Check size={14} className="text-emerald-500 shrink-0" />}
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <div className="text-xs text-muted-foreground p-2">Default Camera</div>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
+                      {/* Right: Test live preview button */}
+                      <Button
+                        type="button"
+                        variant={isTestingCamera ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={() => setIsTestingCamera((prev) => !prev)}
+                        className="h-8 text-xs gap-1.5 font-medium px-3 cursor-pointer shrink-0"
+                      >
+                        {isTestingCamera ? (
+                          <>
+                            <VideoOff size={13} className="shrink-0" />
+                            <span>Stop Preview</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play size={11} className="text-emerald-500 fill-emerald-500 shrink-0" />
+                            <span>Test Live Preview</span>
+                          </>
+                        )}
+                      </Button>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -951,13 +1020,12 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
           <div className="flex items-center gap-2.5 shrink-0">
             {/* Mic Split Button: Icon on Left, Chevron on Right */}
             <div className="flex items-center rounded-full border border-border bg-card p-0.5 shadow-xs shrink-0">
-              <Tooltip content={micOn ? 'Mute Mic' : 'Unmute Mic'} side="top">
+              <Tooltip content={micOn ? 'Mute Mic (Alt+C)' : 'Unmute Mic (Alt+C)'} side="top">
                 <button
                   type="button"
                   onClick={onToggleMic}
-                  className={`flex size-9 w-9 h-9 min-w-9 min-h-9 shrink-0 aspect-square items-center justify-center rounded-full transition-colors cursor-pointer ${
-                    micOn ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
-                  }`}
+                  className={`flex size-9 w-9 h-9 min-w-9 min-h-9 shrink-0 aspect-square items-center justify-center rounded-full transition-colors cursor-pointer ${micOn ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
+                    }`}
                 >
                   {micOn ? <Mic size={16} /> : <MicOff size={16} />}
                 </button>
@@ -965,7 +1033,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               <Tooltip content={activeShelf === 'mic' ? 'Close Mic Settings' : 'Microphone Settings'} side="top">
                 <button
                   type="button"
-                  onClick={() => setActiveShelf(activeShelf === 'mic' ? null : 'mic')}
+                  onClick={() => handleToggleShelf('mic')}
                   className="flex size-7 w-7 h-7 shrink-0 aspect-square items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                   aria-label="Microphone Settings"
                 >
@@ -976,13 +1044,12 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
 
             {/* Camera Split Button: Icon on Left, Chevron on Right */}
             <div className="flex items-center rounded-full border border-border bg-card p-0.5 shadow-xs shrink-0">
-              <Tooltip content={cameraOn ? 'Turn Camera Off' : 'Turn Camera On'} side="top">
+              <Tooltip content={cameraOn ? 'Turn Camera Off (Alt+V)' : 'Turn Camera On (Alt+V)'} side="top">
                 <button
                   type="button"
                   onClick={onToggleCamera}
-                  className={`flex size-9 w-9 h-9 min-w-9 min-h-9 shrink-0 aspect-square items-center justify-center rounded-full transition-colors cursor-pointer ${
-                    cameraOn ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
-                  }`}
+                  className={`flex size-9 w-9 h-9 min-w-9 min-h-9 shrink-0 aspect-square items-center justify-center rounded-full transition-colors cursor-pointer ${cameraOn ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
+                    }`}
                 >
                   {cameraOn ? <Video size={16} /> : <VideoOff size={16} />}
                 </button>
@@ -990,7 +1057,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               <Tooltip content={activeShelf === 'camera' ? 'Close Camera Settings' : 'Camera Settings'} side="top">
                 <button
                   type="button"
-                  onClick={() => setActiveShelf(activeShelf === 'camera' ? null : 'camera')}
+                  onClick={() => handleToggleShelf('camera')}
                   className="flex size-7 w-7 h-7 shrink-0 aspect-square items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                   aria-label="Camera Settings"
                 >
@@ -1001,13 +1068,12 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
 
             {/* Speaker Split Button: Icon on Left, Chevron on Right */}
             <div className="flex items-center rounded-full border border-border bg-card p-0.5 shadow-xs shrink-0">
-              <Tooltip content={speakerOn && speakerVolume > 0 ? 'Mute Speaker' : 'Unmute Speaker'} side="top">
+              <Tooltip content={speakerOn && speakerVolume > 0 ? 'Deafen / Mute Speaker (Alt+B)' : 'Undeafen Speaker (Alt+B)'} side="top">
                 <button
                   type="button"
                   onClick={onToggleSpeaker}
-                  className={`flex size-9 w-9 h-9 min-w-9 min-h-9 shrink-0 aspect-square items-center justify-center rounded-full transition-colors cursor-pointer ${
-                    speakerOn && speakerVolume > 0 ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
-                  }`}
+                  className={`flex size-9 w-9 h-9 min-w-9 min-h-9 shrink-0 aspect-square items-center justify-center rounded-full transition-colors cursor-pointer ${speakerOn && speakerVolume > 0 ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
+                    }`}
                 >
                   {!speakerOn || speakerVolume === 0 ? (
                     <VolumeX size={16} />
@@ -1021,7 +1087,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               <Tooltip content={activeShelf === 'speaker' ? 'Close Speaker Settings' : 'Speaker Settings'} side="top">
                 <button
                   type="button"
-                  onClick={() => setActiveShelf(activeShelf === 'speaker' ? null : 'speaker')}
+                  onClick={() => handleToggleShelf('speaker')}
                   className="flex size-7 w-7 h-7 shrink-0 aspect-square items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                   aria-label="Speaker Settings"
                 >
@@ -1030,31 +1096,15 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               </Tooltip>
             </div>
 
-            {/* Screen Share Button */}
-            <Tooltip content={isScreenSharing ? 'Stop Screen Share' : 'Share Screen'} side="top">
-              <button
-                type="button"
-                onClick={onToggleScreenShare}
-                className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-colors cursor-pointer ${
-                  isScreenSharing
-                    ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
-                    : 'border-border bg-card text-foreground hover:bg-secondary'
-                }`}
-              >
-                <MonitorUp size={18} />
-              </button>
-            </Tooltip>
-
             {/* Hand Raise Button */}
             <Tooltip content={handRaised ? 'Lower Hand' : 'Raise Hand'} side="top">
               <button
                 type="button"
                 onClick={onToggleHandRaise}
-                className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-all cursor-pointer ${
-                  handRaised
-                    ? 'bg-amber-500 text-white border-amber-500 shadow-md scale-105'
-                    : 'border-border bg-card text-foreground hover:bg-secondary'
-                }`}
+                className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-all cursor-pointer ${handRaised
+                  ? 'bg-accent text-accent-foreground border-accent shadow-md scale-105'
+                  : 'border-border bg-card text-foreground hover:bg-secondary'
+                  }`}
               >
                 <Hand size={18} />
               </button>
@@ -1073,18 +1123,17 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
         </div>
       </div>
 
-      {/* Right: Panels Navigation Buttons (People, Chat, Q&A) & View Settings */}
+      {/* Right: Panels Navigation Buttons (Chat, Q&A) & View Settings */}
       <div className="flex items-center gap-1.5 shrink-0">
-        {PANELS.map((item) => (
+        {PANELS.filter((item) => item.key !== 'people').map((item) => (
           <Tooltip key={item.key} content={item.label} side="top">
             <button
               type="button"
               onClick={() => onSelectPanel(panel === item.key ? null : item.key)}
-              className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-colors cursor-pointer ${
-                panel === item.key
-                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
-                  : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
-              }`}
+              className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-colors cursor-pointer ${panel === item.key
+                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
+                : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
+                }`}
             >
               <item.icon size={18} />
             </button>
@@ -1106,11 +1155,11 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               }
             />
           </Tooltip>
-          <PopoverContent side="top" sideOffset={12} className="w-64 p-3 space-y-2.5 border-border bg-card shadow-xl" align="end">
+          <PopoverContent side="top" sideOffset={12} className="w-68 p-3 space-y-3 border-border bg-card shadow-xl rounded-xs" align="end">
             <div className="font-bold text-xs text-foreground border-b border-border pb-1.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <LayoutGrid size={14} className="text-emerald-500" />
-                <span>Layout & View</span>
+                <Settings size={14} className="text-primary" />
+                <span>Settings</span>
               </span>
               <button
                 type="button"
@@ -1121,47 +1170,126 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                 <X size={13} />
               </button>
             </div>
-            <div className="space-y-1.5 text-xs">
-              <Button
-                variant={layoutMode === 'grid' ? 'default' : 'outline'}
-                size="sm"
-                className="w-full justify-start text-xs font-medium gap-2 h-8 cursor-pointer"
-                onClick={() => onSelectLayoutMode('grid')}
-              >
-                <LayoutGrid size={14} />
-                <span>Grid View</span>
-              </Button>
-              <Button
-                variant={layoutMode === 'focus' ? 'default' : 'outline'}
-                size="sm"
-                className="w-full justify-start text-xs font-medium gap-2 h-8 cursor-pointer"
-                onClick={() => onSelectLayoutMode('focus')}
-              >
-                <Maximize2 size={14} />
-                <span>Speaker Focus</span>
-              </Button>
-              <Button
-                variant={layoutMode === 'compact' ? 'default' : 'outline'}
-                size="sm"
-                className="w-full justify-start text-xs font-medium gap-2 h-8 cursor-pointer"
-                onClick={() => onSelectLayoutMode('compact')}
-              >
-                <Minimize2 size={14} />
-                <span>Compact View</span>
-              </Button>
 
-              {/* Fullscreen Button moved into Settings */}
-              <div className="border-t border-border pt-1.5 mt-1.5">
-                <Button
-                  variant={isFullscreen ? 'default' : 'outline'}
-                  size="sm"
-                  className="w-full justify-start text-xs font-medium gap-2 h-8 cursor-pointer"
-                  onClick={onToggleFullscreen}
+            {/* 1. Appearance: Light / Dark / System */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-foreground">Appearance</span>
+              <div className="grid grid-cols-3 gap-1 bg-muted/40 p-1 rounded-xs border border-border/50">
+                <button
+                  type="button"
+                  onClick={() => setTheme('light')}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer",
+                    theme === 'light'
+                      ? "bg-card text-emerald-500 shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
                 >
-                  {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                  <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
-                </Button>
+                  <Sun size={12} />
+                  <span>Light</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme('dark')}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer",
+                    theme === 'dark'
+                      ? "bg-card text-emerald-500 shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Moon size={12} />
+                  <span>Dark</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme('system')}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer",
+                    theme === 'system'
+                      ? "bg-card text-emerald-500 shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Monitor size={12} />
+                  <span>System</span>
+                </button>
               </div>
+            </div>
+
+            {/* 2. Keybinds: List all keybinds + new keybind Alt + N */}
+            <div className="space-y-1.5 border-t border-border/60 pt-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                <Keyboard size={13} className="text-primary" />
+                <span>Keybinds</span>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                {/* Alt + C: Mic */}
+                <div className="flex items-center justify-between rounded-xs px-2 py-1 bg-muted/30 hover:bg-muted/60 transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Mic size={12} className="text-primary shrink-0" />
+                    <span className="text-xs font-medium text-foreground truncate">Mute / Unmute</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Kbd>Alt</Kbd>
+                    <span className="text-muted-foreground text-[10px]">+</span>
+                    <Kbd>C</Kbd>
+                  </div>
+                </div>
+
+                {/* Alt + V: Camera */}
+                <div className="flex items-center justify-between rounded-xs px-2 py-1 bg-muted/30 hover:bg-muted/60 transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Video size={12} className="text-primary shrink-0" />
+                    <span className="text-xs font-medium text-foreground truncate">Camera On / Off</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Kbd>Alt</Kbd>
+                    <span className="text-muted-foreground text-[10px]">+</span>
+                    <Kbd>V</Kbd>
+                  </div>
+                </div>
+
+                {/* Alt + B: Deafen */}
+                <div className="flex items-center justify-between rounded-xs px-2 py-1 bg-muted/30 hover:bg-muted/60 transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <VolumeX size={12} className="text-primary shrink-0" />
+                    <span className="text-xs font-medium text-foreground truncate">Deafen / Undeafen</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Kbd>Alt</Kbd>
+                    <span className="text-muted-foreground text-[10px]">+</span>
+                    <Kbd>B</Kbd>
+                  </div>
+                </div>
+
+                {/* Alt + N: Mute All Three */}
+                <div className="flex items-center justify-between rounded-xs px-2 py-1 bg-muted/30 hover:bg-muted/60 transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MicOff size={12} className="text-rose-400 shrink-0" />
+                    <span className="text-xs font-medium text-foreground truncate">Mute All Three</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Kbd>Alt</Kbd>
+                    <span className="text-muted-foreground text-[10px]">+</span>
+                    <Kbd>N</Kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Fullscreen toggle button */}
+            <div className="border-t border-border/60 pt-2.5">
+              <Button
+                variant={isFullscreen ? 'default' : 'outline'}
+                size="sm"
+                className="w-full justify-start text-xs font-medium gap-2 h-8 rounded-xs cursor-pointer"
+                onClick={onToggleFullscreen}
+              >
+                {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+              </Button>
             </div>
           </PopoverContent>
         </Popover>

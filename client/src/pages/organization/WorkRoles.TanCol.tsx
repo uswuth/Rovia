@@ -1,6 +1,7 @@
 import { Tag, Edit2, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CodeBadge } from '@/components/ui/CodeBadge';
 import type { Column } from '@/components/ui/data-table';
 import type { WorkRoleItem } from '@/api/work-roles/work-roles.api';
 
@@ -22,9 +23,7 @@ export const getWorkRoleColumns = ({
       width: '120px',
       minWidth: '110px',
       cell: (r) => (
-        <span className="font-mono text-xs font-bold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm">
-          {r.roleCode || 'WR-N/A'}
-        </span>
+        <CodeBadge code={r.roleCode} fallback="WR-N/A" />
       ),
     },
     {

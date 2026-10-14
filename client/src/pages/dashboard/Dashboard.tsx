@@ -84,7 +84,7 @@ export const Dashboard: React.FC = () => {
       <div className="space-y-6">
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
-            <TrendingUp size={14} className="text-emerald-500" />
+            <TrendingUp size={14} className="text-primary" />
             <span>Workspace Overview</span>
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -108,16 +108,16 @@ export const Dashboard: React.FC = () => {
             {/* No. of Teams */}
             <div
               onClick={() => navigate('/teams')}
-              className="relative overflow-hidden rounded-sm border border-border/80 bg-card p-5 flex items-center justify-between shadow-xs hover:border-emerald-500/50 hover:shadow-md transition-all duration-200 cursor-pointer group"
+              className="relative overflow-hidden rounded-sm border border-border/80 bg-card p-5 flex items-center justify-between shadow-xs hover:border-primary/50 hover:shadow-md transition-all duration-200 cursor-pointer group"
             >
-              <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div>
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">No of Teams</p>
                 <p className="text-3xl font-extrabold text-foreground mt-1 tracking-tight">
                   {loading || teamsCount === null ? '...' : teamsCount}
                 </p>
               </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-xs group-hover:scale-105 transition-transform">
+              <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-primary/10 text-primary border border-primary/20 shadow-xs group-hover:scale-105 transition-transform">
                 <UsersRound size={22} />
               </div>
             </div>
@@ -161,19 +161,19 @@ export const Dashboard: React.FC = () => {
         {/* Organization Members Overview */}
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
-            <Users size={14} className="text-emerald-500" />
+            <Users size={14} className="text-primary" />
             <span>Organization Roster</span>
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div
               onClick={() => navigate('/organization/members')}
-              className="relative overflow-hidden rounded-sm border border-border/80 bg-card p-5 flex items-center justify-between shadow-xs hover:border-emerald-500/30 transition-all duration-200 cursor-pointer group"
+              className="relative overflow-hidden rounded-sm border border-border/80 bg-card p-5 flex items-center justify-between shadow-xs hover:border-primary/30 transition-all duration-200 cursor-pointer group"
             >
               <div>
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Total Members</p>
                 <p className="text-2xl font-bold text-foreground mt-1 tracking-tight">{totalMembers}</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-primary/10 text-primary border border-primary/20 shadow-xs">
                 <Users size={19} />
               </div>
             </div>

@@ -24,7 +24,33 @@ import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/s
 import { MemberRoster } from '@/components/members/MemberRoster';
 import { getRoleCategory, getMemberId } from '@/components/members/member-utils';
 import { cn } from '@/lib/utils';
+import { formatDurationHuman } from '@/utils/duration';
 
+
+const checkIsUserProjectHost = (p?: Project | null, currentUserId?: string): boolean => {
+  if (!p || !currentUserId) return false;
+  return (p.hosts || []).some((h: unknown) => {
+    if (typeof h === 'string') return h === currentUserId;
+    if (typeof h === 'object' && h !== null) {
+      const obj = h as Record<string, unknown>;
+      return (obj.userId || obj._id || obj.id) === currentUserId;
+    }
+    return false;
+  });
+};
+
+const checkIsUserTeamHost = (tObj?: Record<string, unknown> | null, currentUserId?: string): boolean => {
+  if (!tObj || !currentUserId) return false;
+  const hosts = (tObj.hosts as unknown[]) || [];
+  return hosts.some((h: unknown) => {
+    if (typeof h === 'string') return h === currentUserId;
+    if (typeof h === 'object' && h !== null) {
+      const obj = h as Record<string, unknown>;
+      return (obj.userId || obj._id || obj.id) === currentUserId;
+    }
+    return false;
+  });
+};
 
 export const CreateMeeting: React.FC = () => {
   const [params] = useSearchParams();
@@ -81,37 +107,44 @@ export const CreateMeeting: React.FC = () => {
   const watchedDuration = useWatch({ control, name: 'meetingDurationMinutes' }) || 360;
   const selectedProjectId = lockedProjectId || watchedProjectId;
 
-  const projectOptions = useMemo<SearchableSelectOption[]>(() => {
-    return (projects ?? []).map((p) => {
-      const pId = getProjectId(p) || '';
-      const pName = getProjectName(p) || 'Unnamed Project';
-      return {
-        value: pId,
-        label: pName,
-      };
-    });
-  }, [projects]);
+  const isGlobalAdmin = Boolean(
+    user?.isSuperAdmin || user?.userRole === 'SuperAdmin' || user?.userRole === 'Admin'
+  );
 
-  const teamOptions = useMemo<SearchableSelectOption[]>(() => {
-    return (teams ?? [])
-      .filter((tm) => {
-        if (!selectedProjectId) return true;
-        const pObj =
-          typeof tm.projectId === 'object' && tm.projectId !== null
-            ? (tm.projectId as unknown as Record<string, unknown>)
-            : null;
-        const pId = pObj ? ((pObj._id || pObj.projectId) as string) : (tm.projectId as string);
-        return !pId || pId === selectedProjectId;
+  const currentUserId = user?.userId;
+
+  const hasAnyHostPrivilege = useMemo(() => {
+    if (isGlobalAdmin) return true;
+    if (!currentUserId) return false;
+    const inAnyProject = (projects ?? []).some((p) => checkIsUserProjectHost(p, currentUserId));
+    const inAnyTeam = (teams ?? []).some((t) => checkIsUserTeamHost(t, currentUserId));
+    return inAnyProject || inAnyTeam;
+  }, [isGlobalAdmin, currentUserId, projects, teams]);
+
+  useEffect(() => {
+    if (!projectsLoading && isAuthenticated && !hasAnyHostPrivilege) {
+      const timer = setTimeout(() => {
+        navigate('/meetings');
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [projectsLoading, isAuthenticated, hasAnyHostPrivilege, navigate]);
+
+  const projectOptions = useMemo<SearchableSelectOption[]>(() => {
+    return (projects ?? [])
+      .filter((p) => {
+        if (isGlobalAdmin) return true;
+        return checkIsUserProjectHost(p, currentUserId);
       })
-      .map((tm) => {
-        const tmId = (tm.teamId || tm._id) as string;
-        const tmName = (tm.teamName as string) || 'Unnamed Team';
+      .map((p) => {
+        const pId = getProjectId(p) || '';
+        const pName = getProjectName(p) || 'Unnamed Project';
         return {
-          value: tmId,
-          label: tmName,
+          value: pId,
+          label: pName,
         };
       });
-  }, [teams, selectedProjectId]);
+  }, [projects, isGlobalAdmin, currentUserId]);
 
   // Compute sub-team member IDs if a team is selected
   const activeTeamMemberIds = useMemo<Set<string> | null>(() => {
@@ -151,6 +184,47 @@ export const CreateMeeting: React.FC = () => {
   const activeProjectName = activeProject ? getProjectName(activeProject) : undefined;
   const activeProjectStatus = (activeProject?.projectStatus || activeProject?.status || '').toLowerCase();
   const isProjectReadOnly = activeProjectStatus === 'completed' || activeProjectStatus === 'archived';
+
+  const teamOptions = useMemo<SearchableSelectOption[]>(() => {
+    return (teams ?? [])
+      .filter((tm) => {
+        if (selectedProjectId) {
+          const pObj =
+            typeof tm.projectId === 'object' && tm.projectId !== null
+              ? (tm.projectId as unknown as Record<string, unknown>)
+              : null;
+          const pId = pObj ? ((pObj._id || pObj.projectId) as string) : (tm.projectId as string);
+          if (pId && pId !== selectedProjectId) return false;
+        }
+        if (isGlobalAdmin) return true;
+        if (selectedProjectId && checkIsUserProjectHost(activeProject, currentUserId)) return true;
+        return checkIsUserTeamHost(tm, currentUserId);
+      })
+      .map((tm) => {
+        const tmId = (tm.teamId || tm._id) as string;
+        const tmName = (tm.teamName as string) || 'Unnamed Team';
+        return {
+          value: tmId,
+          label: tmName,
+        };
+      });
+  }, [teams, selectedProjectId, isGlobalAdmin, activeProject, currentUserId]);
+
+  const selectedTeamObj = useMemo(() => {
+    if (!watchedTeamId || watchedTeamId === 'NONE') return null;
+    return teams.find((t) => ((t.teamId || t._id) as string) === watchedTeamId) || null;
+  }, [teams, watchedTeamId]);
+
+  const canScheduleMeeting = useMemo(() => {
+    if (isGlobalAdmin) return true;
+    if (selectedTeamObj) {
+      return checkIsUserTeamHost(selectedTeamObj, currentUserId) || (Boolean(activeProject) && checkIsUserProjectHost(activeProject, currentUserId));
+    }
+    if (activeProject) {
+      return checkIsUserProjectHost(activeProject, currentUserId);
+    }
+    return false;
+  }, [isGlobalAdmin, selectedTeamObj, activeProject, currentUserId]);
 
   // Extract set of user IDs assigned to this project
   const projectMemberIds = useMemo<Set<string>>(() => {
@@ -218,6 +292,73 @@ export const CreateMeeting: React.FC = () => {
     setValue('meetingScheduledAt', defaultStart);
   }, [defaultStart, setValue]);
 
+  // Pre-assign hosts whenever selected project or team changes
+  useEffect(() => {
+    // Defer to avoid synchronous setState in effect (React Compiler warning)
+    const timer = setTimeout(() => {
+      setAssignedRoles((prev) => {
+        const next: Record<string, 'Host' | 'Member'> = {};
+
+        // 1. Current user is always seeded as Host
+        if (user?.userId) {
+          next[user.userId] = 'Host';
+        }
+
+        // 2. Lock TopAdmins (SuperAdmin & Admin) as Host
+        if (members) {
+          members.forEach((m) => {
+            const cat = getRoleCategory(m);
+            const mId = getMemberId(m);
+            if (mId && (cat === 'SUPER_ADMIN' || cat === 'ADMIN' || m.isSuperAdmin)) {
+              next[mId] = 'Host';
+            }
+          });
+        }
+
+        // 3. Pre-assign team hosts if team is selected, or project hosts if project is selected
+        const extractHostIds = (hostsArray: unknown[] = []): string[] => {
+          return hostsArray
+            .map((h) => {
+              if (typeof h === 'string') return h;
+              if (typeof h === 'object' && h !== null) {
+                const obj = h as Record<string, unknown>;
+                return (obj.userId || obj._id || obj.id) as string | undefined;
+              }
+              return undefined;
+            })
+            .filter((id): id is string => Boolean(id));
+        };
+
+        if (selectedTeamObj) {
+          const teamHostIds = extractHostIds((selectedTeamObj.hosts as unknown[]) || []);
+          teamHostIds.forEach((hId) => {
+            if (!next[hId]) next[hId] = 'Host';
+          });
+        } else if (activeProject) {
+          const projectHostIds = extractHostIds(
+            (Array.isArray(activeProject.hosts) ? activeProject.hosts : []) as unknown[]
+          );
+          projectHostIds.forEach((hId) => {
+            if (!next[hId]) next[hId] = 'Host';
+          });
+        }
+
+        // 4. Preserve existing user-modified roles for users that are still in next or previously selected
+        Object.entries(prev).forEach(([id, role]) => {
+          if (!next[id]) {
+            next[id] = role;
+          } else if (next[id] !== 'Host') {
+            next[id] = role;
+          }
+        });
+
+        return next;
+      });
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [selectedProjectId, watchedTeamId, selectedTeamObj, activeProject, user?.userId, members]);
+
   // Only pre-assign creator as Host by default
   const seededCreatorRef = useRef(Boolean(user?.userId));
   useEffect(() => {
@@ -265,8 +406,13 @@ export const CreateMeeting: React.FC = () => {
 
   const create = useMutation<unknown, CreateMeetingFormValues>({
     invalidates: [queryKeys.meetings.all],
-    mutationFn: (values) =>
-      createMeeting({
+    mutationFn: (values) => {
+      const roleMap: Record<string, 'HOST' | 'MEMBER'> = {};
+      Object.entries(assignedRoles).forEach(([uId, r]) => {
+        roleMap[uId] = r === 'Host' ? 'HOST' : 'MEMBER';
+      });
+
+      return createMeeting({
         projectId: lockedProjectId || (values.projectId ? values.projectId : undefined),
         teamId: values.teamId || undefined,
         meetingTitle: values.meetingTitle.trim(),
@@ -276,7 +422,9 @@ export const CreateMeeting: React.FC = () => {
         meetingJoinMode: values.meetingJoinMode,
         meetingParticipantLimit: Number(values.meetingParticipantLimit),
         participantIds: Object.keys(assignedRoles),
-      }),
+        participantRoles: roleMap,
+      });
+    },
     onSuccess: () => {
       navigate('/meetings');
     },
@@ -291,7 +439,7 @@ export const CreateMeeting: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
-              <Video size={24} className="text-emerald-500" />
+              <Video size={24} className="text-primary" />
               <span>Schedule a Meeting</span>
             </h1>
             <p className="text-xs text-muted-foreground">
@@ -310,7 +458,27 @@ export const CreateMeeting: React.FC = () => {
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit((values) => create.mutate(values as CreateMeetingFormValues))}>
+        {!hasAnyHostPrivilege && !projectsLoading && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-xs text-destructive flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle size={18} className="shrink-0" />
+              <div>
+                <p className="font-bold">Access Denied</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Only project hosts, team hosts, Admins, or SuperAdmins can schedule meetings. Redirecting to meetings...
+                </p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => navigate('/meetings')} className="self-start sm:self-auto cursor-pointer">
+              Return to Meetings
+            </Button>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit((values) => {
+          if (!canScheduleMeeting) return;
+          create.mutate(values as CreateMeetingFormValues);
+        })}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
             {/* LEFT COLUMN: Meeting Details Form Fields */}
             <div className="lg:col-span-7 space-y-4">
@@ -460,10 +628,8 @@ export const CreateMeeting: React.FC = () => {
                     {watchedDuration > 0 ? 'Calculated Duration:' : 'Invalid Time Selection:'}
                   </span>
                   {watchedDuration > 0 ? (
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      {Math.floor(watchedDuration / 60) > 0 ? `${Math.floor(watchedDuration / 60)}h ` : ''}
-                      {watchedDuration % 60 > 0 || Math.floor(watchedDuration / 60) === 0 ? `${watchedDuration % 60}m` : ''}
-                      {' '}({watchedDuration} minutes)
+                    <span className="font-bold text-primary font-mono text-sm">
+                      {formatDurationHuman(watchedDuration)}
                     </span>
                   ) : (
                     <span className="font-bold text-destructive">
@@ -480,6 +646,22 @@ export const CreateMeeting: React.FC = () => {
                     <p className="font-bold">Project is Read-Only ({activeProjectStatus.toUpperCase()})</p>
                     <p className="text-[11px] leading-relaxed">
                       This project is currently marked as <strong>{activeProjectStatus}</strong>. Scheduling new meetings is disabled. An Admin or SuperAdmin must change the project status to <strong>Active</strong> before scheduling new meetings.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!canScheduleMeeting && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive flex items-start gap-2.5">
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-bold">Host or Admin Role Required</p>
+                    <p className="text-[11px] leading-relaxed">
+                      {lockedProjectId
+                        ? 'You must be a host of this project, an Admin, or a SuperAdmin to schedule meetings for it.'
+                        : selectedProjectId
+                        ? 'You must be a host of the selected project or team, an Admin, or a SuperAdmin to schedule meetings.'
+                        : 'Scheduling organization-wide meetings requires an Admin or SuperAdmin role. Select a project where you are a host to proceed.'}
                     </p>
                   </div>
                 </div>
@@ -502,8 +684,9 @@ export const CreateMeeting: React.FC = () => {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={create.pending || isProjectReadOnly || watchedDuration <= 0}
+                  disabled={create.pending || isProjectReadOnly || !canScheduleMeeting || watchedDuration <= 0}
                   className="gap-2"
+                  title={!canScheduleMeeting ? 'Only project/team hosts, Admins, or SuperAdmins can schedule meetings' : undefined}
                 >
                   <Video size={15} />
                   <span>{create.pending ? 'Scheduling…' : 'Schedule Meeting'}</span>

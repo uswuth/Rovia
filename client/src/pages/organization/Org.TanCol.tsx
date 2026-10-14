@@ -1,23 +1,21 @@
 import type { NavigateFunction } from 'react-router-dom';
-import { Phone, MapPin, Droplet, Edit2 } from 'lucide-react';
+import { Edit2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CodeBadge } from '@/components/ui/CodeBadge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { getRoleBadgeTone } from '@/lib/status-tone';
 import type { Column } from '@/components/ui/data-table';
 import type { Member } from '@/types/member.types';
-import type { User as AuthUser } from '@/api/auth/auth.types';
 
 export interface OrgMemberColumnsOptions {
   navigate: NavigateFunction;
   canManage: boolean;
-  currentUser: AuthUser | null;
 }
 
 export const getOrgMemberColumns = ({
   navigate,
   canManage,
-  currentUser,
 }: OrgMemberColumnsOptions): Column<Member>[] => {
   return [
     {
@@ -26,9 +24,7 @@ export const getOrgMemberColumns = ({
       width: '110px',
       minWidth: '110px',
       cell: (m) => (
-        <span className="font-mono text-xs font-bold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm">
-          {m.userCode || 'USR-N/A'}
-        </span>
+        <CodeBadge code={m.userCode} fallback="USR-N/A" />
       ),
     },
     {
@@ -55,7 +51,7 @@ export const getOrgMemberColumns = ({
               <button
                 type="button"
                 onClick={() => navigate(profilePath)}
-                className="font-semibold text-foreground text-sm leading-snug hover:text-emerald-500 hover:underline cursor-pointer text-left"
+                className="font-semibold text-foreground text-sm leading-snug hover:text-primary hover:underline cursor-pointer text-left"
               >
                 {name}
               </button>
@@ -95,99 +91,6 @@ export const getOrgMemberColumns = ({
             {status}
           </Badge>
         );
-      },
-    },
-    {
-      id: 'phoneNumber',
-      header: 'Phone',
-      width: '140px',
-      minWidth: '130px',
-      cell: (m) => {
-        if (!canManage && m.userId !== currentUser?.userId) {
-          return <span className="text-xs text-muted-foreground/60 italic">Private</span>;
-        }
-        return m.phoneNumber ? (
-          <div className="flex items-center gap-1 text-xs text-foreground">
-            <Phone size={12} className="text-muted-foreground shrink-0" />
-            <span>{m.phoneNumber}</span>
-          </div>
-        ) : (
-          <span className="text-xs text-muted-foreground/60 italic">No phone</span>
-        );
-      },
-    },
-    {
-      id: 'bloodType',
-      header: 'Blood Group',
-      width: '110px',
-      minWidth: '110px',
-      cell: (m) => {
-        if (!canManage && m.userId !== currentUser?.userId) {
-          return <span className="text-xs text-muted-foreground/60 italic">Private</span>;
-        }
-        return m.bloodType ? (
-          <div className="flex items-center gap-1 text-xs text-red-500 dark:text-red-400 font-medium">
-            <Droplet size={12} className="shrink-0" />
-            <span>{m.bloodType}</span>
-          </div>
-        ) : (
-          <span className="text-xs text-muted-foreground/60 italic">N/A</span>
-        );
-      },
-    },
-    {
-      id: 'city',
-      header: 'City',
-      width: '120px',
-      minWidth: '110px',
-      cell: (m) => {
-        if (!canManage && m.userId !== currentUser?.userId) {
-          return <span className="text-xs text-muted-foreground/60 italic">Private</span>;
-        }
-        return m.city ? (
-          <span className="text-xs text-foreground font-medium">{m.city}</span>
-        ) : (
-          <span className="text-xs text-muted-foreground/60 italic">N/A</span>
-        );
-      },
-    },
-    {
-      id: 'address',
-      header: 'Address',
-      width: '200px',
-      minWidth: '180px',
-      cell: (m) => {
-        if (!canManage && m.userId !== currentUser?.userId) {
-          return <span className="text-xs text-muted-foreground/60 italic">Private</span>;
-        }
-        return m.address ? (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <MapPin size={12} className="shrink-0" />
-            <span className="line-clamp-1">{m.address}</span>
-          </div>
-        ) : (
-          <span className="text-xs text-muted-foreground/60 italic">N/A</span>
-        );
-      },
-    },
-    {
-      id: 'createdAt',
-      header: 'Created At',
-      width: '110px',
-      minWidth: '110px',
-      cell: (m) => {
-        const created = m.createdAt ? new Date(m.createdAt).toLocaleDateString() : 'N/A';
-        return <span className="text-xs text-muted-foreground font-mono">{created}</span>;
-      },
-    },
-    {
-      id: 'updatedAt',
-      header: 'Updated At',
-      width: '110px',
-      minWidth: '110px',
-      cell: (m) => {
-        const updated = m.updatedAt ? new Date(m.updatedAt).toLocaleDateString() : 'N/A';
-        return <span className="text-xs text-muted-foreground font-mono">{updated}</span>;
       },
     },
     ...(canManage

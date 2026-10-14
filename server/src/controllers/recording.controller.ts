@@ -85,8 +85,11 @@ export const getRecordingSummary = async (req: Request, res: Response): Promise<
 export const getRecordingUploadUrl = async (req: Request, res: Response): Promise<Response> => {
   const { organizationId } = getRequestScope(req);
   const { id } = req.params;
+  // Index only. The key itself stays server-side, so a client cannot sign a URL
+  // for a speaker that is not on this recording.
+  const speakerIndex = Number(req.query.speaker ?? 0);
 
-  const result = await getRecordingUploadUrlService(id, organizationId);
+  const result = await getRecordingUploadUrlService(id, organizationId, speakerIndex);
 
   return ApiResponse.success(res, 'Upload URL generated successfully', result, 200);
 };

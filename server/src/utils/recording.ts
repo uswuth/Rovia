@@ -7,15 +7,21 @@ import { assertObjectId } from './objectId.js';
  * them.
  */
 
-/** MVP cap. Enforced in the browser only; the server records what was measured. */
-export const MAX_RECORDING_DURATION_MS = 60_000;
-
 /**
- * Server-authoritative object size ceiling. This is a POLICY limit: a client
- * controls its own upload, so complete() must treat HeadObject.ContentLength as
- * the fact and delete anything larger.
+ * Recorded meetings are captured whole, so there is no duration cap. A one-hour
+ * meeting is ordinary input, not an abuse case: the browser is the only thing
+ * holding the buffer, so a cap here would only reject a meeting the user
+ * legitimately wanted transcribed.
+ *
+ * What still needs a ceiling is object SIZE, because a client controls its own
+ * upload. That limit is a POLICY value, and complete() treats the object store's
+ * reported length as the fact and deletes anything larger.
+ *
+ * Sized for a long recording: ~2 hours of screen-and-audio VP8 at 1 Mbps is
+ * roughly 900 MB. Whisper never sees this file — the server demuxes it to
+ * trimmed 16 kHz mono FLAC before transcription — so this only bounds storage.
  */
-export const MAX_RECORDING_SIZE_BYTES = 25_678_900; // 25 MiB
+export const MAX_RECORDING_SIZE_BYTES = 1_073_741_824; // 1 GiB
 
 export const RECORDING_TTL_DAYS = 30;
 export const UPLOAD_URL_TTL_SECONDS = 120;
@@ -53,13 +59,26 @@ export const extensionForMimeType = (mimeType: string): string => {
 /**
  * The ONLY place a storage key is built. It is always derived from the caller's
  * own organization id, so a client can never address another tenant's object.
+ *
+ * Speaker index is part of the key: each participant's audio is a separate
+ * object, so the server can transcribe tracks independently and no client's
+ * upload can overwrite another's.
  */
-export const buildRecordingStorageKey = (organizationId: string, recordingId: string, mimeType: string): string => {
+export const buildRecordingStorageKey = (
+  organizationId: string,
+  recordingId: string,
+  mimeType: string,
+  speakerIndex = 0
+): string => {
   if (!organizationId) {
     throw ApiError.badRequest('An organization is required to build a storage key');
   }
   assertObjectId(recordingId, 'recordingId');
-  return `recordings/${organizationId}/${recordingId}.${extensionForMimeType(mimeType)}`;
+  if (!Number.isInteger(speakerIndex) || speakerIndex < 0 || speakerIndex > 99) {
+    throw ApiError.badRequest('Speaker index must be a whole number between 0 and 99');
+  }
+  const extension = extensionForMimeType(mimeType);
+  return `recordings/${organizationId}/${recordingId}/speaker-${speakerIndex}.${extension}`;
 };
 
 /** Defence in depth for reads/deletes: the key must sit under the caller's org. */

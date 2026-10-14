@@ -2,7 +2,7 @@ import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
-import { corsOptions } from '../config/cors.js';
+import { socketCorsOptions } from '../config/cors.js';
 import { env } from '../config/env.js';
 import { Meeting, MeetingParticipantClass } from '../models/meeting.model.js';
 import { Project } from '../models/project.model.js';
@@ -11,7 +11,8 @@ import {
   ServerToClientEvents,
   ClientToServerEvents,
   InterServerEvents,
-  SocketData
+  SocketData,
+  RaisedHand
 } from '../types/index.js';
 import { randomUUID } from 'node:crypto';
 
@@ -33,6 +34,7 @@ type TypedSocket = Socket<
 const MAX_CHAT_MESSAGE_CHARS = 2000;
 
 let io: TypedSocketServer | null = null;
+const meetingRaisedHands = new Map<string, RaisedHand[]>();
 
 export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
   io = new SocketIOServer<
@@ -41,7 +43,7 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
     InterServerEvents,
     SocketData
   >(httpServer, {
-    cors: corsOptions
+    cors: socketCorsOptions
   });
 
   /**
@@ -184,6 +186,8 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
 
         ack?.({ ok: true, peers: Array.from(live) });
         socket.to(`meeting:${realMeetingId}`).emit('meeting:peer-joined', { userId });
+        const currentHands = meetingRaisedHands.get(realMeetingId) || [];
+        socket.emit('meeting:hands-updated', { hands: currentHands });
       } catch (error) {
         logger.error(`meeting:join failed: ${(error as Error).message}`);
         ack?.({ ok: false, error: (error as Error).message });
@@ -192,10 +196,20 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
 
     socket.on('meeting:leave', async (meetingId: string) => {
       const targetId = socket.data.meetingId || meetingId;
+      const leavingUserId = socket.data.userId;
       void socket.leave(`meeting:${targetId}`);
       delete socket.data.meetingId;
       delete (socket.data as Record<string, unknown>).meetingCode;
-      socket.to(`meeting:${targetId}`).emit('meeting:peer-left', { userId: socket.data.userId ?? '' });
+      socket.to(`meeting:${targetId}`).emit('meeting:peer-left', { userId: leavingUserId ?? '' });
+
+      if (targetId && leavingUserId) {
+        const hands = meetingRaisedHands.get(targetId);
+        if (hands && hands.some((h) => h.userId === leavingUserId)) {
+          const updated = hands.filter((h) => h.userId !== leavingUserId);
+          meetingRaisedHands.set(targetId, updated);
+          io?.to(`meeting:${targetId}`).emit('meeting:hands-updated', { hands: updated });
+        }
+      }
 
       try {
         const meeting = targetId.match(/^[0-9a-fA-F]{24}$/)
@@ -214,10 +228,35 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       }
     });
 
-    socket.on('meeting:end', (meetingId: string) => {
+    socket.on('meeting:end', async (meetingId: string) => {
       const targetId = socket.data.meetingId || meetingId;
       if (!targetId) return;
-      io?.to(`meeting:${targetId}`).emit('meeting:ended', { meetingId: targetId });
+
+      const userId = socket.data.userId;
+      if (!userId) return;
+
+      try {
+        const meeting = targetId.match(/^[0-9a-fA-F]{24}$/)
+          ? await Meeting.findById(targetId)
+          : await Meeting.findOne({ meeting_join_code: targetId });
+
+        if (!meeting) return;
+
+        const isCreator = meeting.created_by.toString() === userId;
+        const participant = meeting.meeting_participants.find((p) => String(p.userId) === userId);
+        const isHost = participant?.participant_role === 'HOST';
+        const isSuperAdmin = socket.data.isSuperAdmin;
+
+        if (!isCreator && !isHost && !isSuperAdmin) {
+          logger.warn(`Unauthorized meeting:end attempt by user ${userId} on meeting ${targetId}`);
+          return;
+        }
+
+        meetingRaisedHands.delete(targetId);
+        io?.to(`meeting:${targetId}`).emit('meeting:ended', { meetingId: targetId });
+      } catch (err) {
+        logger.error(`Error ending meeting via socket: ${(err as Error).message}`);
+      }
     });
 
     // SDP and ICE are relayed untouched. The server never inspects media.
@@ -245,6 +284,56 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
         userId: socket.data.userId ?? '',
         state: payload.state
       });
+    });
+
+    socket.on('meeting:hand-raise', (payload: { meetingId: string; raised: boolean; userName?: string }) => {
+      const targetId = socket.data.meetingId || payload?.meetingId;
+      const userId = socket.data.userId;
+      if (!targetId || !userId) return;
+
+      let hands = meetingRaisedHands.get(targetId) || [];
+      if (payload.raised) {
+        if (!hands.some((h) => h.userId === userId)) {
+          hands = [...hands, { userId, userName: payload.userName, raisedAt: Date.now() }];
+        }
+      } else {
+        hands = hands.filter((h) => h.userId !== userId);
+      }
+      meetingRaisedHands.set(targetId, hands);
+      io?.to(`meeting:${targetId}`).emit('meeting:hands-updated', { hands });
+    });
+
+    socket.on('meeting:hand-lower', async (payload: { meetingId: string; userId?: string }) => {
+      const targetId = socket.data.meetingId || payload?.meetingId;
+      const callerId = socket.data.userId;
+      if (!targetId || !callerId) return;
+
+      const targetUserId = payload.userId || callerId;
+
+      // If user is lowering someone else's hand or all hands, verify host status
+      if (targetUserId !== callerId) {
+        const meeting = targetId.match(/^[0-9a-fA-F]{24}$/)
+          ? await Meeting.findById(targetId)
+          : await Meeting.findOne({ meeting_join_code: targetId });
+
+        if (meeting) {
+          const isCreator = meeting.created_by.toString() === callerId;
+          const participant = meeting.meeting_participants.find((p) => String(p.userId) === callerId);
+          const isHost = participant?.participant_role === 'HOST';
+          if (!isCreator && !isHost && !socket.data.isSuperAdmin) {
+            return;
+          }
+        }
+      }
+
+      let hands = meetingRaisedHands.get(targetId) || [];
+      if (targetUserId === 'all') {
+        hands = [];
+      } else if (targetUserId) {
+        hands = hands.filter((h) => h.userId !== targetUserId);
+      }
+      meetingRaisedHands.set(targetId, hands);
+      io?.to(`meeting:${targetId}`).emit('meeting:hands-updated', { hands });
     });
 
     /**
@@ -323,6 +412,12 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       const userId = socket.data.userId;
       if (meetingId && userId) {
         socket.to(`meeting:${meetingId}`).emit('meeting:peer-left', { userId });
+        const hands = meetingRaisedHands.get(meetingId);
+        if (hands && hands.some((h) => h.userId === userId)) {
+          const updated = hands.filter((h) => h.userId !== userId);
+          meetingRaisedHands.set(meetingId, updated);
+          io?.to(`meeting:${meetingId}`).emit('meeting:hands-updated', { hands: updated });
+        }
       }
     });
   });

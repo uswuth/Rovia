@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Hand, Crown, Volume2, VolumeX, MonitorUp } from 'lucide-react';
+import { Mic, MicOff, Crown, Volume2, VolumeX } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAvatarColorByName, getAvatarTileBgByName } from '@/components/ui/avatar-colors';
+import {
+  getAvatarColorByName,
+  getAvatarTileBgByName,
+  getAvatarSpeakerBorderByName,
+} from '@/components/ui/avatar-colors';
 import { cn } from '@/lib/utils';
 
 export interface VideoTileProps {
@@ -13,15 +17,13 @@ export interface VideoTileProps {
   muted: boolean;
   cameraOn: boolean;
   stream?: MediaStream | null;
-  handRaised?: boolean;
   avatarUrl?: string;
   speakerMuted?: boolean;
   selectedSpeaker?: string;
-  screenSharing?: boolean;
   isSpeaking?: boolean;
 }
 
-/** One participant video tile with camera/audio states, active speaker border, and hand-raise indicator. */
+/** One participant video tile with camera/audio states, active speaker border, and screen sharing indicator. */
 export const VideoTile: React.FC<VideoTileProps> = ({
   name,
   isYou,
@@ -29,56 +31,52 @@ export const VideoTile: React.FC<VideoTileProps> = ({
   muted,
   cameraOn,
   stream,
-  handRaised,
   avatarUrl,
   speakerMuted = false,
   selectedSpeaker,
-  screenSharing = false,
   isSpeaking = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [hasLiveTrack, setHasLiveTrack] = useState<boolean>(() => {
-    return Boolean(
-      cameraOn &&
-      stream &&
-      stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
-    );
-  });
+  const [, setTrackRevision] = useState(0);
 
   useEffect(() => {
-    if (!cameraOn || !stream) {
-      return;
-    }
-
-    const check = () => {
-      const active = stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live');
-      setHasLiveTrack(active);
-    };
-
+    if (!stream) return;
+    const bump = () => setTrackRevision((r) => r + 1);
     const tracks = stream.getVideoTracks();
     tracks.forEach((track) => {
-      track.addEventListener('mute', check);
-      track.addEventListener('unmute', check);
-      track.addEventListener('ended', check);
+      track.addEventListener('mute', bump);
+      track.addEventListener('unmute', bump);
+      track.addEventListener('ended', bump);
     });
 
     return () => {
       tracks.forEach((track) => {
-        track.removeEventListener('mute', check);
-        track.removeEventListener('unmute', check);
-        track.removeEventListener('ended', check);
+        track.removeEventListener('mute', bump);
+        track.removeEventListener('unmute', bump);
+        track.removeEventListener('ended', bump);
       });
-      setHasLiveTrack(false);
     };
-  }, [cameraOn, stream]);
+  }, [stream]);
+
+  const hasLiveTrack = Boolean(
+    stream &&
+    stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
+  );
 
   const isVideoShowing = Boolean(cameraOn && hasLiveTrack && stream);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+    if (videoRef.current) {
+      if (isVideoShowing && stream) {
+        if (videoRef.current.srcObject !== stream) {
+          videoRef.current.srcObject = stream;
+        }
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.srcObject = null;
+      }
     }
-  }, [stream]);
+  }, [stream, isVideoShowing]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -95,28 +93,45 @@ export const VideoTile: React.FC<VideoTileProps> = ({
   }, [selectedSpeaker, isYou]);
 
   const avatarTileBg = getAvatarTileBgByName(name);
+  const speakerBorder = getAvatarSpeakerBorderByName(name);
 
   return (
     <div
       className={cn(
-        "relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-xs text-white shadow-lg transition-all duration-300 bg-slate-950",
+        "relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-xs text-white transition-all duration-200 bg-zinc-950 shadow-md",
         isVideoShowing
           ? (isSpeaking
-              ? "border-2 border-emerald-500 shadow-md shadow-emerald-500/20 ring-2 ring-emerald-500/40"
-              : "border border-slate-800")
+              ? speakerBorder
+              : "border border-[#27272a]")
           : (isSpeaking
-              ? cn(avatarTileBg, "border-2 border-emerald-500 shadow-md shadow-emerald-500/20 ring-2 ring-emerald-500/40")
-              : avatarTileBg)
+              ? cn(avatarTileBg, speakerBorder)
+              : cn(avatarTileBg, "border border-[#27272a]"))
       )}
     >
-      {/* ALWAYS render video element so audio track plays even when camera is off */}
+      {/* Hidden audio element ensures peer speech is audible without exposing disabled video frames */}
+      {!isYou && stream && (
+        <audio
+          ref={(el) => {
+            if (el && el.srcObject !== stream) {
+              el.srcObject = stream;
+              el.play().catch(() => {});
+            }
+          }}
+          autoPlay
+          playsInline
+          muted={Boolean(speakerMuted)}
+          className="hidden"
+        />
+      )}
+
+      {/* Video element only exists when video is explicitly showing */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted={isYou || Boolean(speakerMuted)}
         data-is-local={isYou ? 'true' : 'false'}
-        className={isVideoShowing ? 'size-full object-cover -scale-x-100' : 'invisible absolute pointer-events-none size-0'}
+        className={isVideoShowing ? cn('size-full object-cover', isYou && '-scale-x-100') : 'hidden'}
       />
 
       {!isVideoShowing && (
@@ -135,7 +150,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
 
       {/* Name tag at bottom-left */}
       <div className="absolute bottom-3 left-3 flex items-center gap-1.5 z-10 max-w-[calc(100%-140px)]">
-        <div className="flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-white backdrop-blur-xs shadow-xs">
+        <div className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-white bg-black/60 backdrop-blur-xs shadow-xs">
           {host && (
             <Crown
               size={12}
@@ -151,15 +166,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
 
       {/* Mic, Speaker, and Screen Share icons on bottom-right (outside the name tag) */}
       <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-30">
-        <div className="flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-white backdrop-blur-xs shadow-xs">
-          {screenSharing && (
-            <Tooltip content="Sharing Screen" side="top" align="end">
-              <span className="flex items-center text-emerald-400">
-                <MonitorUp size={12} />
-              </span>
-            </Tooltip>
-          )}
-
+        <div className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-white bg-black/60 backdrop-blur-xs shadow-xs">
           {speakerMuted ? (
             <Tooltip content="Speaker Output Muted" side="top" align="end">
               <span className="flex items-center text-red-400">
@@ -167,37 +174,24 @@ export const VideoTile: React.FC<VideoTileProps> = ({
               </span>
             </Tooltip>
           ) : (
-            <Tooltip content={isSpeaking ? "Audio Output Active" : "Speaker Output"} side="top" align="end">
-              <span className={cn("flex items-center", isSpeaking ? "text-emerald-400" : "text-slate-400")}>
+            <Tooltip content="Speaker Output" side="top" align="end">
+              <span className="flex items-center text-zinc-400">
                 <Volume2 size={12} />
               </span>
             </Tooltip>
           )}
 
-          <Tooltip content={muted ? "Microphone Muted" : isSpeaking ? "Speaking" : "Microphone Active"} side="top" align="end">
+          <Tooltip content={muted ? "Microphone Muted" : "Microphone Active"} side="top" align="end">
             <span className="flex items-center">
               {muted ? (
                 <MicOff size={12} className="text-red-400" />
               ) : (
-                <Mic size={12} className={isSpeaking ? "text-emerald-400" : "text-slate-300"} />
+                <Mic size={12} className="text-zinc-200" />
               )}
             </span>
           </Tooltip>
         </div>
       </div>
-
-      {/* Top right active hand-raise status */}
-      {handRaised && (
-        <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-          <Tooltip content="Hand Raised" side="left">
-            <span
-              className="flex size-7 items-center justify-center rounded-full bg-amber-500 text-white shadow-md animate-bounce"
-            >
-              <Hand size={14} />
-            </span>
-          </Tooltip>
-        </div>
-      )}
     </div>
   );
 };

@@ -243,7 +243,7 @@ function SidebarTrigger({
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       className={cn(
-        "flex size-7 items-center justify-center rounded-md text-foreground/70 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer border-none bg-transparent hover:bg-transparent outline-hidden focus-visible:ring-0 shadow-none",
+        "flex size-7 items-center justify-center rounded-md text-foreground/70 hover:text-primary transition-colors cursor-pointer border-none bg-transparent hover:bg-transparent outline-hidden focus-visible:ring-0 shadow-none",
         className
       )}
       onClick={(event) => {
@@ -473,7 +473,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button flex w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left text-sm font-medium outline-none transition-all duration-150 border-none bg-transparent group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4.5 [&_svg]:shrink-0 cursor-pointer text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 data-[active=true]:bg-emerald-500/15 data-[active=true]:text-emerald-800 dark:data-[active=true]:text-emerald-400 data-[active=true]:font-semibold w-full",
+  "peer/menu-button group/menu-button flex w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left text-sm font-medium outline-none transition-all duration-150 border-none bg-transparent group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4.5 [&_svg]:shrink-0 [&_svg]:text-current cursor-pointer text-zinc-700 dark:text-zinc-300 hover:text-primary hover:bg-primary/10 data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold w-full",
   {
     variants: {
       variant: {
@@ -687,7 +687,7 @@ function SidebarMenuSubButton({
   render?: RenderableElement
 }) {
   const mergedClass = cn(
-    "flex h-8 w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-150 cursor-pointer border-none bg-transparent data-[active=true]:text-emerald-700 dark:data-[active=true]:text-emerald-400 data-[active=true]:font-semibold data-[active=true]:bg-emerald-500/12 dark:data-[active=true]:bg-emerald-500/18",
+    "flex h-8 w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-150 cursor-pointer border-none bg-transparent data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:bg-primary/15",
     className
   )
 

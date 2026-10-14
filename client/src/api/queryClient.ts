@@ -26,6 +26,13 @@ export const queryKeys = {
     questions: (meetingId: string) => ['meetings', 'questions', meetingId] as const,
     polls: (meetingId: string) => ['meetings', 'polls', meetingId] as const,
   },
+  recordings: {
+    all: ['recordings'] as const,
+    list: () => ['recordings', 'list'] as const,
+    detail: (id: string) => ['recordings', 'detail', id] as const,
+    transcript: (id: string) => ['recordings', 'transcript', id] as const,
+    summary: (id: string) => ['recordings', 'summary', id] as const,
+  },
 };
 
 export const createQueryClient = (): QueryClient =>

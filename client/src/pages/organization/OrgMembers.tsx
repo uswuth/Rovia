@@ -53,8 +53,8 @@ export const OrgMembers: React.FC = () => {
   }, [members, debouncedSearch]);
 
   const columns = useMemo(
-    () => getOrgMemberColumns({ navigate, canManage, currentUser: user }),
-    [navigate, canManage, user]
+    () => getOrgMemberColumns({ navigate, canManage }),
+    [navigate, canManage]
   );
 
   return (
@@ -63,7 +63,7 @@ export const OrgMembers: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <Users className="text-emerald-500 dark:text-emerald-400" size={24} />
+            <Users className="text-primary" size={24} />
             <span>Organization Members</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">

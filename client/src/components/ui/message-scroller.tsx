@@ -46,6 +46,19 @@ function MessageScrollerProvider({
 
     isAtBottomRef.current = atEnd
 
+    if (!hasOverflow) {
+      el.setAttribute('data-overflow', 'false');
+      el.style.setProperty('--scroll-fade-top', '0px');
+      el.style.setProperty('--scroll-fade-bottom', '0px');
+    } else {
+      el.setAttribute('data-overflow', 'true');
+      const size = 32;
+      const topFade = Math.min(scrollTop, size);
+      const bottomFade = Math.min(maxScroll - scrollTop, size);
+      el.style.setProperty('--scroll-fade-top', `${Math.max(0, topFade)}px`);
+      el.style.setProperty('--scroll-fade-bottom', `${Math.max(0, bottomFade)}px`);
+    }
+
     setScrollable((prev) => {
       const nextStart = hasOverflow && !atStart
       const nextEnd = hasOverflow && !atEnd
@@ -254,7 +267,7 @@ function MessageScrollerViewport({
       data-pending-scroll={ctx?.isPendingScroll ? "" : undefined}
       onScroll={handleScroll}
       className={cn(
-        "flex flex-1 flex-col overflow-y-auto overscroll-contain select-text outline-none no-scrollbar",
+        "flex flex-1 flex-col overflow-y-auto overscroll-contain select-text outline-none no-scrollbar scroll-fade-y",
         className
       )}
       {...props}
@@ -342,7 +355,7 @@ function MessageScrollerButton({
   }
 
   const defaultChild = (
-    <span className="inline-flex items-center gap-1.5 shadow-md">
+    <span className="inline-flex items-center gap-1.5">
       <ChevronDown size={14} className="shrink-0" />
       <span>Jump to latest</span>
     </span>
@@ -360,7 +373,7 @@ function MessageScrollerButton({
       onClick={handleClick}
       aria-hidden={!canScroll}
       className={cn(
-        "absolute bottom-2 left-1/2 z-20 -translate-x-1/2 rounded-full border border-border bg-card/95 hover:bg-secondary text-foreground px-3 py-1.5 text-xs font-semibold shadow-lg backdrop-blur-xs transition-all duration-200 cursor-pointer select-none",
+        "absolute bottom-2 left-1/2 z-20 -translate-x-1/2 rounded-full border border-border/80 bg-card hover:bg-secondary text-foreground px-3 py-1.5 text-xs font-semibold shadow-md dark:shadow-lg backdrop-blur-xs transition-all duration-200 cursor-pointer select-none",
         canScroll
           ? "opacity-100 translate-y-0 pointer-events-auto visible"
           : "opacity-0 translate-y-2 pointer-events-none invisible pointer-events-none",

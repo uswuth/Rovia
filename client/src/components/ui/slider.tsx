@@ -118,7 +118,7 @@ export const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
         >
           <div
             data-slot="slider-range"
-            className="absolute h-full bg-emerald-500 rounded-full transition-all"
+            className="absolute h-full bg-primary rounded-full transition-all"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -130,7 +130,7 @@ export const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
           aria-valuenow={currentVal}
           onKeyDown={handleKeyDown}
           data-slot="slider-thumb"
-          className="absolute block size-3.5 -translate-x-1/2 rounded-full border-2 border-emerald-500 bg-background shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+          className="absolute block size-3.5 -translate-x-1/2 rounded-full border-2 border-primary bg-background shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           style={{ left: `${percent}%` }}
         />
       </div>

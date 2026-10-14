@@ -25,18 +25,14 @@ export const MeetingLeaveModal: React.FC<MeetingLeaveModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl space-y-4">
+      <div className="w-full max-w-md rounded-xs border border-border bg-card p-6 shadow-2xl space-y-4">
         <h3 className="text-base font-bold text-foreground">
-          {isCreatorOrHost ? 'Leave or End Meeting' : 'Leave Call?'}
+          {isCreatorOrHost ? 'Meeting' : 'Leave Call?'}
         </h3>
 
         {isCreatorOrHost ? (
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              As the meeting organizer, you can leave the room while keeping it active for others, or end the meeting for everyone:
-            </p>
-
-            <div className="rounded-lg border border-border/80 bg-muted/30 p-3 space-y-1.5">
+            <div className="rounded-xs border border-border/80 bg-muted/30 p-3 space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-foreground">Just leave the call</span>
                 <Button
@@ -54,7 +50,7 @@ export const MeetingLeaveModal: React.FC<MeetingLeaveModalProps> = ({
               </p>
             </div>
 
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1.5">
+            <div className="rounded-xs border border-destructive/30 bg-destructive/5 p-3 space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-destructive">End call for everyone</span>
                 <Button

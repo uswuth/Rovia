@@ -33,16 +33,19 @@ import {
   type MeetingPoll,
 } from '@/api/meeting/meeting-poll.api';
 import { useWebRtcMeeting } from '@/hooks/useWebRtcMeeting';
+import { useMeetingRecorder, type SpeakerTrack } from '@/hooks/useMeetingRecorder';
 import type { Meeting, MeetingParticipant, MeetingParticipantRaw, MeetingPreview } from '@/api/meeting/meeting.types';
 import { normalizeParticipants } from '@/api/meeting/meeting.types';
+import type { MeetingChatMessage, RaisedHand } from '@/api/meeting/webrtc.types';
 
 // Modular Meeting Subcomponents
 import { MeetingHeader } from '@/components/meetings/MeetingHeader';
-import { MeetingVideoStage, type LayoutViewMode } from '@/components/meetings/MeetingVideoStage';
+import { MeetingVideoStage } from '@/components/meetings/MeetingVideoStage';
 import { MeetingControls, type PanelKey } from '@/components/meetings/MeetingControls';
 import { MeetingSidebar } from '@/components/meetings/MeetingSidebar';
 import { MeetingLeaveModal } from '@/components/meetings/MeetingLeaveModal';
 import { MeetingEndedModal } from '@/components/meetings/MeetingEndedModal';
+import { MeetingAiSummaryCard } from '@/components/meetings/MeetingAiSummaryCard';
 import { ParticipantSettingsModal, type ParticipantPermissions } from '@/components/meetings/ParticipantSettingsModal';
 import { shareOrCopy } from '@/lib/share';
 import { cn } from '@/lib/utils';
@@ -64,15 +67,16 @@ export const MeetingRoom: React.FC = () => {
       setRenderedPanel(p);
     }
   }, []);
-  const [layoutMode, setLayoutMode] = useState<LayoutViewMode>('grid');
   const [editing, setEditing] = useState<MeetingParticipant | null>(null);
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<MeetingChatMessage[]>([]);
 
   // In-call toggles
   const [micOn, setMicOn] = useState(() => (location.state as { initialMic?: boolean } | null)?.initialMic ?? true);
   const [cameraOn, setCameraOn] = useState(() => (location.state as { initialCamera?: boolean } | null)?.initialCamera ?? true);
-  const [handRaised, setHandRaised] = useState(false);
+  const [raisedHands, setRaisedHands] = useState<RaisedHand[]>([]);
+  const isMyHandRaised = raisedHands.some((h) => h.userId === user?.userId);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Dialog & popover states
@@ -82,7 +86,6 @@ export const MeetingRoom: React.FC = () => {
   const [meetingEndedByHost, setMeetingEndedByHost] = useState(false);
 
   // Recording & AI Summary
-  const [isRecording, setIsRecording] = useState(false);
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(false);
 
   const locationState = location.state as {
@@ -111,7 +114,7 @@ export const MeetingRoom: React.FC = () => {
 
   const { members: orgMembers } = useOrganization();
 
-  const getParticipantDisplayName = (participant: { userId?: string; userName?: string; name?: string } | MeetingParticipant) => {
+  const getParticipantDisplayName = useCallback((participant: { userId?: string; userName?: string; name?: string } | MeetingParticipant) => {
     const pId = participant.userId || '';
     if (pId === user?.userId) return user?.userName || 'You';
 
@@ -131,7 +134,7 @@ export const MeetingRoom: React.FC = () => {
     }
 
     return pId.length > 20 ? `Participant (${pId.slice(-4)})` : pId;
-  };
+  }, [orgMembers, user?.userId, user?.userName]);
 
   const getParticipantAvatar = (participant: { userId?: string } | MeetingParticipant): string | undefined => {
     const pId = participant.userId || '';
@@ -239,6 +242,8 @@ export const MeetingRoom: React.FC = () => {
   const rtc = useWebRtcMeeting(id, Boolean(id) && isAuthenticated, {
     initialAudioDeviceId: locationState?.selectedMic,
     initialVideoDeviceId: locationState?.selectedCamera,
+    initialMic: locationState?.initialMic ?? true,
+    initialCamera: locationState?.initialCamera ?? false,
     onPeerJoined: () => {
       void refetch();
     },
@@ -248,6 +253,48 @@ export const MeetingRoom: React.FC = () => {
       void refetch();
     },
   });
+
+  const recorder = useMeetingRecorder({ meetingId: id });
+
+  // Each participant is recorded on their own track. Remote audio only exists in
+  // the peer map, so the tracks are assembled at the moment capture starts rather
+  // than captured once. Names come from the roster so the transcript can
+  // attribute speech without any diarization.
+  const handleToggleRecording = useCallback(async () => {
+    if (recorder.isRecording) {
+      await recorder.stopRecording();
+      return;
+    }
+
+    const tracks: SpeakerTrack[] = [];
+    if (rtc.localStream?.getAudioTracks().length) {
+      tracks.push({
+        speakerId: user?.userId ?? 'me',
+        speakerName: user?.userName || 'You',
+        stream: rtc.localStream,
+      });
+    }
+    for (const [peerId, peer] of Object.entries(rtc.peers)) {
+      if (peer.stream?.getAudioTracks().length) {
+        tracks.push({
+          speakerId: peerId,
+          speakerName: getParticipantDisplayName({ userId: peerId }),
+          stream: peer.stream,
+        });
+      }
+    }
+    await recorder.startRecording(tracks);
+  }, [recorder, rtc.localStream, rtc.peers, user?.userId, user?.userName, getParticipantDisplayName]);
+
+  // Elapsed time is derived from a one-second tick rather than a per-frame
+  // counter: the display only shows whole seconds, so a faster timer is waste.
+  const [recordingTick, setRecordingTick] = useState(0);
+  useEffect(() => {
+    if (!recorder.isRecording) return undefined;
+    const timer = window.setInterval(() => setRecordingTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [recorder.isRecording]);
+  const recordingElapsedMs = recorder.isRecording ? recordingTick * 1000 : 0;
 
   // Clean socket room leave on tab/window unload
   useEffect(() => {
@@ -266,7 +313,7 @@ export const MeetingRoom: React.FC = () => {
   const questions = useQuery<MeetingQuestion[]>(
     queryKeys.meetings.questions(id),
     () => getMeetingQuestions(id),
-    { enabled: Boolean(id) && panel === 'qa', list: true }
+    { enabled: Boolean(id) && panel === 'qa', list: true, refetchInterval: panel === 'qa' ? 3000 : false }
   );
 
   const polls = useQuery<MeetingPoll[]>(
@@ -275,47 +322,62 @@ export const MeetingRoom: React.FC = () => {
     { enabled: Boolean(id), list: true }
   );
 
-  // Listen for meeting:ended, meeting:poll-updated, and meeting:participant-updated broadcast from socket
+  // Listen for meeting:ended, meeting:poll-updated, meeting:question-updated, and meeting:participant-updated broadcast from socket
   useEffect(() => {
     if (!id || !isAuthenticated) return;
-    let s: ReturnType<typeof import('@/api/meeting/meeting-socket').getMeetingSocket> | null = null;
-    import('@/api/meeting/meeting-socket').then((m) => {
-      s = m.getMeetingSocket();
-      s.on('meeting:ended', () => {
-        setMeetingEndedByHost(true);
-      });
-      s.on('meeting:poll-updated', () => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.meetings.polls(id) });
-      });
-      s.on('meeting:participant-updated', (data: { meetingId: string; participantId: string; permissions?: Record<string, boolean> }) => {
-        void refetch();
-        if (data.participantId === user?.userId) {
-          if (data.permissions?.canSendAudio === false) {
-            setMicOn(false);
-            rtc.setAudioEnabled(false);
-            showToast('You were muted by the host');
-          }
-          if (data.permissions?.canSendVideo === false) {
-            setCameraOn(false);
-            rtc.setVideoEnabled(false);
-            showToast('Your camera was turned off by the host');
-          }
-          if (data.permissions?.canShareScreen === false && rtc.screenStream) {
-            rtc.stopScreenShare();
-            showToast('Your screen sharing was ended by the host');
-          }
-        }
-      });
-    }).catch(() => {});
+    const s = getMeetingSocket();
 
-    return () => {
-      if (s) {
-        s.off('meeting:ended');
-        s.off('meeting:poll-updated');
-        s.off('meeting:participant-updated');
+    const handleEnded = () => {
+      setMeetingEndedByHost(true);
+    };
+    const handlePollUpdated = () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.meetings.polls(id) });
+    };
+    const handleQuestionUpdated = () => {
+      void questions.refetch();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.meetings.questions(id) });
+    };
+    const handleParticipantUpdated = (data: { meetingId: string; participantId: string; permissions?: Record<string, boolean> }) => {
+      void refetch();
+      if (data.participantId === user?.userId) {
+        if (data.permissions?.canSendAudio === false) {
+          setMicOn(false);
+          rtc.setAudioEnabled(false);
+          showToast('You were muted by the host');
+        }
+        if (data.permissions?.canSendVideo === false) {
+          setCameraOn(false);
+          rtc.setVideoEnabled(false);
+          showToast('Your camera was turned off by the host');
+        }
       }
     };
-  }, [id, isAuthenticated, queryClient, refetch, rtc, showToast, user?.userId]);
+    const handleMessage = (message: MeetingChatMessage) => {
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.messageId === message.messageId)) return prev;
+        return [...prev, message];
+      });
+    };
+    const handleHandsUpdated = (data: { hands: RaisedHand[] }) => {
+      setRaisedHands(data?.hands || []);
+    };
+
+    s.on('meeting:ended', handleEnded);
+    s.on('meeting:poll-updated', handlePollUpdated);
+    s.on('meeting:question-updated', handleQuestionUpdated);
+    s.on('meeting:participant-updated', handleParticipantUpdated);
+    s.on('meeting:message', handleMessage);
+    s.on('meeting:hands-updated', handleHandsUpdated);
+
+    return () => {
+      s.off('meeting:ended', handleEnded);
+      s.off('meeting:poll-updated', handlePollUpdated);
+      s.off('meeting:question-updated', handleQuestionUpdated);
+      s.off('meeting:participant-updated', handleParticipantUpdated);
+      s.off('meeting:message', handleMessage);
+      s.off('meeting:hands-updated', handleHandsUpdated);
+    };
+  }, [id, isAuthenticated, queryClient, questions, refetch, rtc, showToast, user?.userId]);
 
   // Track Fullscreen state changes
   useEffect(() => {
@@ -333,6 +395,139 @@ export const MeetingRoom: React.FC = () => {
       document.exitFullscreen().catch(() => {});
     }
   };
+
+  const handleToggleMic = useCallback(() => {
+    setMicOn((on) => {
+      const next = !on;
+      rtc.setAudioEnabled(next);
+      showToast(next ? 'Microphone unmuted (Alt+C)' : 'Microphone muted (Alt+C)');
+      return next;
+    });
+  }, [rtc, showToast]);
+
+  const handleToggleCamera = useCallback(() => {
+    setCameraOn((on) => {
+      const next = !on;
+      rtc.setVideoEnabled(next);
+      showToast(next ? 'Camera turned on (Alt+V)' : 'Camera turned off (Alt+V)');
+      return next;
+    });
+  }, [rtc, showToast]);
+
+  const handleToggleSpeaker = useCallback(() => {
+    setSpeakerOn((on) => {
+      const next = !on;
+      const mediaElements = Array.from(document.querySelectorAll<HTMLMediaElement>('video, audio'));
+      for (const el of mediaElements) {
+        if (el.dataset.isLocal !== 'true') {
+          el.muted = !next;
+        }
+      }
+      showToast(next ? 'Audio undeafened (Alt+B)' : 'Audio deafened (Alt+B)');
+      return next;
+    });
+  }, [showToast]);
+
+  const handleMuteAllThree = useCallback(() => {
+    if (micOn || cameraOn || speakerOn) {
+      setMicOn(false);
+      rtc.setAudioEnabled(false);
+
+      setCameraOn(false);
+      rtc.setVideoEnabled(false);
+
+      setSpeakerOn(false);
+      const mediaElements = Array.from(document.querySelectorAll<HTMLMediaElement>('video, audio'));
+      for (const el of mediaElements) {
+        if (el.dataset.isLocal !== 'true') {
+          el.muted = true;
+        }
+      }
+      showToast('Muted all (Mic, Camera, and Audio off)');
+    } else {
+      setMicOn(true);
+      rtc.setAudioEnabled(true);
+
+      setCameraOn(true);
+      rtc.setVideoEnabled(true);
+
+      setSpeakerOn(true);
+      const mediaElements = Array.from(document.querySelectorAll<HTMLMediaElement>('video, audio'));
+      for (const el of mediaElements) {
+        if (el.dataset.isLocal !== 'true') {
+          el.muted = false;
+        }
+      }
+      showToast('Unmuted all (Mic, Camera, and Audio on)');
+    }
+  }, [micOn, cameraOn, speakerOn, rtc, showToast]);
+
+  const handleToggleHandRaise = useCallback(() => {
+    const isRaised = raisedHands.some((h) => h.userId === user?.userId);
+    const next = !isRaised;
+    getMeetingSocket().emit('meeting:hand-raise', {
+      meetingId: id,
+      raised: next,
+      userName: user?.userName || 'You',
+    });
+    showToast(next ? 'Hand raised' : 'Hand lowered');
+  }, [id, raisedHands, showToast, user?.userId, user?.userName]);
+
+  const handleLowerHand = useCallback((targetUserId?: string) => {
+    getMeetingSocket().emit('meeting:hand-lower', {
+      meetingId: id,
+      userId: targetUserId,
+    });
+  }, [id]);
+
+  const toggleParticipantsPanel = useCallback(() => {
+    setPanel((current) => {
+      const next = current === 'people' ? null : 'people';
+      if (next) {
+        setRenderedPanel(next);
+      }
+      return next;
+    });
+  }, []);
+
+  // Global Keyboard Shortcuts (Alt+C: Mic, Alt+V: Camera, Alt+B: Deafen, Alt+N: Mute All Three)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (event.altKey && !event.ctrlKey && !event.metaKey) {
+        const isKeyC = event.code === 'KeyC' || event.key.toLowerCase() === 'c';
+        const isKeyV = event.code === 'KeyV' || event.key.toLowerCase() === 'v';
+        const isKeyB = event.code === 'KeyB' || event.key.toLowerCase() === 'b';
+        const isKeyN = event.code === 'KeyN' || event.key.toLowerCase() === 'n';
+
+        if (isKeyC) {
+          event.preventDefault();
+          handleToggleMic();
+        } else if (isKeyV) {
+          event.preventDefault();
+          handleToggleCamera();
+        } else if (isKeyB) {
+          event.preventDefault();
+          handleToggleSpeaker();
+        } else if (isKeyN) {
+          event.preventDefault();
+          handleMuteAllThree();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleToggleMic, handleToggleCamera, handleToggleSpeaker, handleMuteAllThree]);
 
   // Enumerate media devices and synchronize with lobby selections
   useEffect(() => {
@@ -454,23 +649,42 @@ export const MeetingRoom: React.FC = () => {
     }
   };
 
-  const me = meeting?.participants.find((p) => p.userId === user?.userId);
+  const participants = useMemo(() => {
+    return normalizeParticipants((meeting?.participants ?? []) as unknown as MeetingParticipantRaw[]);
+  }, [meeting]);
+
+  const me = useMemo(() => {
+    if (!user?.userId) return undefined;
+    return (
+      participants.find((p) => p.userId === user.userId) ??
+      (meeting?.participants as unknown as MeetingParticipantRaw[])?.find(
+        (p) => String(p.userId || p.user_id) === user.userId
+      )
+    );
+  }, [participants, meeting, user]);
+
   const isTopAdmin = Boolean(
     user?.isSuperAdmin ||
     ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes((user?.userRole || '').toUpperCase())
   );
+  const meRole = (
+    (me as MeetingParticipant)?.participantRole ||
+    (me as unknown as MeetingParticipantRaw)?.participant_role ||
+    ''
+  ).toString().toUpperCase();
+
   const canManage = Boolean(
-    me?.participantRole === 'HOST' ||
-    me?.participantRole === 'MODERATOR' ||
-    meeting?.createdBy === user?.userId ||
+    meRole === 'HOST' ||
+    meRole === 'MODERATOR' ||
+    (meeting?.createdBy && user?.userId && meeting.createdBy === user.userId) ||
     isTopAdmin
   );
   const isHost = Boolean(
-    me?.participantRole === 'HOST' ||
-    meeting?.createdBy === user?.userId ||
+    meRole === 'HOST' ||
+    (meeting?.createdBy && user?.userId && meeting.createdBy === user.userId) ||
     isTopAdmin
   );
-  const canPost = me?.canUseChat ?? true;
+  const canPost = (me as MeetingParticipant)?.canUseChat ?? (me as unknown as MeetingParticipantRaw)?.can_use_chat ?? true;
   const joinUrl = meeting ? `${window.location.origin}/meetings/join/${meeting.meetingJoinCode}` : '';
 
   const handleShare = async () => {
@@ -531,10 +745,6 @@ export const MeetingRoom: React.FC = () => {
     },
   });
 
-  const participants = useMemo(() => {
-    return normalizeParticipants((meeting?.participants ?? []) as unknown as MeetingParticipantRaw[]);
-  }, [meeting]);
-
   const joined = useMemo(() => {
     const list: MeetingParticipant[] = [];
 
@@ -547,9 +757,9 @@ export const MeetingRoom: React.FC = () => {
         avatarUrl: user.avatarUrl,
         participantRole: rosterSelf?.participantRole || (meeting?.createdBy === user.userId ? 'HOST' : 'MEMBER'),
         participantStatus: 'JOINED',
-        canSendAudio: true,
-        canSendVideo: true,
-        canShareScreen: true,
+        canSendAudio: micOn,
+        canSendVideo: cameraOn,
+        canShareScreen: false,
         canUseChat: true,
       });
     }
@@ -566,18 +776,18 @@ export const MeetingRoom: React.FC = () => {
           participantStatus: 'JOINED',
           canSendAudio: peer.audioEnabled,
           canSendVideo: peer.videoEnabled,
-          canShareScreen: peer.screenSharing,
+          canShareScreen: false,
           canUseChat: true,
         });
       }
     }
 
     return list;
-  }, [user, meeting, participants, rtc.peers]);
+  }, [user, meeting, participants, rtc.peers, micOn, cameraOn]);
 
   if (loading) {
     return (
-      <div className="min-h-screen space-y-4 bg-background p-6">
+      <div className="min-h-dvh space-y-4 bg-background p-6">
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-[420px] w-full" />
       </div>
@@ -586,7 +796,7 @@ export const MeetingRoom: React.FC = () => {
 
   if (error || !meeting) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background p-6 text-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background p-6 text-center">
         <p className="text-sm text-destructive">{parseApiError(error).message}</p>
         <Button variant="outline" onClick={() => navigate('/meetings')}>
           Back to meetings
@@ -595,10 +805,8 @@ export const MeetingRoom: React.FC = () => {
     );
   }
 
-  const activeScreenSharePeer = Object.values(rtc.peers).find((p) => p.screenSharing && p.stream);
-
   return (
-    <div className="flex h-screen max-h-screen flex-col bg-background text-foreground overflow-hidden">
+    <div className="flex h-dvh max-h-dvh flex-col bg-background text-foreground overflow-hidden">
       {/* Toast alert */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-md bg-slate-900 text-white px-4 py-2 text-xs font-semibold shadow-xl flex items-center gap-2">
@@ -613,41 +821,43 @@ export const MeetingRoom: React.FC = () => {
         connectedCount={joined.length}
         copied={copied}
         onCopyLink={handleShare}
+        onOpenParticipants={toggleParticipantsPanel}
+        isParticipantsOpen={panel === 'people'}
+        raisedHands={raisedHands}
+        currentUserId={user?.userId}
+        canManage={canManage}
+        onLowerHand={handleLowerHand}
       />
 
       {/* Main Content: Video Stage on the Left, Collapsible Sidebar on the Right */}
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row overflow-hidden relative">
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col transition-all duration-300 ease-in-out">
+      <div className="flex min-h-0 flex-1 flex-row overflow-hidden relative">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col transition-all duration-300 ease-in-out bg-background">
           <MeetingVideoStage
-            screenStream={rtc.screenStream}
-            activeScreenSharePeer={activeScreenSharePeer}
-            onStopScreenShare={rtc.stopScreenShare}
             participants={joined}
             currentUserId={user?.userId}
-            handRaised={handRaised}
             localStream={rtc.localStream}
             peers={rtc.peers}
-            layoutMode={layoutMode}
             getParticipantDisplayName={getParticipantDisplayName}
             getParticipantAvatar={getParticipantAvatar}
             speakerMuted={!speakerOn}
             selectedSpeaker={selectedSpeaker}
             localCameraOn={cameraOn}
             localMicOn={micOn}
+            onOpenParticipants={toggleParticipantsPanel}
           />
         </div>
 
-        {/* Collapsible Aside Panel with dynamic scale & slide from/to right */}
+        {/* Collapsible Aside Panel with smooth horizontal slide & un-shrink */}
         <div
           className={cn(
-            "overflow-hidden transition-all duration-300 ease-in-out flex flex-col shrink-0 origin-right border-border",
+            "overflow-hidden transition-all duration-300 ease-in-out flex flex-col shrink-0 border-l z-20 bg-card shadow-xs",
             panel
-              ? "w-full lg:w-96 opacity-100 scale-100 translate-x-0 border-t lg:border-t-0 lg:border-l"
-              : "w-0 lg:w-0 max-h-0 lg:max-h-none opacity-0 scale-95 translate-x-12 pointer-events-none border-0"
+              ? "w-80 md:w-96 opacity-100 translate-x-0 border-border/80"
+              : "w-0 opacity-0 translate-x-10 pointer-events-none border-transparent"
           )}
         >
           {renderedPanel && (
-            <div className="w-full lg:w-96 h-full min-h-0 flex flex-col shrink-0">
+            <div className="w-80 md:w-96 h-full min-h-0 flex flex-col shrink-0">
               <MeetingSidebar
                 panel={renderedPanel}
                 onSetPanel={handleSetPanel}
@@ -658,7 +868,6 @@ export const MeetingRoom: React.FC = () => {
                 onEditParticipant={setEditing}
                 currentUserId={user?.userId}
                 currentUserName={user?.userName}
-                activeScreenShareUserId={activeScreenSharePeer?.userId}
                 localMicOn={micOn}
                 peers={rtc.peers}
                 onToggleMuteParticipant={(participant) => {
@@ -680,19 +889,6 @@ export const MeetingRoom: React.FC = () => {
                     },
                   ]);
                   showToast(`${participant.userName || 'Participant'} ${currentAudio ? 'muted' : 'unmuted'}`);
-                }}
-                onEndParticipantScreenShare={(userId) => {
-                  const target = participants.find((p) => p.userId === userId) || joined.find((p) => p.userId === userId);
-                  savePermissions.mutate([
-                    userId,
-                    {
-                      canSendAudio: target?.canSendAudio ?? true,
-                      canSendVideo: target?.canSendVideo ?? true,
-                      canShareScreen: false,
-                      canUseChat: target?.canUseChat ?? true,
-                    },
-                  ]);
-                  showToast(`Ended screen share for ${target?.userName || 'participant'}`);
                 }}
                 onRemoveParticipant={(userId) => {
                   const target = participants.find((p) => p.userId === userId) || joined.find((p) => p.userId === userId);
@@ -725,6 +921,10 @@ export const MeetingRoom: React.FC = () => {
                 onCreatePoll={handleCreatePoll}
                 onVotePoll={handleVotePoll}
                 onClosePoll={handleClosePoll}
+                chatMessages={chatMessages}
+                setChatMessages={setChatMessages}
+                raisedHands={raisedHands}
+                onLowerHand={handleLowerHand}
               />
             </div>
           )}
@@ -734,21 +934,17 @@ export const MeetingRoom: React.FC = () => {
       {/* Bottom Controls Toolbar Dock */}
       <MeetingControls
         localStream={rtc.localStream}
-        isRecording={isRecording}
-        onToggleRecording={() => setIsRecording(!isRecording)}
+        isRecording={recorder.isRecording}
+        onToggleRecording={handleToggleRecording}
+        recordingStage={recorder.stage}
+        recordingElapsedMs={recordingElapsedMs}
         showRecordModal={showRecordModal}
         setShowRecordModal={setShowRecordModal}
         aiSummaryEnabled={aiSummaryEnabled}
         setAiSummaryEnabled={setAiSummaryEnabled}
         canManage={canManage}
         micOn={micOn}
-        onToggleMic={() => {
-          setMicOn((on) => {
-            const next = !on;
-            rtc.setAudioEnabled(next);
-            return next;
-          });
-        }}
+        onToggleMic={handleToggleMic}
         audioInputs={audioInputs}
         selectedMic={selectedMic}
         onSelectMic={(deviceId) => {
@@ -756,18 +952,7 @@ export const MeetingRoom: React.FC = () => {
           void rtc.switchMicrophone(deviceId);
         }}
         speakerOn={speakerOn}
-        onToggleSpeaker={() => {
-          setSpeakerOn((on) => {
-            const next = !on;
-            const mediaElements = Array.from(document.querySelectorAll<HTMLMediaElement>('video, audio'));
-            for (const el of mediaElements) {
-              if (el.dataset.isLocal !== 'true') {
-                el.muted = !next;
-              }
-            }
-            return next;
-          });
-        }}
+        onToggleSpeaker={handleToggleSpeaker}
         audioOutputs={audioOutputs}
         selectedSpeaker={selectedSpeaker}
         onSelectSpeaker={async (deviceId) => {
@@ -786,45 +971,20 @@ export const MeetingRoom: React.FC = () => {
           }
         }}
         cameraOn={cameraOn}
-        onToggleCamera={() => {
-          setCameraOn((on) => {
-            const next = !on;
-            rtc.setVideoEnabled(next);
-            return next;
-          });
-        }}
+        onToggleCamera={handleToggleCamera}
         videoInputs={videoInputs}
         selectedCamera={selectedCamera}
         onSelectCamera={(deviceId) => {
           setSelectedCamera(deviceId);
           void rtc.switchCamera(deviceId);
         }}
-        isScreenSharing={rtc.isScreenSharing}
-        onToggleScreenShare={async () => {
-          if (rtc.isScreenSharing) {
-            rtc.stopScreenShare();
-            return;
-          }
-          if (activeScreenSharePeer) {
-            const presenterName = getParticipantDisplayName({ userId: activeScreenSharePeer.userId });
-            showToast(`${presenterName} is already sharing screen. Ask them to stop.`);
-            return;
-          }
-          if (me && !me.canShareScreen && !canManage) {
-            showToast('Only host can share screen');
-            return;
-          }
-          await rtc.startScreenShare();
-        }}
-        handRaised={handRaised}
-        onToggleHandRaise={() => setHandRaised(!handRaised)}
+        handRaised={isMyHandRaised}
+        onToggleHandRaise={handleToggleHandRaise}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
         onLeaveClick={() => setShowLeaveModal(true)}
         panel={panel}
         onSelectPanel={handleSetPanel}
-        layoutMode={layoutMode}
-        onSelectLayoutMode={setLayoutMode}
         showSettingsModal={showSettingsModal}
         setShowSettingsModal={setShowSettingsModal}
       />
@@ -857,6 +1017,16 @@ export const MeetingRoom: React.FC = () => {
           onSave={async (participantId, permissions) => {
             await savePermissions.mutateAsync([participantId, permissions]);
           }}
+        />
+      )}
+
+      {/* AI Summary: only meaningful once a recording has been uploaded. */}
+      {(recorder.stage !== 'idle' || recorder.summary || recorder.transcript) && (
+        <MeetingAiSummaryCard
+          stage={recorder.stage}
+          error={recorder.error}
+          summary={recorder.summary}
+          transcript={recorder.transcript}
         />
       )}
     </div>

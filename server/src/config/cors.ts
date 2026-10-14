@@ -26,7 +26,16 @@ export const corsOptions: CorsOptions = {
     }
 
     if (Array.isArray(allowed)) {
-      if (allowed.includes(requestOrigin) || env.NODE_ENV === 'development') {
+      if (allowed.includes(requestOrigin)) {
+        return callback(null, true);
+      }
+      // In development, automatically allow requests from local network IPs (e.g. mobile devices on Wi-Fi)
+      if (
+        env.NODE_ENV !== 'production' &&
+        /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(
+          requestOrigin
+        )
+      ) {
         return callback(null, true);
       }
       return callback(new Error(`Origin '${requestOrigin}' not allowed by CORS`));
@@ -37,4 +46,34 @@ export const corsOptions: CorsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+export const socketCorsOptions = {
+  origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    const allowed = parseAllowedOrigins();
+
+    // Socket handshakes from browsers must provide an origin header matching allowed origins
+    if (requestOrigin && Array.isArray(allowed)) {
+      if (allowed.includes(requestOrigin)) {
+        return callback(null, true);
+      }
+      if (
+        env.NODE_ENV !== 'production' &&
+        /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(
+          requestOrigin
+        )
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Socket origin '${requestOrigin}' not allowed`));
+    }
+
+    // In non-browser contexts (e.g., tests, dev tools) without origin header in non-prod
+    if (!requestOrigin && env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Origin header required for Socket.io connections'));
+  },
+  credentials: true
 };

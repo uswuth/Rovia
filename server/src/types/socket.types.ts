@@ -22,11 +22,13 @@ export interface ServerToClientEvents {
   'meeting:ended'?: (data: { meetingId: string }) => void;
   'meeting:typing'?: (data: { userId: string; userName: string; isTyping: boolean }) => void;
   'meeting:poll-updated'?: (data: { meetingId: string }) => void;
+  'meeting:question-updated'?: (data: { meetingId: string }) => void;
   'meeting:participant-updated'?: (data: {
     meetingId: string;
     participantId: string;
     permissions?: Record<string, boolean>;
   }) => void;
+  'meeting:hands-updated'?: (data: { hands: RaisedHand[] }) => void;
   'webrtc:offer': (data: MeetingSignalPayload) => void;
   'webrtc:answer': (data: MeetingSignalPayload) => void;
   'webrtc:ice': (data: MeetingSignalPayload) => void;
@@ -34,6 +36,12 @@ export interface ServerToClientEvents {
 
 // Minimal structural shapes: the server never inspects SDP or ICE, it only
 // relays them, so these stay open rather than depending on DOM lib types.
+export interface RaisedHand {
+  userId: string;
+  userName?: string;
+  raisedAt: number;
+}
+
 export interface RTCSessionDescriptionInitLike {
   type?: string;
   sdp?: string;
@@ -52,6 +60,8 @@ export interface ClientToServerEvents {
   'meeting:leave': (meetingId: string) => void;
   'meeting:end'?: (meetingId: string) => void;
   'meeting:state': (payload: { meetingId: string; state: Record<string, boolean | string> }) => void;
+  'meeting:hand-raise'?: (payload: { meetingId: string; raised: boolean; userName?: string }) => void;
+  'meeting:hand-lower'?: (payload: { meetingId: string; userId?: string }) => void;
   'meeting:typing'?: (payload: { meetingId: string; isTyping: boolean; userName?: string }) => void;
   'meeting:message': (
     payload: { meetingId: string; text: string },

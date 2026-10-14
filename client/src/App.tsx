@@ -40,9 +40,9 @@ const TaskView = lazy(() => import('@/pages/tasks/TaskView').then((m) => ({ defa
 
 const SuspenseFallback = () => (
 
-  <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
+  <div className="min-h-dvh flex items-center justify-center bg-background text-muted-foreground">
     <div className="flex items-center gap-2 text-xs font-medium">
-      <div className="h-4 w-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+      <div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       <span>Loading...</span>
     </div>
   </div>
@@ -52,7 +52,7 @@ const ProtectedRoute = () => {
   const { isAuthenticated, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
+      <div className="min-h-dvh flex items-center justify-center bg-background text-muted-foreground">
         <div className="flex items-center gap-2 text-xs font-medium">
           <div className="h-4 w-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
           <span>Loading IntellMeet…</span>
@@ -86,7 +86,7 @@ const MeetingRoomRoute = () => {
   const { isAuthenticated, loading } = useAuth();
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-dvh items-center justify-center bg-background">
         <span className="text-xs text-muted-foreground">Loading…</span>
       </div>
     );
@@ -155,7 +155,7 @@ const App = () => (
                         <Route path="/organization/members/:id/profile" element={<UserProfile />} />
                         <Route path="/organization/members/:id/edit" element={<CreateOrgMember />} />
                         <Route path="/organization/work-roles" element={<OrgWorkRoles />} />
-                        <Route path="/organization/job-titles" element={<Navigate to="/organization/work-roles" replace />} />
+                        
                         <Route path="/organization/job-roles" element={<Navigate to="/organization/work-roles" replace />} />
                         <Route path="/projects" element={<Projects />} />
                         <Route path="/projects/new" element={<CreateProject />} />

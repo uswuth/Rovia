@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CodeBadge } from '@/components/ui/CodeBadge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { GroupedAvatars } from '@/components/members/GroupedAvatars';
 import type { Column } from '@/components/ui/data-table';
@@ -58,17 +59,19 @@ export const getTaskColumns = ({
         const code = (t.taskCode as string) || (t.task_code as string) || (taskIdStr ? `TSK-${taskIdStr.slice(-4).toUpperCase()}` : 'TSK-N/A');
         const navId = ((t.taskCode || t.task_code || taskIdStr) as string) || '';
         return (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (navId) navigate(`/tasks/${navId}`);
-            }}
-            className="font-mono text-xs font-bold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm hover:bg-emerald-500/20 cursor-pointer transition-colors"
-            title="View Task"
-          >
-            {code}
-          </button>
+          <CodeBadge
+            code={code}
+            fallback="TSK-N/A"
+            onClick={
+              navId
+                ? (e) => {
+                    e.stopPropagation();
+                    navigate(`/tasks/${navId}`);
+                  }
+                : undefined
+            }
+            title={navId ? 'View Task' : undefined}
+          />
         );
       },
     },
@@ -88,7 +91,7 @@ export const getTaskColumns = ({
               e.stopPropagation();
               if (navId) navigate(`/tasks/${navId}`);
             }}
-            className="font-semibold text-foreground text-sm leading-snug hover:text-emerald-500 hover:underline cursor-pointer text-left block line-clamp-2"
+            className="font-semibold text-foreground text-sm leading-snug hover:text-primary hover:underline cursor-pointer text-left block line-clamp-2"
             title="View Task Details"
           >
             {title}
@@ -144,7 +147,7 @@ export const getTaskColumns = ({
         return (
           <div className="flex flex-col gap-1 text-xs">
             {projName && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium w-fit max-w-[180px] truncate" title={projName}>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-primary/10 text-primary border border-primary/20 font-medium w-fit max-w-[180px] truncate" title={projName}>
                 <FolderGit2 size={12} className="shrink-0" />
                 <span className="truncate">{projName}</span>
               </span>
@@ -222,7 +225,7 @@ export const getTaskColumns = ({
                     e.stopPropagation();
                     navigate(profilePath);
                   }}
-                  className="font-medium text-foreground text-xs leading-tight hover:text-emerald-500 hover:underline cursor-pointer text-left truncate block max-w-[120px]"
+                  className="font-medium text-foreground text-xs leading-tight hover:text-primary hover:underline cursor-pointer text-left truncate block max-w-[120px]"
                   title={`View ${name}'s profile`}
                 >
                   {name}

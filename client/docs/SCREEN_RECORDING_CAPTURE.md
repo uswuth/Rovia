@@ -21,9 +21,13 @@ Test environment: **Chromium 148 / Google Chrome 148, Windows**.
 Recommended server constants:
 
 ```text
-MAX_RECORDING_DURATION_MS = 60_000
-MAX_RECORDING_SIZE_BYTES   = 25_678_900   // 25 MB — ~6 min of headroom over the 60s cap
+MAX_RECORDING_SIZE_BYTES = 1_073_741_824   // 1 GiB
 ```
+
+The duration cap was removed: a one-hour meeting is ordinary input, and at the
+measured 3.9 MB/minute an hour is roughly 235 MB, so the size ceiling is what
+actually bounds a recording. Whisper never sees this file — the server demuxes
+it to silence-trimmed 16 kHz mono FLAC chunks before transcription.
 
 `MAX_RECORDING_SIZE_BYTES` is a **policy limit, not a trust boundary**. A client can
 send any `Content-Length` it likes. `complete()` must treat

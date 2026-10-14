@@ -151,34 +151,11 @@ services:
     networks:
       - intellmeet-network
 
-  # ── Local AI pipeline ─────────────────────────────────────────────────────
-  # Both run entirely on the developer machine: no API keys, no per-minute
-  # billing, and no meeting audio leaves the host.
-  whisper:
-    build:
-      context: ./docker/whisper
-      dockerfile: Dockerfile
-    container_name: intellmeet-whisper
-    restart: unless-stopped
-    profiles: ["ai"]
-    environment:
-      WHISPER_MODEL: ${WHISPER_MODEL:-tiny}
-      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
-      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
-    volumes:
-      - whisper-model:/root/.cache
-    networks:
-      - intellmeet-network
-
-  ollama:
-    image: ollama/ollama:latest
-    container_name: intellmeet-ollama
-    restart: unless-stopped
-    profiles: ["ai"]
-    volumes:
-      - ollama-models:/root/.ollama
-    networks:
-      - intellmeet-network
+  # ── AI pipeline ───────────────────────────────────────────────────────────
+  # Transcription and summarisation run through hosted providers (Groq and
+  # OpenRouter free tiers) from the server process, so there is nothing to
+  # schedule here and no model weights are downloaded to this host. Configure
+  # GROQ_API_KEY and OPENROUTER_API_KEY in server/.env instead.
 
   # Optional MongoDB web UI, connects to the Atlas cluster over the SRV URI.
   #   docker compose --profile tools run --rm mongosh

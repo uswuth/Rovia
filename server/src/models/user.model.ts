@@ -86,7 +86,7 @@ export class UserClass {
   @prop({
     type: () => String,
     required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters'],
+    minlength: [8, 'Password must be at least 8 characters'],
     select: false
   })
   public password!: string;
@@ -122,6 +122,26 @@ export class UserClass {
     this.user_status = val;
   }
 
+
+  @prop({ type: () => Number, default: 0, alias: 'failedLoginAttempts' })
+  public failed_login_attempts!: number;
+
+  public get failedLoginAttempts(): number {
+    return this.failed_login_attempts;
+  }
+  public set failedLoginAttempts(val: number) {
+    this.failed_login_attempts = val;
+  }
+
+  @prop({ type: () => Date, default: null, alias: 'lockedUntil' })
+  public locked_until?: Date | null;
+
+  public get lockedUntil(): Date | null | undefined {
+    return this.locked_until;
+  }
+  public set lockedUntil(val: Date | null | undefined) {
+    this.locked_until = val;
+  }
 
   @prop({ type: () => Boolean, default: false, alias: 'isSuperAdmin' })
   public is_super_admin!: boolean;

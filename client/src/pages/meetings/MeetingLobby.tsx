@@ -23,6 +23,7 @@ import { previewMeetingByJoinCode, joinMeeting } from '@/api/meeting/meeting.api
 import type { MeetingPreview } from '@/api/meeting/meeting.types';
 import { parseApiError } from '@/utils/apiError';
 import { shareOrCopy } from '@/lib/share';
+import { formatDurationHuman } from '@/utils/duration';
 
 const getCleanDeviceLabel = (
   device: MediaDeviceInfo | undefined,
@@ -155,8 +156,8 @@ export const MeetingLobby: React.FC = () => {
 
       const audioConstraint = buildAudioConstraints(micId);
       const videoConstraint: boolean | MediaTrackConstraints = camId
-        ? { deviceId: { exact: camId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        : { width: { ideal: 1280 }, height: { ideal: 720 } };
+        ? { deviceId: { exact: camId }, width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 30, max: 30 } }
+        : { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 30, max: 30 } };
 
       const userMedia = await navigator.mediaDevices.getUserMedia({
         video: videoConstraint,
@@ -355,7 +356,7 @@ export const MeetingLobby: React.FC = () => {
   }, [preview, user]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-emerald-500/20">
+    <div className="flex min-h-dvh flex-col bg-background text-foreground selection:bg-emerald-500/20">
       {/* Header bar */}
       <header className="flex h-14 items-center justify-between border-b border-border/80 px-6 bg-background">
         <div className="flex items-center gap-3">
@@ -394,7 +395,7 @@ export const MeetingLobby: React.FC = () => {
       <main className="flex flex-1 items-center justify-center p-6 sm:p-10">
         {loading ? (
           <div className="flex flex-col items-center gap-3 text-center">
-            <div className="size-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+            <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <p className="text-xs text-muted-foreground">Connecting to meeting lobby...</p>
           </div>
         ) : error || !preview ? (
@@ -514,7 +515,7 @@ export const MeetingLobby: React.FC = () => {
                   <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2.5 py-1 backdrop-blur-xs">
                     <span className="text-[10px] text-slate-300 font-medium">Mic</span>
                     <div className="h-1.5 w-10 overflow-hidden rounded-full bg-slate-700">
-                      <div className="h-full bg-emerald-400 transition-all duration-75" style={{ width: `${audioLevel}%` }} />
+                      <div className="h-full bg-primary transition-all duration-75" style={{ width: `${audioLevel}%` }} />
                     </div>
                   </div>
                 )}
@@ -524,7 +525,7 @@ export const MeetingLobby: React.FC = () => {
               {showDeviceSettings && (
                 <div className="border-t border-b border-border/80 py-4 my-1 space-y-3 text-xs">
                   <div className="font-bold text-foreground flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                    <Settings2 size={13} className="text-emerald-500" />
+                    <Settings2 size={13} className="text-primary" />
                     <span>Audio & Video Devices</span>
                   </div>
 
@@ -618,7 +619,7 @@ export const MeetingLobby: React.FC = () => {
               )}
 
               <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
-                <ShieldCheck size={14} className="text-emerald-500 shrink-0" />
+                <ShieldCheck size={14} className="text-primary shrink-0" />
                 <span>Devices previewed locally before entering.</span>
               </div>
             </div>
@@ -627,7 +628,7 @@ export const MeetingLobby: React.FC = () => {
             <div className="flex flex-col gap-5 lg:col-span-5 py-1">
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-xs font-mono font-bold text-primary">
                     Meeting Session
                   </span>
 
@@ -657,7 +658,7 @@ export const MeetingLobby: React.FC = () => {
               <div className="space-y-2 text-xs border-t border-b border-border/80 py-3 text-muted-foreground">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 font-medium">
-                    <Calendar size={14} className="text-emerald-500" />
+                    <Calendar size={14} className="text-primary" />
                     Scheduled At:
                   </span>
                   <span className="font-semibold text-foreground">
@@ -667,11 +668,11 @@ export const MeetingLobby: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 font-medium">
-                    <Clock size={14} className="text-emerald-500" />
+                    <Clock size={14} className="text-primary" />
                     Duration:
                   </span>
                   <span className="font-semibold text-foreground">
-                    {preview.meetingDurationMinutes} minutes
+                    {formatDurationHuman(preview.meetingDurationMinutes)}
                   </span>
                 </div>
               </div>

@@ -40,8 +40,11 @@ const resolveSecret = (name: string): string | undefined =>
 const rawMongoUri = resolveSecret('MONGO_URI') ?? resolveSecret('MONGODB_URI');
 const accessSecret = resolveSecret('JWT_ACCESS_SECRET');
 const refreshSecret = resolveSecret('JWT_REFRESH_SECRET');
+const rootSharedSecret = resolveSecret('ROOT_SHARED_SECRET');
+const serverAdminInitialPassword = resolveSecret('SERVER_ADMIN_INITIAL_PASSWORD');
 const s3AccessKeyId = resolveSecret('AWS_ACCESS_KEY_ID');
 const s3SecretKey = resolveSecret('AWS_SECRET_ACCESS_KEY');
+const s3Bucket = resolveSecret('AWS_S3_BUCKET') || process.env.AWS_S3_BUCKET;
 
 // Non-secret settings are the only ones allowed a default value.
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -52,6 +55,11 @@ const validateEnv = (): void => {
   if (!rawMongoUri) missing.push('MONGO_URI (or MONGO_URI_FILE / MONGODB_URI)');
   if (!accessSecret) missing.push('JWT_ACCESS_SECRET (or JWT_ACCESS_SECRET_FILE)');
   if (!refreshSecret) missing.push('JWT_REFRESH_SECRET (or JWT_REFRESH_SECRET_FILE)');
+  if (!rootSharedSecret) missing.push('ROOT_SHARED_SECRET (or ROOT_SHARED_SECRET_FILE)');
+
+  if (isProduction && !s3Bucket) {
+    missing.push('AWS_S3_BUCKET (or AWS_S3_BUCKET_FILE)');
+  }
 
   if (missing.length > 0) {
     console.error(
@@ -86,6 +94,8 @@ export const env: Readonly<EnvConfig> = Object.freeze({
   JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY || '8h',
   JWT_REFRESH_SECRET: refreshSecret as string,
   JWT_REFRESH_EXPIRY: process.env.JWT_REFRESH_EXPIRY || '7d',
+  ROOT_SHARED_SECRET: rootSharedSecret as string,
+  SERVER_ADMIN_INITIAL_PASSWORD: serverAdminInitialPassword,
   // Non-secret S3 settings may have defaults. The credentials may not: they go
   // through resolveSecret so a missing value fails loudly instead of signing
   // with a publicly known key.
@@ -99,17 +109,33 @@ export const env: Readonly<EnvConfig> = Object.freeze({
   AWS_SECRET_ACCESS_KEY: s3SecretKey,
   AWS_S3_BUCKET: process.env.AWS_S3_BUCKET || 'intellmeet-bucket',
 
-  // ── Local AI pipeline (self-hosted, no third-party API keys) ──────────────
-  // Defaults are deliberately the smallest useful models so the pipeline runs
-  // on a modest laptop CPU. Raise these only on a machine with headroom.
+  // ── AI pipeline ───────────────────────────────────────────────────────────
+  // Transcription and summarisation are hosted (Groq and OpenRouter free tiers),
+  // so no model weights are downloaded and no AI container runs on this host.
+  // FFmpeg still runs locally: it normalises the stored recording into the
+  // 16 kHz mono WAV that the transcriber expects.
   FFMPEG_PATH: process.env.FFMPEG_PATH || 'ffmpeg',
-  // Internal URL used by the server itself.
-  WHISPER_BASE_URL: process.env.WHISPER_BASE_URL || 'http://whisper:9000',
-  // "tiny" ~75 MB, "base" ~145 MB. "small" and above are not laptop-friendly.
-  WHISPER_MODEL: process.env.WHISPER_MODEL || 'tiny',
-  WHISPER_TIMEOUT_MS: parseInt(process.env.WHISPER_TIMEOUT_MS || '300000', 10),
-  OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || 'http://ollama:11434',
-  // 0.5b ~400 MB. 3b is ~2 GB and noticeably slower on CPU.
-  OLLAMA_MODEL: process.env.OLLAMA_MODEL || 'qwen2.5:0.5b-instruct',
-  OLLAMA_TIMEOUT_MS: parseInt(process.env.OLLAMA_TIMEOUT_MS || '180000', 10)
+
+  // Same rule as every other secret: resolved from <NAME>_FILE then <NAME>, and
+  // deliberately NOT validated at boot. The AI pipeline is opt-in, so a missing
+  // key must not stop the whole server; the adapters fail loudly with a 503 only
+  // when someone actually asks for a transcript or summary.
+  GROQ_API_KEY: resolveSecret('GROQ_API_KEY'),
+  GROQ_BASE_URL: process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
+  GROQ_TRANSCRIBE_MODEL: process.env.GROQ_TRANSCRIBE_MODEL || 'whisper-large-v3',
+  // An hour-long meeting is far past the default request timeout.
+  GROQ_TIMEOUT_MS: parseInt(process.env.GROQ_TIMEOUT_MS || '600000', 10),
+  OPENROUTER_API_KEY: resolveSecret('OPENROUTER_API_KEY'),
+  OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+  // A free text model. Audio is not available on the free tier, so the
+  // transcript always comes from GROQ_API_KEY and only text goes here.
+  OPENROUTER_SUMMARY_MODEL: process.env.OPENROUTER_SUMMARY_MODEL || 'nvidia/nemotron-3-super-120b-a12b:free',
+  // Tried in order when the primary model is rate-limited or answers unusably.
+  // Verified to honour response_format json_object, which weaker free models do not.
+  OPENROUTER_FALLBACK_MODELS: (process.env.OPENROUTER_FALLBACK_MODELS ??
+    'nvidia/nemotron-3-ultra-550b-a55b:free,poolside/laguna-s-2.1:free,liquid/lfm-2.5-2.6b:free')
+    .split(',')
+    .map((model) => model.trim())
+    .filter((model) => model.length > 0),
+  OPENROUTER_TIMEOUT_MS: parseInt(process.env.OPENROUTER_TIMEOUT_MS || '180000', 10)
 });

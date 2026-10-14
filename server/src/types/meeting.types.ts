@@ -23,6 +23,8 @@ export interface ICreateMeetingInput {
   meetingParticipantLimit?: number;
   /** Must all be members or hosts of the organization. */
   participantIds?: string[];
+  /** Optional map of userId -> role (HOST | MEMBER) */
+  participantRoles?: Record<string, MeetingParticipantRole>;
 }
 
 export interface IMeetingListQuery extends Record<string, unknown> {

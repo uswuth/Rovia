@@ -171,7 +171,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
               >
                 <Bell size={18} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white shadow-none">
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground shadow-none">
                     {unreadCount}
                   </span>
                 )}
@@ -182,10 +182,10 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                 <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50 rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-0 space-y-0 overflow-hidden animate-in fade-in-0 zoom-in-95">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
                     <div className="flex items-center gap-2">
-                      <Bell size={15} className="text-emerald-500" />
+                      <Bell size={15} className="text-primary" />
                       <span className="text-xs font-bold text-foreground">Notifications</span>
                       {unreadCount > 0 && (
-                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary border border-primary/30">
                           {unreadCount} new
                         </span>
                       )}
@@ -193,7 +193,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                     {unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllRead}
-                        className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
+                        className="text-[11px] font-medium text-primary hover:underline cursor-pointer flex items-center gap-1"
                       >
                         <CheckCheck size={13} />
                         Mark all read
@@ -205,10 +205,10 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                     {notificationsList.map((item) => (
                       <div
                         key={item.id}
-                        className={`p-3.5 flex gap-3 transition-colors hover:bg-muted/50 ${item.unread ? 'bg-emerald-500/[0.03]' : ''
+                        className={`p-3.5 flex gap-3 transition-colors hover:bg-muted/50 ${item.unread ? 'bg-primary/[0.04]' : ''
                           }`}
                       >
-                        <div className="flex shrink-0 items-center justify-center text-emerald-600 dark:text-emerald-400 pt-0.5">
+                        <div className="flex shrink-0 items-center justify-center text-primary pt-0.5">
                           {item.type === 'meeting' ? <Video size={16} /> : item.type === 'ai' ? <Sparkles size={16} /> : <Bell size={16} />}
                         </div>
                         <div className="min-w-0 flex-1">

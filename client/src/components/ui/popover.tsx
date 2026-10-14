@@ -9,7 +9,7 @@ interface PopoverContextType {
 
 const PopoverContext = React.createContext<PopoverContextType>({
   open: false,
-  setOpen: () => {},
+  setOpen: () => { },
 })
 
 export function Popover({
@@ -167,11 +167,11 @@ export function PopoverContent({
         side === "top"
           ? { marginBottom: `${sideOffset}px` }
           : side === "bottom"
-          ? { marginTop: `${sideOffset}px` }
-          : undefined
+            ? { marginTop: `${sideOffset}px` }
+            : undefined
       }
       className={cn(
-        "absolute z-50 rounded-lg border border-border bg-card p-3 text-card-foreground shadow-xl outline-none animate-in fade-in-0 zoom-in-95",
+        "absolute z-50 rounded-xs border border-border bg-card p-3 text-card-foreground shadow-xl outline-none animate-in fade-in-0 zoom-in-95",
         sideClasses[side] || sideClasses.bottom,
         alignClasses[align],
         className

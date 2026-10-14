@@ -61,7 +61,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-7 rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground focus:outline-hidden focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+              className="h-7 rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary cursor-pointer"
             >
               {pageSizeOptions.map((size) => (
                 <option key={size} value={size}>
@@ -88,7 +88,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             onChange={(e) => setInputPage(e.target.value)}
             onBlur={handlePageSubmit}
             onKeyDown={handleKeyDown}
-            className="w-10 h-7 text-center rounded-md border border-border bg-background text-xs font-semibold text-foreground focus:outline-hidden focus:ring-1 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="w-10 h-7 text-center rounded-md border border-border bg-background text-xs font-semibold text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           <span>of <strong className="text-foreground">{maxPages}</strong></span>
         </div>

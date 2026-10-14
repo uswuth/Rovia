@@ -23,7 +23,6 @@ import {
   getAllUsersAdminApi,
 } from '@/api/organization/organization.api';
 import { getWorkRolesApi } from '@/api/work-roles/work-roles.api';
-import { getJobTitles } from '@/api/job-title/job-title.api';
 import { parseApiError } from '@/utils/apiError';
 import { extractApiItems } from '@/utils/apiResponse';
 
@@ -94,20 +93,14 @@ export const CreateOrgMember: React.FC = () => {
     let isMounted = true;
     const loadJobTitles = async () => {
       try {
-        const [wrRes, jtRes] = await Promise.allSettled([getWorkRolesApi(), getJobTitles()]);
+        const wrRes = await Promise.allSettled([getWorkRolesApi()]);
         if (!isMounted) return;
 
         const titlesSet = new Set<string>();
 
-        if (wrRes.status === 'fulfilled') {
-          extractApiItems<Record<string, string>>(wrRes.value).forEach((r) => {
+        if (wrRes[0].status === 'fulfilled') {
+          extractApiItems<Record<string, string>>(wrRes[0].value).forEach((r) => {
             if (r.roleName) titlesSet.add(r.roleName);
-          });
-        }
-
-        if (jtRes.status === 'fulfilled') {
-          extractApiItems<Record<string, string>>(jtRes.value).forEach((j) => {
-            if (j.title) titlesSet.add(j.title);
           });
         }
 
@@ -210,7 +203,7 @@ export const CreateOrgMember: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
-              <UserPlus size={24} className="text-emerald-500" />
+              <UserPlus size={24} className="text-primary" />
               <span>{isEditMode ? 'Edit Member' : 'Add Member'}</span>
             </h1>
           </div>
@@ -269,7 +262,7 @@ export const CreateOrgMember: React.FC = () => {
               {isTargetSuperAdmin ? (
                 <div className="flex items-center gap-2 h-10 px-3 border border-border/80 bg-muted/30 rounded-md select-none">
                   <span className="font-semibold text-xs text-foreground">SuperAdmin</span>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-sm">
+                  <span className="text-[10px] text-primary font-medium bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-sm">
                     Org Owner (Locked)
                   </span>
                 </div>
@@ -310,7 +303,7 @@ export const CreateOrgMember: React.FC = () => {
               {isTargetSuperAdmin ? (
                 <div className="flex items-center gap-2 h-10 px-3 border border-border/80 bg-muted/30 rounded-md select-none">
                   <span className="font-semibold text-xs text-foreground">Active</span>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-sm">
+                  <span className="text-[10px] text-primary font-medium bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-sm">
                     Locked
                   </span>
                 </div>

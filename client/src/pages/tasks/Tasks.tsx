@@ -273,7 +273,7 @@ export const Tasks: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <CheckSquare className="text-emerald-500 dark:text-emerald-400" size={24} />
+            <CheckSquare className="text-primary" size={24} />
             <span>Tasks & Board</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
@@ -513,7 +513,7 @@ export const Tasks: React.FC = () => {
                                   e.stopPropagation();
                                   navigate(`/tasks/${taskCodeStr}`);
                                 }}
-                                className="font-semibold text-xs text-foreground hover:text-emerald-500 hover:underline leading-snug truncate text-left cursor-pointer flex-1"
+                                className="font-semibold text-xs text-foreground hover:text-primary hover:underline leading-snug truncate text-left cursor-pointer flex-1"
                                 title={`View task: ${taskTitleStr}`}
                               >
                                 {taskTitleStr}
@@ -583,7 +583,7 @@ export const Tasks: React.FC = () => {
                                       e.stopPropagation();
                                       navigate(`/tasks/${taskCodeStr}`);
                                     }}
-                                    className="inline-flex items-center text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer ml-1 whitespace-nowrap"
+                                    className="inline-flex items-center text-[10px] font-bold text-primary hover:underline cursor-pointer ml-1 whitespace-nowrap"
                                   >
                                     ...more
                                   </button>
@@ -599,7 +599,7 @@ export const Tasks: React.FC = () => {
                             <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
                               {projName && (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-secondary text-secondary-foreground text-[10px] font-medium border border-border/50 truncate shrink-0 max-w-[85px]" title={projName}>
-                                  <FolderGit2 size={10} className="text-emerald-500 shrink-0" />
+                                  <FolderGit2 size={10} className="text-primary shrink-0" />
                                   <span className="truncate">{projName}</span>
                                 </span>
                               )}

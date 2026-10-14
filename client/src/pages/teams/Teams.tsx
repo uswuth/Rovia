@@ -112,7 +112,7 @@ export const Teams: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-foreground">
-              <Users size={24} className="text-emerald-500" />
+              <Users size={24} className="text-primary" />
               <span>Teams</span>
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">

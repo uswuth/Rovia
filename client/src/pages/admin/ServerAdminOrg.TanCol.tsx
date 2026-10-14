@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Column } from '@/components/ui/data-table';
 import { Building2, MapPin, Users, ChevronRight } from 'lucide-react';
 

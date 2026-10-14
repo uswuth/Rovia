@@ -7,9 +7,11 @@ import { FormField } from '@/components/ui/form-field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarColorByName } from '@/components/ui/avatar-colors';
 import { getPollStatusTone } from '@/lib/status-tone';
 import { parseApiError } from '@/utils/apiError';
 import { cn } from '@/lib/utils';
+import { useScrollFade } from '@/hooks/useScrollFade';
 import type { MeetingPoll } from '@/api/meeting/meeting-poll.api';
 
 interface PollListProps {
@@ -55,29 +57,37 @@ const PollItem: React.FC<{
       </div>
 
       <ul className="space-y-2">
-        {poll.pollOptions.map((option) => {
-          const pct = totalVotes > 0 ? Math.round((option.voteCount / totalVotes) * 100) : 0;
-          const hasVotedThis = (option.voterIds || []).includes(currentUserId || '');
+        {(() => {
+          const maxVotes = Math.max(0, ...poll.pollOptions.map((o) => o.voteCount));
+          return poll.pollOptions.map((option) => {
+            const pct = totalVotes > 0 ? Math.round((option.voteCount / totalVotes) * 100) : 0;
+            const hasVotedThis = (option.voterIds || []).includes(currentUserId || '');
+            const isLeader = option.voteCount > 0 && option.voteCount === maxVotes;
+            const isTrailing = option.voteCount > 0 && option.voteCount < maxVotes;
 
-          return (
-            <li key={option.optionId} className="space-y-1.5">
-              <button
-                type="button"
-                disabled={poll.pollStatus === 'CLOSED' || pending}
-                onClick={() => onVote(poll.pollId, [option.optionId])}
-                className={cn(
-                  'relative w-full overflow-hidden rounded-xs border text-left p-2.5 transition-all',
-                  poll.pollStatus === 'OPEN' ? 'cursor-pointer hover:border-emerald-500/60' : 'cursor-default opacity-90',
-                  hasVotedThis
-                    ? 'border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-600 dark:text-emerald-300'
-                    : 'border-border bg-muted/30 text-foreground'
-                )}
-              >
-                {/* Background Progress Fill */}
-                <div
-                  className="absolute inset-y-0 left-0 bg-emerald-500/15 -z-0 transition-all duration-300 rounded-xs"
-                  style={{ width: `${pct}%` }}
-                />
+            return (
+              <li key={option.optionId} className="space-y-1.5">
+                <button
+                  type="button"
+                  disabled={poll.pollStatus === 'CLOSED' || pending}
+                  onClick={() => onVote(poll.pollId, [option.optionId])}
+                  className={cn(
+                    'relative w-full overflow-hidden rounded-xs border text-left p-2.5 transition-all',
+                    poll.pollStatus === 'OPEN' ? 'cursor-pointer hover:border-emerald-500/60' : 'cursor-default opacity-90',
+                    hasVotedThis
+                      ? 'border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-600 dark:text-emerald-300'
+                      : 'border-border bg-muted/30 text-foreground'
+                  )}
+                >
+                  {/* Background Progress Fill */}
+                  <div
+                    className={cn(
+                      'absolute inset-y-0 left-0 transition-all duration-300 rounded-xs pointer-events-none',
+                      isLeader && 'bg-emerald-500/20 border-r border-emerald-400/60',
+                      isTrailing && 'bg-zinc-500/25 dark:bg-zinc-700/50 border-r border-zinc-400/50 dark:border-zinc-500/60'
+                    )}
+                    style={{ width: `${pct}%` }}
+                  />
                 <div className="relative z-10 flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1.5 truncate">
                     {hasVotedThis && <Check size={13} className="text-emerald-500 shrink-0" />}
@@ -107,7 +117,7 @@ const PollItem: React.FC<{
                       >
                         <Avatar className="size-3.5 text-[8px]">
                           {vAvatar && <AvatarImage src={vAvatar} alt={vName} />}
-                          <AvatarFallback name={vName} className="font-bold">
+                          <AvatarFallback name={vName} className={cn("font-bold text-[7px]", getAvatarColorByName(vName))}>
                             {vName.charAt(0).toUpperCase() || 'U'}
                           </AvatarFallback>
                         </Avatar>
@@ -119,7 +129,8 @@ const PollItem: React.FC<{
               )}
             </li>
           );
-        })}
+        });
+      })()}
       </ul>
 
       {canManage && poll.pollStatus === 'OPEN' && (
@@ -210,6 +221,7 @@ export const MeetingPolls: React.FC<MeetingPollsProps> = ({
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
   const [localError, setLocalError] = useState<string | null>(null);
+  const scrollFadeRef = useScrollFade<HTMLDivElement>({ size: 32 });
 
   const hasOpenPoll = (polls || []).some((p) => p.pollStatus === 'OPEN');
 
@@ -313,7 +325,7 @@ export const MeetingPolls: React.FC<MeetingPollsProps> = ({
     <div className="flex flex-col h-full min-h-0 space-y-3">
       {headerToolbar}
 
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5 no-scrollbar">
+      <div ref={scrollFadeRef} className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5 no-scrollbar scroll-fade-y">
         {/* One active poll limit rule notice */}
         {canManage && hasOpenPoll && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">

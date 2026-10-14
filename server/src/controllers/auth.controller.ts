@@ -43,7 +43,7 @@ export const loginUser = async (req: Request, res: Response): Promise<Response> 
 };
 
 export const refreshAccessToken = async (req: Request, res: Response): Promise<Response> => {
-  const incomingRefreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+  const incomingRefreshToken = req.cookies?.refreshToken;
 
   const { accessToken, newRefreshToken } = await refreshAccessTokenService(incomingRefreshToken);
 

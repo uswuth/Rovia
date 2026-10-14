@@ -226,7 +226,7 @@ export function DataTable<T>({
                     {/* Resizable handle divider */}
                     <div
                       onMouseDown={(e) => handleMouseDown(e, colKey, col.width)}
-                      className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-emerald-500/60 active:bg-emerald-500 transition-colors z-10"
+                      className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/60 active:bg-primary transition-colors z-10"
                       title="Drag to resize column"
                     />
                   </TableHead>

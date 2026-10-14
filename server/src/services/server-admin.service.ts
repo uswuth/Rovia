@@ -13,14 +13,13 @@ import { Recording } from '../models/recording.model.js';
 import { Summary } from '../models/summary.model.js';
 import { Transcript } from '../models/transcript.model.js';
 import { WorkRole } from '../models/work-role.model.js';
-import { JobTitle } from '../models/job-title.model.js';
+
 import { ApiError } from '../utils/apiError.js';
 import { Ref } from '@typegoose/typegoose';
 import { generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
+import { env } from '../config/env.js';
 
-const ROOT_SHARED_SECRET = 'IntellMeet@RootSecret2026';
-
-export const encryptCredential = (plaintext: string, secret: string = ROOT_SHARED_SECRET): string => {
+export const encryptCredential = (plaintext: string, secret: string = env.ROOT_SHARED_SECRET): string => {
   const iv = crypto.randomBytes(12);
   const key = crypto.createHash('sha256').update(secret).digest();
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
@@ -33,12 +32,17 @@ export const encryptCredential = (plaintext: string, secret: string = ROOT_SHARE
 export const seedInitialServerAdminService = async () => {
   const adminCount = await ServerAdmin.countDocuments();
   if (adminCount === 0) {
+    const initialPassword = env.SERVER_ADMIN_INITIAL_PASSWORD || crypto.randomBytes(16).toString('base64url');
     await ServerAdmin.create({
       username: 'serveradmin',
       email: 'admin@intellmeet.internal',
-      password: 'ServerAdmin@123456'
+      password: initialPassword
     });
-    console.log('[ServerAdmin] Initial server admin account seeded: username: serveradmin');
+    if (!env.SERVER_ADMIN_INITIAL_PASSWORD) {
+      console.log(`[ServerAdmin] Initial server admin seeded. Generated Password: ${initialPassword}`);
+    } else {
+      console.log('[ServerAdmin] Initial server admin account seeded from environment configuration.');
+    }
   }
 };
 
@@ -154,7 +158,9 @@ export const createOrgAndGenerateCredentialsService = async (input: {
   const orgId = new mongoose.Types.ObjectId();
   const userId = new mongoose.Types.ObjectId();
 
-  const generatedPassword = `OrgAdmin@${Math.floor(100000 + Math.random() * 900000)}`;
+  // Generate a cryptographically secure random password meeting complexity rules (upper, lower, digit, special, 16+ chars)
+  const randomEntropy = crypto.randomBytes(12).toString('base64url');
+  const generatedPassword = `OrgAdmin@${randomEntropy}1!`;
   const userCode = await generateSequentialCode(ENTITY_PREFIXES.USER, User, 'user_code');
 
   const orgAdminUser = await User.create({
@@ -190,7 +196,7 @@ export const createOrgAndGenerateCredentialsService = async (input: {
       adminUserId: orgAdminUser._id.toString(),
       adminName: orgAdminUser.user_name,
       adminEmail: orgAdminUser.user_email,
-      encryptedPassword: encryptCredential(generatedPassword),
+      initialPassword: generatedPassword,
       userRole: orgAdminUser.user_role
     }
   };
@@ -240,7 +246,6 @@ export const deleteOrgServerAdminService = async (orgId: string) => {
     Team.deleteMany({ organization_id: orgId }),
     Project.deleteMany({ organization_id: orgId }),
     WorkRole.deleteMany({ organization_id: orgId }),
-    JobTitle.deleteMany({ organization_id: orgId }),
     User.deleteMany({ organization_id: orgId })
   ]);
 

@@ -6,6 +6,7 @@ import {
   MEETING_MAX_DURATION_MINUTES
 } from '../models/meeting.model.js';
 import { Project } from '../models/project.model.js';
+import { Team } from '../models/team.model.js';
 import { User } from '../models/user.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { validateTitle } from '../utils/validation.js';
@@ -63,7 +64,14 @@ export const findScopedMeetingByJoinCode = async (
 };
 
 /** The project's roster: members and hosts, which is the only assignable set. */
-const loadProjectRoster = async (projectIdOrCode: string, organizationId: string): Promise<{ roster: Set<string>; project: import('../models/project.model.js').ProjectDocument }> => {
+const loadProjectRoster = async (
+  projectIdOrCode: string,
+  organizationId: string
+): Promise<{
+  roster: Set<string>;
+  hosts: Set<string>;
+  project: import('../models/project.model.js').ProjectDocument;
+}> => {
   const isMongoId = Types.ObjectId.isValid(projectIdOrCode);
   const project = await Project.findOne({
     $or: [
@@ -81,6 +89,7 @@ const loadProjectRoster = async (projectIdOrCode: string, organizationId: string
       ...project.project_members.map(toObjectIdString),
       ...project.project_hosts.map(toObjectIdString)
     ]),
+    hosts: new Set(project.project_hosts.map(toObjectIdString)),
     project
   };
 };
@@ -152,10 +161,12 @@ export const createMeetingService = async (
 
   let project: import('../models/project.model.js').ProjectDocument | null = null;
   let roster = new Set<string>();
+  let projectHosts = new Set<string>();
 
   if (input.projectId && input.projectId.trim() && input.projectId !== 'NONE') {
     const loaded = await loadProjectRoster(input.projectId, organizationId);
     roster = loaded.roster;
+    projectHosts = loaded.hosts;
     project = loaded.project;
     const projectStatus = (project.project_status || '').toLowerCase();
     if (projectStatus === 'completed' || projectStatus === 'archived') {
@@ -163,19 +174,56 @@ export const createMeetingService = async (
     }
   }
 
-  const creator = await User.findById(userId).lean();
-  const isSuperAdmin = creator?.user_role === 'SuperAdmin' || creator?.is_super_admin === true;
+  let team: import('../models/team.model.js').TeamClass | null = null;
+  let teamHosts = new Set<string>();
 
-  // The creator must belong to the project as a member/host, unless they are a SuperAdmin or it's a general meeting.
-  if (project && !isSuperAdmin && !roster.has(userId)) {
-    throw ApiError.forbidden('Only project members or hosts can create a meeting for this project');
+  if (input.teamId && input.teamId.trim() && input.teamId !== 'NONE') {
+    const isMongoId = Types.ObjectId.isValid(input.teamId);
+    const foundTeam = await Team.findOne({
+      $or: [
+        ...(isMongoId ? [{ _id: input.teamId }] : []),
+        { team_code: input.teamId },
+        { team_code: input.teamId.toUpperCase() }
+      ],
+      organization_id: organizationId
+    });
+    if (!foundTeam) {
+      throw ApiError.notFound('Team not found');
+    }
+    team = foundTeam;
+    teamHosts = new Set((foundTeam.team_hosts || []).map(toObjectIdString));
+  }
+
+  const creator = await User.findById(userId).lean();
+  const creatorRole = (creator?.user_role || '').toUpperCase();
+  const isSuperOrAdmin = Boolean(
+    creator?.is_super_admin === true ||
+    creatorRole === 'SUPERADMIN' ||
+    creatorRole === 'SUPER_ADMIN' ||
+    creatorRole === 'ADMIN'
+  );
+
+  if (!isSuperOrAdmin) {
+    if (team) {
+      const isTeamHost = teamHosts.has(userId);
+      const isParentProjectHost = Boolean(project && projectHosts.has(userId));
+      if (!isTeamHost && !isParentProjectHost) {
+        throw ApiError.forbidden('Only project/team hosts, Admins, or SuperAdmins can create meetings');
+      }
+    } else if (project) {
+      if (!projectHosts.has(userId)) {
+        throw ApiError.forbidden('Only project/team hosts, Admins, or SuperAdmins can create meetings');
+      }
+    } else {
+      throw ApiError.forbidden('Only project/team hosts, Admins, or SuperAdmins can create meetings');
+    }
   }
 
   const requested = input.participantIds?.length
     ? await assertUsersInOrganization(input.participantIds, organizationId)
     : [];
 
-  if (project && !isSuperAdmin) {
+  if (project && !isSuperOrAdmin) {
     const outsiders = requested.filter((id) => !roster.has(id));
     if (outsiders.length > 0) {
       throw ApiError.badRequest('Participants must be members or hosts of the selected project', [
@@ -195,6 +243,29 @@ export const createMeetingService = async (
 
   const scope = input.teamId ? 'team' : project ? 'project' : 'general';
 
+  // Build participant roles map: creator and top admins are always HOST, requested roles are respected
+  const requestedRoles = input.participantRoles || {};
+  const participantsUsers = await User.find({ _id: { $in: uniqueRoster } }).select('user_role is_super_admin').lean();
+  const topAdminSet = new Set(
+    participantsUsers
+      .filter((u) => {
+        const role = (u.user_role || '').toUpperCase();
+        return u.is_super_admin === true || role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN';
+      })
+      .map((u) => u._id.toString())
+  );
+
+  const meetingParticipants = uniqueRoster.map((id) => {
+    let assignedRole: 'HOST' | 'MEMBER' = 'MEMBER';
+    if (id === userId || topAdminSet.has(id)) {
+      assignedRole = 'HOST';
+    } else if (requestedRoles[id]) {
+      const normalized = requestedRoles[id].toUpperCase();
+      assignedRole = normalized === 'HOST' ? 'HOST' : 'MEMBER';
+    }
+    return buildParticipant(id, assignedRole);
+  });
+
   const meeting = new Meeting({
     organization_id: organizationId,
     project_id: project ? project._id : undefined,
@@ -209,7 +280,7 @@ export const createMeetingService = async (
     meeting_scheduled_at: scheduledAt,
     meeting_duration_minutes: duration,
     meeting_participant_limit: requestedLimit,
-    meeting_participants: uniqueRoster.map((id) => buildParticipant(id, id === userId ? 'HOST' : 'MEMBER'))
+    meeting_participants: meetingParticipants
   });
   await meeting.save();
   return meeting;
@@ -264,6 +335,18 @@ export const assertMeetingCanChat = (meeting: MeetingDocument, userId: string): 
   const participant = assertMeetingParticipant(meeting, userId);
   if (!participant.can_use_chat) {
     throw ApiError.forbidden('Chat is disabled for you in this meeting');
+  }
+};
+
+/** Confirms the caller is a Host or Moderator in the meeting before asking questions. */
+export const assertMeetingCanAskQuestion = (meeting: MeetingDocument, userId: string): void => {
+  const participant = assertMeetingParticipant(meeting, userId);
+  if (!participant.can_use_chat) {
+    throw ApiError.forbidden('Chat is disabled for you in this meeting');
+  }
+  const isHostOrMod = participant.participant_role === 'HOST' || participant.participant_role === 'MODERATOR';
+  if (!isHostOrMod) {
+    throw ApiError.forbidden('Only hosts and moderators can create questions in Q&A');
   }
 };
 

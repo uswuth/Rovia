@@ -2,6 +2,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import { Video, CheckSquare, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CodeBadge } from '@/components/ui/CodeBadge';
 import { GroupedAvatars } from '@/components/members/GroupedAvatars';
 import { getProjectStatusTone } from '@/lib/status-tone';
 import type { Column } from '@/components/ui/data-table';
@@ -17,6 +18,7 @@ import {
   type Project,
 } from '@/types/project.types';
 import type { Meeting } from '@/api/meeting/meeting.types';
+import type { User } from '@/api/auth/auth.types';
 
 export interface ProjectRosterModalState {
   open: boolean;
@@ -30,12 +32,14 @@ export interface ProjectColumnsOptions {
   navigate: NavigateFunction;
   meetings?: Meeting[];
   onOpenRoster: (modalData: ProjectRosterModalState) => void;
+  user?: User | null;
 }
 
 export const getProjectColumns = ({
   navigate,
   meetings,
   onOpenRoster,
+  user,
 }: ProjectColumnsOptions): Column<Project>[] => {
   return [
     {
@@ -47,17 +51,15 @@ export const getProjectColumns = ({
         const pCode = getProjectCode(project);
         const pId = getProjectId(project);
         return (
-          <button
-            type="button"
+          <CodeBadge
+            code={pCode}
+            fallback="PRJ-N/A"
             onClick={(e) => {
               e.stopPropagation();
               if (pId) navigate(`/projects/${pId}/edit`);
             }}
-            className="font-mono text-xs font-bold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm hover:bg-emerald-500/20 cursor-pointer transition-colors"
             title="Edit project"
-          >
-            {pCode}
-          </button>
+          />
         );
       },
     },
@@ -209,19 +211,40 @@ export const getProjectColumns = ({
         const pCode = getProjectCode(project);
         const pStatus = getProjectStatus(project).toLowerCase();
         const isReadOnly = pStatus === 'completed' || pStatus === 'archived';
+        const isGlobalAdmin = Boolean(
+          user?.isSuperAdmin || user?.userRole === 'SuperAdmin' || user?.userRole === 'Admin'
+        );
+        const isProjectHost = Boolean(
+          user?.userId &&
+          (project.hosts || []).some((h: unknown) => {
+            if (typeof h === 'string') return h === user.userId;
+            if (typeof h === 'object' && h !== null) {
+              const obj = h as Record<string, unknown>;
+              return (obj.userId || obj._id || obj.id) === user.userId;
+            }
+            return false;
+          })
+        );
+        const canSchedule = isGlobalAdmin || isProjectHost;
 
         return (
           <div className="flex justify-end gap-1">
             <Button
               variant="ghost"
               size="sm"
-              disabled={isReadOnly}
+              disabled={isReadOnly || !canSchedule}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!isReadOnly) navigate(`/meetings/new?projectId=${pCode || pId}`);
+                if (!isReadOnly && canSchedule) navigate(`/meetings/new?projectId=${pCode || pId}`);
               }}
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-emerald-500 hover:bg-secondary cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-              title={isReadOnly ? `Project is ${pStatus}. Re-activate status to Active to schedule meetings.` : 'Schedule meeting'}
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              title={
+                !canSchedule
+                  ? 'Only project hosts, Admins, or SuperAdmins can schedule meetings'
+                  : isReadOnly
+                  ? `Project is ${pStatus}. Re-activate status to Active to schedule meetings.`
+                  : 'Schedule meeting'
+              }
             >
               <Video size={14} />
             </Button>

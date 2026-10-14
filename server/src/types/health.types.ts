@@ -6,11 +6,11 @@ export interface IMemoryUsage {
 export interface IHealthData {
   service: string;
   status: string;
-  environment: string;
-  uptimeSeconds: number;
+  environment?: string;
+  uptimeSeconds?: number;
   timestamp: string;
   database: string;
-  memory: IMemoryUsage;
+  memory?: IMemoryUsage;
 }
 
 export interface IReadinessData {

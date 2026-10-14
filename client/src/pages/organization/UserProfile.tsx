@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, User, Mail, Shield, Phone, MapPin, Calendar, Briefcase, Activity, Hash, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CodeBadge } from '@/components/ui/CodeBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getOrganizationMemberByIdApi } from '@/api/organization/organization.api';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -98,7 +99,7 @@ export const UserProfile: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
-              <User size={24} className="text-emerald-500" />
+              <User size={24} className="text-primary" />
               <span>Member Profile</span>
             </h1>
           </div>
@@ -124,9 +125,7 @@ export const UserProfile: React.FC = () => {
           <div className="space-y-1.5 text-center sm:text-left flex-1">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <h1 className="text-xl font-bold tracking-tight text-foreground">{name}</h1>
-              <span className="font-mono text-xs font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-sm w-fit mx-auto sm:mx-0">
-                {uCode}
-              </span>
+              <CodeBadge code={uCode} className="w-fit mx-auto sm:mx-0" />
             </div>
             <p className="text-xs text-muted-foreground flex items-center justify-center sm:justify-start gap-1.5">
               <Mail size={13} />
@@ -149,7 +148,7 @@ export const UserProfile: React.FC = () => {
           {/* Box 1: Account & Platform Attributes */}
           <div className="rounded-sm border border-border bg-card p-5 space-y-4">
             <h3 className="text-sm font-bold text-foreground flex items-center gap-2 pb-2 border-b border-border/50">
-              <Shield size={16} className="text-emerald-500" />
+              <Shield size={16} className="text-primary" />
               <span>Platform Account Details</span>
             </h3>
 
@@ -194,7 +193,7 @@ export const UserProfile: React.FC = () => {
           {/* Box 2: Personal Contact Information */}
           <div className="rounded-sm border border-border bg-card p-5 space-y-4">
             <h3 className="text-sm font-bold text-foreground flex items-center gap-2 pb-2 border-b border-border/50">
-              <Phone size={16} className="text-emerald-500" />
+              <Phone size={16} className="text-primary" />
               <span>Contact & Location</span>
             </h3>
 

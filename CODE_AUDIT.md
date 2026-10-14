@@ -116,7 +116,7 @@
 | `JWT_ACCESS_EXPIRY \|\| '24h'` | `server/src/config/env.ts:85` | ⚠️ Change needed | Default `15m` to match docs/compose |
 | Swagger `http://localhost:${PORT}` | `server/src/config/swagger.ts:26` | ⚠️ Dev-only | Set server URL from `CLIENT_URL` in production |
 | `AWS_ENDPOINT_URL \|\| localhost:4566`, bucket `\|\| 'intellmeet-bucket'` | `server/src/config/env.ts:93-99` | ✅ Acceptable | Non-secret defaults are documented; required in prod by convention — consider a prod assertion |
-| `WHISPER/OLLAMA` docker hostnames & model sizes | `server/src/config/env.ts:104-113` | ✅ Acceptable | Deliberate compose defaults, fully overridable |
+| `GROQ/OPENROUTER` base URLs & model ids | `server/src/config/env.ts` | ✅ Acceptable | Non-secret defaults are documented and overridable; the API keys themselves have no default |
 | `'Visitor'`, `pId.slice(-4)` display heuristics, `meeting_guest_${id}` key | `client/src/pages/meetings/MeetingRoom.tsx:114-174` | ⚠️ Minor | Fine for now; centralise guest-session helper |
 | Bruno/floci emulator credentials (`test`) | `server/floci/browser/index.html` | ✅ Acceptable | Explicitly emulator-only, never deployed |
 
@@ -152,7 +152,7 @@
 
 1. **In-meeting real-time chat** over Socket.io (roster-gated, `can_use_chat` enforced) — F03 half-done.
 2. **Post-meeting dashboard** — recording player, transcript, AI summary, action items (F04 ⬜).
-3. **Execute the local AI pipeline for real** (Whisper + Ollama) and evaluate output quality; add prompt versioning.
+3. **Run the AI pipeline on a real multi-speaker recording** (Groq + OpenRouter) and evaluate transcript quality; add prompt versioning.
 4. **TURN server + ICE env config** and SFU migration path (mediasoup/LiveKit) when > ~8 peers (mesh caps out).
 5. **Recording lifecycle worker**: auto-end over-running meetings, sweep `recording_expires_at`, retry FAILED post-processing, move inline `runPostProcessing` to a queue (design already queue-ready).
 6. **Session management UI** ("active devices", revoke session) on top of F-09 per-device tokens.

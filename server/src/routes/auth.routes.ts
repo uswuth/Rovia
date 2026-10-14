@@ -8,6 +8,7 @@ import {
   changePassword
 } from '../controllers/auth.controller.js';
 import { authenticateUser } from '../middlewares/auth.middleware.js';
+import { authRateLimiter } from '../middlewares/rateLimiter.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router: Router = Router();
@@ -50,7 +51,7 @@ const router: Router = Router();
  *       400:
  *         description: Invalid input or user already exists
  */
-router.post('/signup', asyncHandler(registerUser));
+router.post('/signup', authRateLimiter, asyncHandler(registerUser));
 
 /**
  * @openapi
@@ -82,7 +83,7 @@ router.post('/signup', asyncHandler(registerUser));
  *       401:
  *         description: Invalid email or password
  */
-router.post('/login', asyncHandler(loginUser));
+router.post('/login', authRateLimiter, asyncHandler(loginUser));
 
 /**
  * @openapi

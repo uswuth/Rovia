@@ -319,7 +319,7 @@ function DropdownMenuRadioItem({
       aria-checked={isChecked}
       className={cn(
         "relative flex w-full select-none items-center rounded-md py-1.5 pl-7 pr-2 text-xs text-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground cursor-pointer disabled:pointer-events-none disabled:opacity-50",
-        isChecked && "font-semibold bg-emerald-500/10 text-emerald-500",
+        isChecked && "font-semibold bg-primary/10 text-primary",
         className
       )}
       onClick={handleClick}
@@ -327,7 +327,7 @@ function DropdownMenuRadioItem({
     >
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
         {isChecked && (
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
         )}
       </span>
       {children}

@@ -78,7 +78,7 @@ const Modal: React.FC<ModalProps> = ({
           className
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+        <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-base font-bold leading-tight text-foreground">
               {title}
@@ -102,7 +102,7 @@ const Modal: React.FC<ModalProps> = ({
         {children}
 
         {footer && (
-          <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+          <div className="flex items-center justify-end gap-2 pt-2">
             {footer}
           </div>
         )}

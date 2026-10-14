@@ -7,6 +7,20 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved || 'dark';
   });
 
+  const [accentColor, setAccentColorState] = useState<string>(() => {
+    return localStorage.getItem('accent_color') || '#10b981';
+  });
+
+  const setAccentColor = (color: string) => {
+    setAccentColorState(color);
+    localStorage.setItem('accent_color', color);
+    document.documentElement.style.setProperty('--custom-accent', color);
+  };
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--custom-accent', accentColor);
+  }, [accentColor]);
+
   useEffect(() => {
     const root = document.documentElement;
     const isDark =
@@ -29,7 +43,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, accentColor, setAccentColor }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -2,6 +2,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import { Edit2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CodeBadge } from '@/components/ui/CodeBadge';
 import { GroupedAvatars } from '@/components/members/GroupedAvatars';
 import { getProjectStatusTone } from '@/lib/status-tone';
 import type { Column } from '@/components/ui/data-table';
@@ -43,17 +44,19 @@ export const getTeamColumns = ({
         const teamCodeStr = (t.teamCode as string) || 'N/A';
         const teamIdStr = (t.teamId || t._id) as string;
         return (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isAdmin && teamIdStr) navigate(`/teams/${teamIdStr}/edit`);
-            }}
-            className="font-mono text-xs font-bold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm hover:bg-emerald-500/20 cursor-pointer transition-colors"
-            title="Edit Team"
-          >
-            {teamCodeStr}
-          </button>
+          <CodeBadge
+            code={teamCodeStr}
+            fallback="TEM-N/A"
+            onClick={
+              isAdmin && teamIdStr
+                ? (e) => {
+                    e.stopPropagation();
+                    navigate(`/teams/${teamIdStr}/edit`);
+                  }
+                : undefined
+            }
+            title={isAdmin && teamIdStr ? 'Edit Team' : undefined}
+          />
         );
       },
     },

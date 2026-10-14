@@ -172,7 +172,7 @@ export const CreateProject: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
-              <FolderGit2 size={24} className="text-emerald-500" />
+              <FolderGit2 size={24} className="text-primary" />
               <span>{isEditMode ? 'Edit Project' : 'Create New Project'}</span>
             </h1>
             <p className="text-xs text-muted-foreground">

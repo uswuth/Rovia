@@ -54,7 +54,16 @@ There are no default secret values in code — a missing one stops the server.
 | `pnpm docker:tools` | Starts the stack plus mongo-express and the S3 emulator |
 | `docker compose up --build` | Same as `docker:up` without the secret step |
 | `docker compose --profile tools up -d` | Starts only the optional tooling services |
+| `docker compose --profile localmongo up -d` | Starts a local MongoDB instead of Atlas |
+| `docker compose --profile s3ui up -d s3browser` | Starts the S3 emulator web UI |
 | `docker compose down -v` | Stops everything and deletes the database volume |
+
+There is no `ai` profile: transcription and summarisation are hosted (Groq and
+OpenRouter), so nothing is built or downloaded for them. Add the two keys to
+`server/.env` and the pipeline runs as part of `POST /recordings/:id/complete`.
+
+`ffmpeg` must be on the server's PATH (or set `FFMPEG_PATH`). It demuxes the
+recording, drops silence and splits the audio into chunks before transcription.
 
 | Service | URL |
 | --- | --- |

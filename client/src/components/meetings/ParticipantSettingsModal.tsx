@@ -26,7 +26,7 @@ const PERMISSIONS: ReadonlyArray<{
   { key: 'canSendAudio', label: 'Microphone', hint: 'Allow this member to speak' },
   { key: 'canSendVideo', label: 'Camera', hint: 'Allow this member to send video' },
   { key: 'canShareScreen', label: 'Screen share', hint: 'Allow this member to present' },
-  { key: 'canUseChat', label: 'Chat, Q&A and polls', hint: 'Allow this member to post anything' },
+  { key: 'canUseChat', label: 'Chat & Polls', hint: 'Allow posting in chat & answering Q&A' },
 ];
 
 const permissionsOf = (participant: MeetingParticipant): ParticipantPermissions => ({

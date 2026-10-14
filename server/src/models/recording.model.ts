@@ -5,6 +5,40 @@ import { OrganizationClass } from './organization.model.js';
 
 export type RecordingStatus = 'PENDING' | 'READY' | 'FAILED' | 'DELETED';
 
+/**
+ * One participant's captured audio within a recording.
+ *
+ * Each speaker is stored as a separate object so tracks can be transcribed
+ * independently. Crosstalk between simultaneous speakers is what garbles a
+ * transcript, so mixing everyone into one stream is what we are avoiding here.
+ * The storage key is server-derived and never sent to the client.
+ */
+@modelOptions({ schemaOptions: { _id: false } })
+export class RecordingSpeakerClass {
+  @prop({ type: () => String, required: true })
+  public speakerId!: string;
+
+  @prop({ type: () => String, default: '' })
+  public speakerName!: string;
+
+  @prop({ type: () => Number, required: true })
+  public speakerIndex!: number;
+
+  /** Server-derived. Excluded from toJSON with the other storage internals. */
+  @prop({ type: () => String, required: true })
+  public storageKey!: string;
+
+  @prop({ type: () => String, default: '' })
+  public mimeType!: string;
+
+  @prop({ type: () => Number, default: 0 })
+  public sizeBytes!: number;
+
+  /** Null until the client has uploaded this speaker's track. */
+  @prop({ type: () => Boolean, default: false })
+  public uploaded!: boolean;
+}
+
 @modelOptions({
   schemaOptions: {
     collection: 'recordings',
@@ -12,14 +46,32 @@ export type RecordingStatus = 'PENDING' | 'READY' | 'FAILED' | 'DELETED';
     toJSON: {
       virtuals: false,
       transform: (_doc, ret: Record<string, unknown>) => {
-        // storage_key is deliberately absent: the client never receives it, so
-        // it can never construct, cache or log an object path.
+        // storage_key and each speaker's storageKey are deliberately absent: the
+        // client never receives them, so it can never construct, cache or log an
+        // object path. Speakers are projected to their identity and upload state.
+        const speakers = ((ret.recording_speakers as unknown[]) ?? []).map((entry) => {
+          const speaker = entry as {
+            speakerId?: string;
+            speakerName?: string;
+            speakerIndex?: number;
+            uploaded?: boolean;
+            sizeBytes?: number;
+          };
+          return {
+            speakerId: speaker.speakerId,
+            speakerName: speaker.speakerName ?? '',
+            speakerIndex: speaker.speakerIndex,
+            uploaded: Boolean(speaker.uploaded),
+            sizeBytes: speaker.sizeBytes ?? 0
+          };
+        });
         return {
           recordingId: (ret._id as { toString(): string })?.toString(),
           recordingStatus: ret.recording_status as string,
           recordingMimeType: ret.recording_mime_type as string,
           recordingSizeBytes: ret.recording_size_bytes as number,
           recordingDurationMs: ret.recording_duration_ms as number,
+          recordingSpeakers: speakers,
           organizationId: ret.organization_id,
           projectId: ret.project_id ?? null,
           meetingId: ret.meeting_id ?? null,
@@ -67,6 +119,39 @@ export class RecordingClass {
   }
   public set storageKey(val: string) {
     this.storage_key = val;
+  }
+
+  /**
+   * One entry per participant who had audio captured. Keys are server-derived
+   * from this recording's organization and id, so a client can only ever address
+   * its own recording's own speakers.
+   */
+  @prop({ type: () => [RecordingSpeakerClass], default: [], alias: 'recordingSpeakers' })
+  public recording_speakers!: Array<RecordingSpeakerClass>;
+
+  public get recordingSpeakers(): Array<{
+    speakerId: string;
+    speakerName: string;
+    speakerIndex: number;
+    storageKey: string;
+    mimeType: string;
+    sizeBytes: number;
+    uploaded: boolean;
+  }> {
+    return this.recording_speakers;
+  }
+  public set recordingSpeakers(
+    val: Array<{
+      speakerId: string;
+      speakerName: string;
+      speakerIndex: number;
+      storageKey: string;
+      mimeType: string;
+      sizeBytes: number;
+      uploaded: boolean;
+    }>
+  ) {
+    this.recording_speakers = val;
   }
 
   @prop({

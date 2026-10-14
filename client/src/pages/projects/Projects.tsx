@@ -22,6 +22,7 @@ import {
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CodeBadge } from '@/components/ui/CodeBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTable } from '@/components/ui/data-table';
 import { Pagination } from '@/components/ui/Pagination';
@@ -40,7 +41,7 @@ export const Projects: React.FC = () => {
   const [searchParams] = useSearchParams();
   const currentTab = searchParams.get('status') || 'ALL';
   const { projects, loading } = useProject();
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [gridPage, setGridPage] = useState(1);
   const [gridPageSize, setGridPageSize] = useState(6);
@@ -70,8 +71,9 @@ export const Projects: React.FC = () => {
         navigate,
         meetings,
         onOpenRoster: setRosterModal,
+        user,
       }),
-    [navigate, meetings, setRosterModal]
+    [navigate, meetings, setRosterModal, user]
   );
 
   return (
@@ -80,7 +82,7 @@ export const Projects: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <FolderGit2 className="text-emerald-500 dark:text-emerald-400" size={24} />
+            <FolderGit2 className="text-primary" size={24} />
             <span>{pageTitle}</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
@@ -200,28 +202,48 @@ export const Projects: React.FC = () => {
                 return (
                   <div
                     key={pId || pName}
-                    className="group relative rounded-xs border border-border bg-card text-card-foreground p-5 hover:border-emerald-500/40 transition-all shadow-xs space-y-4 flex flex-col justify-between"
+                    className="group relative rounded-xs border border-border bg-card text-card-foreground p-5 hover:border-primary/40 transition-all shadow-xs space-y-4 flex flex-col justify-between"
                   >
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm">
-                            {pCode}
-                          </span>
+                          <CodeBadge code={pCode} />
                           <Badge tone={getProjectStatusTone(pStatus)}>{pStatus}</Badge>
                         </div>
 
                         <div className="flex items-center gap-1">
                           {(() => {
                             const isReadOnly = pStatus.toLowerCase() === 'completed' || pStatus.toLowerCase() === 'archived';
+                            const isGlobalAdmin = Boolean(
+                              user?.isSuperAdmin || user?.userRole === 'SuperAdmin' || user?.userRole === 'Admin'
+                            );
+                            const isProjectHost = Boolean(
+                              user?.userId &&
+                              (project.hosts || []).some((h: unknown) => {
+                                if (typeof h === 'string') return h === user.userId;
+                                if (typeof h === 'object' && h !== null) {
+                                  const obj = h as Record<string, unknown>;
+                                  return (obj.userId || obj._id || obj.id) === user.userId;
+                                }
+                                return false;
+                              })
+                            );
+                            const canSchedule = isGlobalAdmin || isProjectHost;
+
                             return (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                disabled={isReadOnly}
-                                onClick={() => !isReadOnly && navigate(`/meetings/new?projectId=${pCode || pId}`)}
-                                className="h-7 w-7 p-0 text-muted-foreground hover:text-emerald-500 hover:bg-secondary cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                title={isReadOnly ? `Project is ${pStatus}. Re-activate status to Active to schedule meetings.` : 'Schedule meeting'}
+                                disabled={isReadOnly || !canSchedule}
+                                onClick={() => !isReadOnly && canSchedule && navigate(`/meetings/new?projectId=${pCode || pId}`)}
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                title={
+                                  !canSchedule
+                                    ? 'Only project hosts, Admins, or SuperAdmins can schedule meetings'
+                                    : isReadOnly
+                                    ? `Project is ${pStatus}. Re-activate status to Active to schedule meetings.`
+                                    : 'Schedule meeting'
+                                }
                               >
                                 <Video size={14} />
                               </Button>

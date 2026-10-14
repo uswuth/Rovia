@@ -5,13 +5,42 @@ import { buildAudioConstraints } from '@/lib/audio-capture';
 
 const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
+const CAMERA_MAX_BITRATE = 3_000_000;
+
+export const buildCameraConstraints = (deviceId?: string, exactDevice = false): MediaTrackConstraints => ({
+  deviceId: deviceId && deviceId !== 'default' ? (exactDevice ? { exact: deviceId } : { ideal: deviceId }) : undefined,
+  width: { ideal: 1920, max: 1920 },
+  height: { ideal: 1080, max: 1080 },
+  frameRate: { ideal: 30, max: 30 },
+});
+
+const applySenderBitrate = async (sender: RTCRtpSender, maxBitrate: number) => {
+  try {
+    const params = sender.getParameters();
+    if (!params.encodings || params.encodings.length === 0) {
+      params.encodings = [{}];
+    }
+    params.encodings[0].maxBitrate = maxBitrate;
+    params.encodings[0].scaleResolutionDownBy = 1;
+    await sender.setParameters(params);
+  } catch {
+    // Unsupported browser or early SDP state; setParameters safely ignored
+  }
+};
+
+const applyBitratesToConnection = (pc: RTCPeerConnection) => {
+  const videoSender = pc.getTransceivers().find((t) => t.sender.track?.kind === 'video')?.sender;
+  if (videoSender) {
+    void applySenderBitrate(videoSender, CAMERA_MAX_BITRATE);
+  }
+};
+
 export interface PeerState {
   userId: string;
-  /** The remote MediaStream, ready to attach to a <video> element. */
+  /** The remote MediaStream (camera/audio), ready to attach to a <video> element. */
   stream: MediaStream | null;
   audioEnabled: boolean;
   videoEnabled: boolean;
-  screenSharing: boolean;
 }
 
 /**
@@ -28,6 +57,8 @@ export const useWebRtcMeeting = (
     visitorId?: string;
     initialAudioDeviceId?: string;
     initialVideoDeviceId?: string;
+    initialMic?: boolean;
+    initialCamera?: boolean;
     onPeerLeft?: (userId: string) => void;
     onPeerJoined?: (userId: string) => void;
   }
@@ -42,6 +73,11 @@ export const useWebRtcMeeting = (
   // Peer connections are kept in a ref, not state: they are mutable objects
   // and re-rendering on every change would thrash the video elements.
   const connections = useRef<Record<string, RTCPeerConnection>>({});
+  const peersRef = useRef<Record<string, PeerState>>({});
+  useEffect(() => {
+    peersRef.current = peers;
+  }, [peers]);
+
   const onPeerLeftRef = useRef(options?.onPeerLeft);
   const onPeerJoinedRef = useRef(options?.onPeerJoined);
   useEffect(() => {
@@ -54,10 +90,9 @@ export const useWebRtcMeeting = (
       ...prev,
       [userId]: {
         userId,
-        stream: prev[userId]?.stream ?? null,
-        audioEnabled: prev[userId]?.audioEnabled ?? true,
-        videoEnabled: prev[userId]?.videoEnabled ?? true,
-        screenSharing: prev[userId]?.screenSharing ?? false,
+        stream: patch.stream !== undefined ? patch.stream : (prev[userId]?.stream ?? null),
+        audioEnabled: patch.audioEnabled !== undefined ? patch.audioEnabled : (prev[userId]?.audioEnabled ?? true),
+        videoEnabled: patch.videoEnabled !== undefined ? patch.videoEnabled : (prev[userId]?.videoEnabled ?? true),
         ...patch
       }
     }));
@@ -75,12 +110,26 @@ export const useWebRtcMeeting = (
         localRef.current.getTracks().forEach((track) => pc.addTrack(track, localRef.current as MediaStream));
       }
 
+      // Ensure transceivers for audio and video exist so future tracks can flow without renegotiation
+      const senders = pc.getSenders();
+      if (!senders.some((s) => s.track?.kind === 'audio')) {
+        try { pc.addTransceiver('audio', { direction: 'sendrecv' }); } catch { /* ignore transceiver setup error */ }
+      }
+      if (!senders.some((s) => s.track?.kind === 'video')) {
+        try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch { /* ignore transceiver setup error */ }
+      }
+      applyBitratesToConnection(pc);
+
       const remote = new MediaStream();
       upsertPeer(userId, { stream: remote });
 
       pc.ontrack = (event) => {
-        event.streams[0]?.getTracks().forEach((track) => remote.addTrack(track));
-        upsertPeer(userId, { stream: remote });
+        const track = event.track;
+        if (!track) return;
+        if (!remote.getTracks().some((t) => t.id === track.id)) {
+          remote.addTrack(track);
+        }
+        upsertPeer(userId, { stream: new MediaStream(remote.getTracks()) });
         setStatus('connected');
       };
 
@@ -94,7 +143,10 @@ export const useWebRtcMeeting = (
       };
 
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'connected') setStatus('connected');
+        if (pc.connectionState === 'connected') {
+          setStatus('connected');
+          applyBitratesToConnection(pc);
+        }
         if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
           connections.current[userId]?.close();
           delete connections.current[userId];
@@ -131,9 +183,7 @@ export const useWebRtcMeeting = (
     const start = async () => {
       setStatus('connecting');
       const audioConstraint = buildAudioConstraints(options?.initialAudioDeviceId);
-      const videoConstraint = options?.initialVideoDeviceId
-        ? { deviceId: { exact: options.initialVideoDeviceId } }
-        : true;
+      const videoConstraint = buildCameraConstraints(options?.initialVideoDeviceId);
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: audioConstraint });
@@ -144,21 +194,56 @@ export const useWebRtcMeeting = (
         localRef.current = stream;
         setLocalStream(stream);
       } catch {
-        // Fallback to audio-only if camera is unavailable or in use by another profile/window
         try {
-          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint });
+          const stream = await navigator.mediaDevices.getUserMedia({ video: buildCameraConstraints(), audio: audioConstraint });
           if (cancelled) {
-            audioStream.getTracks().forEach((t) => t.stop());
+            stream.getTracks().forEach((t) => t.stop());
             return;
           }
-          localRef.current = audioStream;
-          setLocalStream(audioStream);
+          localRef.current = stream;
+          setLocalStream(stream);
         } catch {
-          // If neither is available, proceed as listener with empty stream to maintain socket connection
-          const emptyStream = new MediaStream();
-          localRef.current = emptyStream;
-          setLocalStream(emptyStream);
+          // Fallback to audio-only if camera is unavailable or in use by another profile/window
+          try {
+            const audioStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint });
+            if (cancelled) {
+              audioStream.getTracks().forEach((t) => t.stop());
+              return;
+            }
+            localRef.current = audioStream;
+            setLocalStream(audioStream);
+          } catch {
+            // If neither is available, proceed as listener with empty stream to maintain socket connection
+            const emptyStream = new MediaStream();
+            localRef.current = emptyStream;
+            setLocalStream(emptyStream);
+          }
         }
+      }
+
+      // Strictly apply initial user privacy states (disabled mic / camera if toggled off)
+      if (localRef.current) {
+        if (options?.initialMic === false) {
+          localRef.current.getAudioTracks().forEach((t) => { t.enabled = false; });
+        }
+        if (options?.initialCamera === false) {
+          localRef.current.getVideoTracks().forEach((t) => { t.enabled = false; });
+        }
+      }
+
+      if (localRef.current) {
+        const currentStream = localRef.current;
+        Object.values(connections.current).forEach((pc) => {
+          currentStream.getTracks().forEach((track) => {
+            const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
+            if (sender) {
+              void sender.replaceTrack(track);
+            } else {
+              pc.addTrack(track, currentStream);
+            }
+          });
+          applyBitratesToConnection(pc);
+        });
       }
 
       const socket = getMeetingSocket(options?.visitorId);
@@ -185,10 +270,9 @@ export const useWebRtcMeeting = (
       socket.on('meeting:state', ({ userId, state }) => {
         // Merge only the keys the event actually carries; defaulting the rest
         // would reset flags the peer never changed.
-        const patch: { audioEnabled?: boolean; videoEnabled?: boolean; screenSharing?: boolean } = {};
+        const patch: { audioEnabled?: boolean; videoEnabled?: boolean } = {};
         if (typeof state.audioEnabled === 'boolean') patch.audioEnabled = state.audioEnabled;
         if (typeof state.videoEnabled === 'boolean') patch.videoEnabled = state.videoEnabled;
-        if (typeof state.screenSharing === 'boolean') patch.screenSharing = state.screenSharing;
         if (Object.keys(patch).length > 0) upsertPeer(userId, patch);
       });
 
@@ -255,20 +339,41 @@ export const useWebRtcMeeting = (
       setPeers({});
       disconnectMeetingSocket();
     };
-  }, [enabled, meetingId, createConnection, upsertPeer, options?.visitorId, options?.initialAudioDeviceId, options?.initialVideoDeviceId]);
-
-  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  }, [enabled, meetingId, createConnection, upsertPeer, options?.visitorId, options?.initialAudioDeviceId, options?.initialVideoDeviceId, options?.initialMic, options?.initialCamera]);
 
   /** Toggle a local track and tell the room. */
   const setTrackEnabled = useCallback(
-    (kind: 'audio' | 'video', on: boolean) => {
-      localRef.current
-        ?.getTracks()
-        .filter((t) => t.kind === kind)
-        .forEach((t) => {
-          t.enabled = on;
-        });
+    async (kind: 'audio' | 'video', on: boolean) => {
+      let tracks = localRef.current?.getTracks().filter((t) => t.kind === kind) ?? [];
+      if (kind === 'video' && on && tracks.length === 0) {
+        try {
+          const videoStream = await navigator.mediaDevices.getUserMedia({ video: buildCameraConstraints() });
+          const newVideoTrack = videoStream.getVideoTracks()[0];
+          if (newVideoTrack) {
+            if (!localRef.current) {
+              localRef.current = new MediaStream();
+            }
+            localRef.current.addTrack(newVideoTrack);
+            Object.values(connections.current).forEach((pc) => {
+              const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+              if (sender) {
+                void sender.replaceTrack(newVideoTrack);
+                void applySenderBitrate(sender, CAMERA_MAX_BITRATE);
+              } else if (localRef.current) {
+                const newSender = pc.addTrack(newVideoTrack, localRef.current);
+                void applySenderBitrate(newSender, CAMERA_MAX_BITRATE);
+              }
+            });
+            setLocalStream(new MediaStream(localRef.current.getTracks()));
+            tracks = [newVideoTrack];
+          }
+        } catch (err) {
+          console.warn('Failed to dynamically acquire video track:', err);
+        }
+      }
+      tracks.forEach((t) => {
+        t.enabled = on;
+      });
       socketRef.current?.emit('meeting:state', {
         meetingId,
         state: { [`${kind}Enabled`]: on }
@@ -276,58 +381,6 @@ export const useWebRtcMeeting = (
     },
     [meetingId]
   );
-
-  const stopScreenShare = useCallback(() => {
-    if (screenStream) {
-      screenStream.getTracks().forEach((t) => t.stop());
-      setScreenStream(null);
-      setIsScreenSharing(false);
-      const camera = localRef.current?.getVideoTracks()[0];
-      if (camera) {
-        Object.values(connections.current).forEach((pc) => {
-          const trackSender = pc.getSenders().find((s) => s.track?.kind === 'video');
-          void trackSender?.replaceTrack(camera);
-        });
-      }
-      socketRef.current?.emit('meeting:state', { meetingId, state: { screenSharing: false } });
-    }
-  }, [screenStream, meetingId]);
-
-  const startScreenShare = useCallback(async (): Promise<MediaStream | null> => {
-    try {
-      const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-      const senderTrack = display.getVideoTracks()[0];
-      if (!senderTrack) return null;
-
-      setScreenStream(display);
-      setIsScreenSharing(true);
-
-      Object.values(connections.current).forEach((pc) => {
-        const trackSender = pc.getSenders().find((s) => s.track?.kind === 'video');
-        void trackSender?.replaceTrack(senderTrack);
-      });
-
-      const handleEnded = () => {
-        setScreenStream(null);
-        setIsScreenSharing(false);
-        const camera = localRef.current?.getVideoTracks()[0];
-        if (camera) {
-          Object.values(connections.current).forEach((pc) => {
-            const trackSender = pc.getSenders().find((s) => s.track?.kind === 'video');
-            void trackSender?.replaceTrack(camera);
-          });
-        }
-        socketRef.current?.emit('meeting:state', { meetingId, state: { screenSharing: false } });
-      };
-
-      senderTrack.addEventListener('ended', handleEnded);
-
-      socketRef.current?.emit('meeting:state', { meetingId, state: { screenSharing: true } });
-      return display;
-    } catch {
-      return null;
-    }
-  }, [meetingId]);
 
   const switchDevice = useCallback(
     async (kind: 'audio' | 'video', deviceId: string) => {
@@ -345,12 +398,16 @@ export const useWebRtcMeeting = (
 
         let newStream: MediaStream;
         if (!deviceId || deviceId === 'default') {
-          newStream = await getStreamForDevice(true);
+          newStream = await getStreamForDevice(kind === 'video' ? buildCameraConstraints() : true);
         } else {
           try {
-            newStream = await getStreamForDevice({ deviceId: { exact: deviceId } });
+            newStream = await getStreamForDevice(
+              kind === 'video' ? buildCameraConstraints(deviceId, true) : { deviceId: { exact: deviceId } }
+            );
           } catch {
-            newStream = await getStreamForDevice({ deviceId: { ideal: deviceId } });
+            newStream = await getStreamForDevice(
+              kind === 'video' ? buildCameraConstraints(deviceId, false) : { deviceId: { ideal: deviceId } }
+            );
           }
         }
 
@@ -378,13 +435,16 @@ export const useWebRtcMeeting = (
           );
           if (transceiver?.sender) {
             void transceiver.sender.replaceTrack(replacementTrack);
+            if (kind === 'video') void applySenderBitrate(transceiver.sender, CAMERA_MAX_BITRATE);
             return;
           }
           const sender = pc.getSenders().find((s) => s.track?.kind === kind);
           if (sender) {
             void sender.replaceTrack(replacementTrack);
+            if (kind === 'video') void applySenderBitrate(sender, CAMERA_MAX_BITRATE);
           } else if (localRef.current) {
-            pc.addTrack(replacementTrack, localRef.current);
+            const newSender = pc.addTrack(replacementTrack, localRef.current);
+            if (kind === 'video') void applySenderBitrate(newSender, CAMERA_MAX_BITRATE);
           }
         });
 
@@ -401,13 +461,9 @@ export const useWebRtcMeeting = (
     peers,
     status,
     error,
-    screenStream,
-    isScreenSharing,
     setAudioEnabled: (on: boolean) => setTrackEnabled('audio', on),
     setVideoEnabled: (on: boolean) => setTrackEnabled('video', on),
     switchMicrophone: (deviceId: string) => switchDevice('audio', deviceId),
     switchCamera: (deviceId: string) => switchDevice('video', deviceId),
-    startScreenShare,
-    stopScreenShare,
   };
 };

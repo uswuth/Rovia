@@ -12,9 +12,28 @@ import { AudioExtractionInput, AudioExtractionResult, AudioExtractor } from '../
  * FFmpeg adapter for AudioExtractor.
  *
  * Reads the authoritative recording out of object storage into a temp file,
- * then remuxes to 16 kHz mono PCM WAV, which is what Whisper expects. The
- * original WebM is never modified and the WAV is temporary by design.
+ * then produces the chunks the transcriber will upload.
+ *
+ * Three steps happen in one pass:
+ *
+ *  1. Remux to 16 kHz mono, which is what Whisper expects.
+ *  2. Drop silence. Meetings are mostly dead air between sentences, and a
+ *     hour-long recording is mostly dead air. Removing it cuts both the
+ *     bytes uploaded and the words Whisper hallucinates over quiet audio.
+ *  3. Encode lossless FLAC (roughly half the size of PCM at no quality cost)
+ *     and split into chunks, because the transcription API caps a single
+ *     upload at 25 MB and an hour of meeting audio is far larger than that.
+ *
+ * The original WebM is never modified. Every artefact here is temporary and is
+ * deleted by the caller.
  */
+
+/** Comfortably under the provider's 25 MB per-file ceiling. */
+const CHUNK_SECONDS = 600;
+
+/** Whisper drifts on silence and invents text to fill it. */
+const SILENCE_THRESHOLD_DB = -50;
+const SILENCE_MIN_DURATION_SECONDS = 1.5;
 
 const runFfmpeg = (args: string[]): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -36,34 +55,63 @@ export class FfmpegAudioExtractor implements AudioExtractor {
     const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'intellmeet-audio-'));
     // The source extension comes from the validated MIME type, never from the client.
     const sourcePath = path.join(workDir, `source${input.recordingMimeType.includes('mp4') ? '.mp4' : '.webm'}`);
-    const audioPath = path.join(workDir, 'audio.wav');
+    const chunkPattern = path.join(workDir, 'chunk-%04d.flac');
 
     try {
       await downloadObjectToFile(input.storageKey, sourcePath);
 
+      // stop_periods=-1 removes every internal silence longer than the minimum,
+      // not just the leading and trailing ones. detection=rms measures loudness
+      // rather than sample peaks, so a quiet-but-present speaker is not clipped.
       await runFfmpeg([
         '-hide_banner',
         '-loglevel', 'error',
         '-y',
         '-i', sourcePath,
         '-vn',
+        '-af',
+        [
+          'silenceremove=start_periods=1',
+          `:start_duration=${SILENCE_MIN_DURATION_SECONDS}`,
+          `:start_threshold=${SILENCE_THRESHOLD_DB}dB`,
+          ':stop_periods=-1',
+          `:stop_duration=${SILENCE_MIN_DURATION_SECONDS}`,
+          `:stop_threshold=${SILENCE_THRESHOLD_DB}dB`,
+          'detection=rms',
+        ].join(''),
         '-ac', '1',
         '-ar', '16000',
-        '-acodec', 'pcm_s16le',
-        '-f', 'wav',
-        audioPath
+        '-acodec', 'flac',
+        // segment muxer writes chunk-0000.flac, chunk-0001.flac, ...
+        '-f', 'segment',
+        '-segment_time', String(CHUNK_SECONDS),
+        '-reset_timestamps', '1',
+        chunkPattern
       ]);
 
-      const stats = await fs.stat(audioPath);
-      if (stats.size <= 44) {
-        // A valid WAV header is 44 bytes; anything smaller has no audio track.
+      const chunkPaths = (await fs.readdir(workDir))
+        .filter((name) => name.startsWith('chunk-') && name.endsWith('.flac'))
+        .sort()
+        .map((name) => path.join(workDir, name));
+
+      if (chunkPaths.length === 0) {
         throw new ApiError(500, 'Recording contains no decodable audio track');
       }
 
-      const durationMs = await this.probeDurationMs(audioPath);
-      logger.info(`Audio extracted for recording ${input.recordingId}: ${stats.size} bytes, ${durationMs}ms`);
+      let totalBytes = 0;
+      let totalDurationMs = 0;
+      for (const chunkPath of chunkPaths) {
+        const stats = await fs.stat(chunkPath);
+        totalBytes += stats.size;
+        totalDurationMs += (await this.probeFlacDurationMs(chunkPath)) ?? 0;
+      }
 
-      return { filePath: audioPath, durationMs };
+      logger.info(
+        `Audio prepared for recording ${input.recordingId}: ${chunkPaths.length} chunk(s), ` +
+          `${Math.round(totalBytes / 1024)} KB, ~${Math.round(totalDurationMs / 1000)}s after silence removal`
+      );
+
+      return { filePaths: chunkPaths, durationMs: totalDurationMs || null };
     } catch (error) {
       await fs.rm(workDir, { recursive: true, force: true });
       throw error;
@@ -71,25 +119,35 @@ export class FfmpegAudioExtractor implements AudioExtractor {
   }
 
   /**
-   * Duration from the WAV header, so the extractor does not need a second
-   * ffprobe process. Returns null when it cannot be determined.
+   * FLAC stores its sample rate and total samples in the STREAMINFO block at a
+   * fixed offset, so duration needs no second ffprobe process. Returns null
+   * when the header cannot be read rather than guessing.
    */
-  private async probeDurationMs(filePath: string): Promise<number | null> {
+  private async probeFlacDurationMs(filePath: string): Promise<number | null> {
     try {
       const handle = await fs.open(filePath, 'r');
       try {
-        const header = Buffer.alloc(44);
-        await handle.read(header, 0, 44, 0);
-        // RIFF chunk size at byte 4 is the file length minus 8.
-        const byteRate = header.readUInt32LE(28);
-        if (!byteRate) return null;
-        const dataSize = header.readUInt32LE(40);
-        return Math.round((dataSize / byteRate) * 1000);
+        // 4 bytes magic "fLaC", 4 bytes metadata block header, then STREAMINFO:
+        // 2 bytes min block, 2 max block, 3 min frame, 3 max frame, then 8 bytes
+        // packing sampleRate (20 bits) and channels (3) and bits (5) and total samples (36).
+        const header = Buffer.alloc(42);
+        const { bytesRead } = await handle.read(header, 0, 42, 0);
+        if (bytesRead < 42) return null;
+        if (header.toString('ascii', 0, 4) !== 'fLaC') return null;
+
+        const info = header.subarray(8);
+        const sampleRate = (info[10] << 12) | (info[11] << 4) | (info[12] >> 4);
+        if (!sampleRate) return null;
+
+        // The 36-bit total sample count spans the last 5 bytes of this field.
+        const totalSamples =
+          (info[13] & 0x0f) * 2 ** 32 + info[14] * 2 ** 24 + info[15] * 2 ** 16 + info[16] * 2 ** 8 + info[17];
+        return Math.round((totalSamples / sampleRate) * 1000);
       } finally {
         await handle.close();
       }
     } catch (error) {
-      logger.warn(`Could not read WAV duration: ${(error as Error).message}`);
+      logger.warn(`Could not read FLAC duration: ${(error as Error).message}`);
       return null;
     }
   }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { MeetingParticipants } from './MeetingParticipants';
 import { MeetingChat } from './MeetingChat';
 import { MeetingQuestions } from './MeetingQuestions';
@@ -9,6 +10,7 @@ import { PANELS, type PanelKey } from './meetingPanels';
 import type { MeetingParticipant } from '@/api/meeting/meeting.types';
 import type { MeetingQuestion } from '@/api/meeting/meeting-qa.api';
 import type { MeetingPoll } from '@/api/meeting/meeting-poll.api';
+import type { MeetingChatMessage, RaisedHand } from '@/api/meeting/webrtc.types';
 
 export interface MeetingSidebarProps {
   panel: PanelKey;
@@ -20,12 +22,10 @@ export interface MeetingSidebarProps {
   onEditParticipant: (participant: MeetingParticipant) => void;
   currentUserId?: string;
   currentUserName?: string;
-  activeScreenShareUserId?: string;
   onToggleMuteParticipant?: (participant: MeetingParticipant) => void;
-  onEndParticipantScreenShare?: (userId: string) => void;
   onRemoveParticipant?: (userId: string) => void;
   localMicOn?: boolean;
-  peers?: Record<string, { stream: MediaStream; audioEnabled?: boolean; videoEnabled?: boolean; screenSharing?: boolean }>;
+  peers?: Record<string, { stream: MediaStream | null; audioEnabled?: boolean; videoEnabled?: boolean }>;
   meetingId: string;
   canPost: boolean;
   onToast: (message: string) => void;
@@ -52,6 +52,10 @@ export interface MeetingSidebarProps {
   onCreatePoll: (question: string, options: string[]) => Promise<void>;
   onVotePoll: (pollId: string, optionIds: string[]) => Promise<void>;
   onClosePoll: (pollId: string) => Promise<void>;
+  chatMessages?: MeetingChatMessage[];
+  setChatMessages?: React.Dispatch<React.SetStateAction<MeetingChatMessage[]>>;
+  raisedHands?: RaisedHand[];
+  onLowerHand?: (userId?: string) => void;
 }
 
 /** Right sidebar container hosting People, Chat, Q&A, and Polls panels */
@@ -65,9 +69,7 @@ export const MeetingSidebar: React.FC<MeetingSidebarProps> = ({
   onEditParticipant,
   currentUserId,
   currentUserName,
-  activeScreenShareUserId,
   onToggleMuteParticipant,
-  onEndParticipantScreenShare,
   onRemoveParticipant,
   localMicOn,
   peers,
@@ -88,6 +90,10 @@ export const MeetingSidebar: React.FC<MeetingSidebarProps> = ({
   onCreatePoll,
   onVotePoll,
   onClosePoll,
+  chatMessages,
+  setChatMessages,
+  raisedHands,
+  onLowerHand,
 }) => {
   const activePoll = React.useMemo(
     () => polls.data?.find((p) => p.pollStatus === 'OPEN') ?? null,
@@ -123,17 +129,17 @@ export const MeetingSidebar: React.FC<MeetingSidebarProps> = ({
               onEditSettings={onEditParticipant}
               currentUserId={currentUserId}
               currentUserName={currentUserName}
-              activeScreenShareUserId={activeScreenShareUserId}
               onToggleMuteParticipant={onToggleMuteParticipant}
-              onEndParticipantScreenShare={onEndParticipantScreenShare}
               onRemoveParticipant={onRemoveParticipant}
               localMicOn={localMicOn}
               peers={peers}
+              raisedHands={raisedHands}
+              onLowerHand={onLowerHand}
             />
           </div>
         )}
 
-        {panel === 'chat' && (
+        <div className={cn("flex-1 min-h-0 flex flex-col overflow-hidden", panel !== 'chat' && "hidden")}>
           <MeetingChat
             meetingId={meetingId}
             currentUserId={currentUserId ?? ''}
@@ -142,7 +148,7 @@ export const MeetingSidebar: React.FC<MeetingSidebarProps> = ({
             onError={onToast}
             displayNameFor={(userId) => getParticipantDisplayName({ userId })}
             emailFor={(userId) => getParticipantEmail?.({ userId })}
-            meetingRoleFor={(userId) => getParticipantMeetingRole?.({ userId })}
+            meetingRoleFor={(userId) => getParticipantMeetingRole?.({ userId }) ?? "Member"}
             participants={participants}
             canViewProfile={true}
             onOpenPolls={() => onSetPanel('polls')}
@@ -150,8 +156,10 @@ export const MeetingSidebar: React.FC<MeetingSidebarProps> = ({
             onVotePoll={onVotePoll}
             onClosePoll={onClosePoll}
             pollPending={pollPending}
+            messages={chatMessages}
+            setMessages={setChatMessages}
           />
-        )}
+        </div>
 
         {panel === 'qa' && (
           <MeetingQuestions
@@ -160,10 +168,18 @@ export const MeetingSidebar: React.FC<MeetingSidebarProps> = ({
             loading={questions.loading}
             error={questions.error}
             canPost={canPost}
+            canManage={canManage}
             posting={qaPending}
             onAsk={onAskQuestion}
             onAnswer={onAnswerQuestion}
             onDismiss={onDismissQuestion}
+            displayNameFor={(userId) => getParticipantDisplayName({ userId })}
+            getParticipantAvatar={(userId) => {
+              const p = participants.find((item) => item.userId === userId);
+              return p?.avatarUrl;
+            }}
+            currentUserId={currentUserId}
+            participants={participants}
           />
         )}
 

@@ -25,7 +25,6 @@ import {
   type CreateServerAdminOrgFormValues
 } from '@/schemas/server-admin.schema';
 import { createOrgWithCredentialsApi } from '@/api/server-admin/server-admin.api';
-import { decryptCredential } from '@/utils/crypto';
 
 interface GeneratedCreds {
   organization: {
@@ -78,12 +77,7 @@ export const CreateServerAdminOrg: React.FC = () => {
       });
 
       const rawCreds = res.data.data as GeneratedCreds;
-      let clearPassword = '';
-      if (rawCreds.credentials?.encryptedPassword) {
-        clearPassword = await decryptCredential(rawCreds.credentials.encryptedPassword);
-      } else if (rawCreds.credentials?.initialPassword) {
-        clearPassword = rawCreds.credentials.initialPassword;
-      }
+      const clearPassword = rawCreds.credentials?.initialPassword || '';
 
       setDecryptedPassword(clearPassword);
       setGeneratedCreds(rawCreds);

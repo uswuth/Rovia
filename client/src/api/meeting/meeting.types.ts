@@ -136,6 +136,7 @@ export interface CreateMeetingDTO {
   meetingJoinMode?: MeetingJoinMode;
   meetingParticipantLimit?: number;
   participantIds?: string[];
+  participantRoles?: Record<string, 'HOST' | 'MEMBER'>;
 }
 
 export interface ParticipantPermissions {

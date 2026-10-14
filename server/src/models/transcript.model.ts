@@ -17,6 +17,33 @@ export class TranscriptSegmentClass {
   public text!: string;
 }
 
+/**
+ * One participant's speech, transcribed on its own track.
+ *
+ * Each speaker is captured and transcribed separately so crosstalk never reaches
+ * the model. Speaker attribution comes from the roster the meeting already holds,
+ * not from the audio, so it is exact rather than inferred.
+ */
+@modelOptions({ schemaOptions: { _id: false } })
+export class TranscriptSpeakerClass {
+  @prop({ type: () => String, required: true })
+  public speakerId!: string;
+
+  /** Display name captured at record time; the roster may change later. */
+  @prop({ type: () => String, required: true })
+  public speakerName!: string;
+
+  @prop({ type: () => String, default: '' })
+  public speakerText!: string;
+
+  @prop({ type: () => Number, default: 0 })
+  public speakerDurationMs!: number;
+
+  /** False when that speaker's track held no speech at all. */
+  @prop({ type: () => Boolean, default: true })
+  public spoke!: boolean;
+}
+
 @modelOptions({
   schemaOptions: {
     collection: 'transcripts',
@@ -31,6 +58,7 @@ export class TranscriptSegmentClass {
           transcriptLanguage: ret.transcript_language ?? null,
           transcriptDurationMs: ret.transcript_duration_ms ?? 0,
           transcriptSegmentCount: ((ret.transcript_segments as unknown[]) ?? []).length,
+          transcriptSpeakers: (ret.transcript_speakers as unknown[]) || [],
           organizationId: ret.organization_id,
           recordingId: ret.recording_id,
           createdAt: ret.created_at,
@@ -128,6 +156,24 @@ export class TranscriptClass {
   }
   public set transcriptSegments(val: Array<{ startMs: number; endMs: number; text: string }>) {
     this.transcript_segments = val;
+  }
+
+  @prop({ type: () => [TranscriptSpeakerClass], default: [], alias: 'transcriptSpeakers' })
+  public transcript_speakers!: Array<TranscriptSpeakerClass>;
+
+  public get transcriptSpeakers(): Array<{
+    speakerId: string;
+    speakerName: string;
+    speakerText: string;
+    speakerDurationMs: number;
+    spoke: boolean;
+  }> {
+    return this.transcript_speakers;
+  }
+  public set transcriptSpeakers(
+    val: Array<{ speakerId: string; speakerName: string; speakerText: string; speakerDurationMs: number; spoke: boolean }>
+  ) {
+    this.transcript_speakers = val;
   }
 
   public get transcriptId(): string {

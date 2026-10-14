@@ -144,7 +144,7 @@ export function NavMain({
                           <Link 
                             to={subItem.url} 
                             onClick={handleNavClick}
-                            className={`w-full cursor-pointer ${isSubActive ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium' : ''}`}
+                            className={`w-full cursor-pointer ${isSubActive ? 'bg-primary/10 text-primary font-medium' : ''}`}
                           >
                             {subItem.title}
                           </Link>

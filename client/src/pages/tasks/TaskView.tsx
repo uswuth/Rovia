@@ -225,7 +225,7 @@ export const TaskView: React.FC = () => {
 
           {projName && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-secondary text-secondary-foreground text-xs font-medium border border-border/60">
-              <FolderGit2 size={12} className="text-emerald-500 shrink-0" />
+              <FolderGit2 size={12} className="text-primary shrink-0" />
               <span>{projName}</span>
             </span>
           )}
@@ -272,7 +272,7 @@ export const TaskView: React.FC = () => {
                     {creatorProfilePath ? (
                       <Link
                         to={creatorProfilePath}
-                        className="font-medium text-foreground text-xs hover:text-emerald-500 hover:underline truncate block"
+                        className="font-medium text-foreground text-xs hover:text-primary hover:underline truncate block"
                       >
                         {resolvedCreatorName}
                       </Link>
@@ -314,7 +314,7 @@ export const TaskView: React.FC = () => {
         <div className="lg:col-span-4 space-y-4 min-w-0 max-w-full">
           <div className="flex items-center justify-between pb-2.5 border-b border-border/50">
             <div className="flex items-center gap-2">
-              <UserCheck size={16} className="text-emerald-500" />
+              <UserCheck size={16} className="text-primary" />
               <h3 className="text-sm font-bold text-foreground tracking-tight">
                 Assigned Members
               </h3>
@@ -358,7 +358,7 @@ export const TaskView: React.FC = () => {
                         {memberProfilePath ? (
                           <Link
                             to={memberProfilePath}
-                            className="text-xs font-semibold text-foreground hover:text-emerald-500 hover:underline truncate block"
+                            className="text-xs font-semibold text-foreground hover:text-primary hover:underline truncate block"
                           >
                             {name}
                           </Link>

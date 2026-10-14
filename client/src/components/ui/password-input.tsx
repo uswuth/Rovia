@@ -28,7 +28,7 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputPro
               variant="ghost"
               size="sm"
               onClick={onGeneratePassword}
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-emerald-500 cursor-pointer"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-primary cursor-pointer"
               title="Generate Random Password"
             >
               <Sparkles size={14} />

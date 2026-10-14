@@ -172,7 +172,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 )}
               >
                 <span className="flex-1 text-left italic">{clearLabel}</span>
-                {!value && <Check size={13} className="text-emerald-500 shrink-0 ml-1.5" />}
+                {!value && <Check size={13} className="text-primary shrink-0 ml-1.5" />}
               </button>
             )}
 
@@ -212,7 +212,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                         </p>
                       )}
                     </div>
-                    {isSelected && <Check size={13} className="text-emerald-500 shrink-0 ml-1" />}
+                    {isSelected && <Check size={13} className="text-primary shrink-0 ml-1" />}
                   </button>
                 );
               })

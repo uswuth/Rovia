@@ -23,7 +23,7 @@ export const getMeetingSocket = (visitorId?: string): MeetingSocket => {
   const token = getAccessToken();
   socket = io('/', {
     auth: token ? { token } : { visitorId },
-    transports: ['websocket', 'polling']
+    transports: ['polling', 'websocket']
   });
   return socket;
 };

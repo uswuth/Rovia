@@ -1,46 +1,35 @@
 import React from 'react';
-import { MonitorUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { VideoTile } from './VideoTile';
+import { OverflowTile } from './OverflowTile';
 import type { MeetingParticipant } from '@/api/meeting/meeting.types';
 
-export type LayoutViewMode = 'grid' | 'focus' | 'compact';
-
 export interface MeetingVideoStageProps {
-  screenStream?: MediaStream | null;
-  activeScreenSharePeer?: { userId: string; stream: MediaStream } | null;
-  onStopScreenShare: () => void;
   participants: MeetingParticipant[];
   currentUserId?: string;
-  handRaised: boolean;
   localStream?: MediaStream | null;
-  peers: Record<string, { stream: MediaStream; screenSharing?: boolean; videoEnabled?: boolean; audioEnabled?: boolean }>;
-  layoutMode: LayoutViewMode;
+  peers: Record<string, { stream: MediaStream | null; videoEnabled?: boolean; audioEnabled?: boolean }>;
   getParticipantDisplayName: (p: { userId?: string; userName?: string; name?: string }) => string;
   getParticipantAvatar: (p: { userId?: string }) => string | undefined;
   speakerMuted?: boolean;
   selectedSpeaker?: string;
   localCameraOn?: boolean;
   localMicOn?: boolean;
+  onOpenParticipants?: () => void;
 }
 
-/** Main central stage containing active screen shares and participant video tiles */
+/** Main central stage containing participant video tiles */
 export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
-  screenStream,
-  activeScreenSharePeer,
-  onStopScreenShare,
   participants,
   currentUserId,
-  handRaised,
   localStream,
   peers,
-  layoutMode,
   getParticipantDisplayName,
   getParticipantAvatar,
   speakerMuted = false,
   selectedSpeaker,
   localCameraOn,
   localMicOn,
+  onOpenParticipants,
 }) => {
   const [speakingMap, setSpeakingMap] = React.useState<Record<string, boolean>>({});
   const [speakerQueue, setSpeakerQueue] = React.useState<string[]>([]);
@@ -59,6 +48,9 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
     let audioCtx: AudioContext | null = null;
     try {
       audioCtx = new AudioContextClass();
+      if (audioCtx.state === 'suspended') {
+        void audioCtx.resume().catch(() => { });
+      }
     } catch {
       return;
     }
@@ -68,12 +60,14 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
 
     participants.forEach((p) => {
       if (!p.canSendAudio) return;
+      if (p.userId === currentUserId && localMicOn === false) return;
 
       const stream = p.userId === currentUserId ? localStream : peers[p.userId]?.stream;
       if (!stream) return;
 
       const audioTrack = stream.getAudioTracks()[0];
-      if (!audioTrack || !audioTrack.enabled) return;
+      if (!audioTrack) return;
+      if (p.userId !== currentUserId && !audioTrack.enabled) return;
 
       try {
         const source = audioCtx!.createMediaStreamSource(stream);
@@ -108,7 +102,7 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
 
     const MIN_HOLD_DURATION_MS = 2500;
     const SUSTAINED_SPEECH_REQUIRED_MS = 1200;
-    const VOICE_THRESHOLD = 12;
+    const VOICE_THRESHOLD = 3.5;
 
     const checkAudio = () => {
       if (!running || !audioCtx || audioCtx.state === 'closed') return;
@@ -131,7 +125,7 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
 
         // Voice detection threshold & hangover (prevents border flicker)
         if (ema > VOICE_THRESHOLD) {
-          hangover[userId] = now + 500;
+          hangover[userId] = now + 650;
           if (!speechStartTime[userId]) {
             speechStartTime[userId] = now;
           }
@@ -211,10 +205,10 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
         }
       });
       if (audioCtx && audioCtx.state !== 'closed') {
-        void audioCtx.close().catch(() => {});
+        void audioCtx.close().catch(() => { });
       }
     };
-  }, [participants, localStream, peers, currentUserId]);
+  }, [participants, localStream, peers, currentUserId, localMicOn]);
 
   // Sort participants by speakerQueue order: active speaker is 1st, others slowly queue back
   const orderedParticipants = React.useMemo(() => {
@@ -237,88 +231,118 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
     return result;
   }, [participants, speakerQueue]);
 
+  const renderTile = (participant: MeetingParticipant) => {
+    const isYou = participant.userId === currentUserId;
+
+    const isCameraActive = isYou
+      ? (localCameraOn ?? true)
+      : Boolean(peers[participant.userId]?.videoEnabled);
+
+    const isMicMuted = isYou
+      ? !(localMicOn ?? true)
+      : (!participant.canSendAudio || peers[participant.userId]?.audioEnabled === false);
+
+    const peerState = peers[participant.userId];
+
+    return (
+      <VideoTile
+        key={participant.userId}
+        name={getParticipantDisplayName(participant)}
+        avatarUrl={getParticipantAvatar(participant)}
+        isYou={isYou}
+        host={participant.participantRole === 'HOST'}
+        muted={isMicMuted}
+        cameraOn={isCameraActive}
+        stream={isYou ? localStream : peerState?.stream}
+        speakerMuted={speakerMuted}
+        selectedSpeaker={selectedSpeaker}
+        isSpeaking={Boolean(speakingMap[participant.userId])}
+      />
+    );
+  };
+
+  // Grid overflow setup:
+  // Dense grid capacity: 20 slots (19 video tiles + 1 overflow tile, as illustrated in the bottom-left layout)
+  const MAX_GRID_TILES = 20;
+  const isGridOverflow = orderedParticipants.length > MAX_GRID_TILES;
+  const gridVisibleParticipants = isGridOverflow
+    ? orderedParticipants.slice(0, MAX_GRID_TILES - 1)
+    : orderedParticipants;
+  const gridOverflowCount = isGridOverflow
+    ? orderedParticipants.length - (MAX_GRID_TILES - 1)
+    : 0;
+
+  const count = gridVisibleParticipants.length;
+
   return (
-    <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-6 bg-muted/20 overflow-y-auto w-full transition-all duration-300 ease-in-out">
-      {/* Active Screen Share Stage (Host or Participant) */}
-      {(screenStream || activeScreenSharePeer) && (
-        <div className="w-full max-w-4xl space-y-2 mb-2">
-          <div className="flex items-center justify-between bg-slate-900 border border-emerald-500/40 rounded-t-xs px-4 py-2 text-xs text-white">
-            <span className="flex items-center gap-2 font-bold text-emerald-400">
-              <MonitorUp size={15} />
-              {screenStream
-                ? 'You are sharing your screen'
-                : `${getParticipantDisplayName({ userId: activeScreenSharePeer?.userId || '' })} is sharing screen`}
-            </span>
-            {screenStream && (
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={onStopScreenShare}
-                className="h-7 text-xs px-2.5 cursor-pointer rounded-xs"
-              >
-                Stop Sharing
-              </Button>
-            )}
+    <main className="flex min-h-0 flex-1 flex-col items-center justify-center p-4 lg:p-6 bg-transparent overflow-y-auto w-full h-full transition-all duration-300 ease-in-out">
+      {/* 1 Participant: Single Large Center Tile */}
+      {count === 1 && (
+        <div className="w-full max-w-3xl aspect-video mx-auto my-auto">
+          {renderTile(gridVisibleParticipants[0])}
+        </div>
+      )}
+
+      {/* 2 Participants: 1 Row, 2 Columns */}
+      {count === 2 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto my-auto">
+          {gridVisibleParticipants.map(renderTile)}
+        </div>
+      )}
+
+      {/* 3 Participants (Top-Right Diagram): 2 on Top Row, 1 Centered on Bottom Row */}
+      {count === 3 && (
+        <div className="flex flex-col gap-4 w-full max-w-5xl mx-auto my-auto items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+            {renderTile(gridVisibleParticipants[0])}
+            {renderTile(gridVisibleParticipants[1])}
           </div>
-          <div className="relative aspect-video w-full overflow-hidden rounded-b-xs border border-slate-800 bg-black shadow-2xl">
-            <video
-              ref={(el) => {
-                if (el) {
-                  el.srcObject = screenStream || activeScreenSharePeer?.stream || null;
-                }
-              }}
-              autoPlay
-              playsInline
-              muted={Boolean(screenStream)}
-              className="size-full object-contain"
-            />
+          <div className="w-full sm:w-[calc(50%-8px)]">
+            {renderTile(gridVisibleParticipants[2])}
           </div>
         </div>
       )}
 
-      {/* Participant Video Tiles Grid */}
-      <div
-        className={`grid w-full max-w-4xl gap-4 ${
-          layoutMode === 'focus'
-            ? 'grid-cols-1'
-            : layoutMode === 'compact'
-              ? 'grid-cols-2 sm:grid-cols-3'
-              : 'grid-cols-1 sm:grid-cols-2'
-        }`}
-      >
-        {orderedParticipants.map((participant) => {
-          const isYou = participant.userId === currentUserId;
-          const isSharingScreen = isYou
-            ? Boolean(screenStream)
-            : Boolean(peers[participant.userId]?.screenSharing || activeScreenSharePeer?.userId === participant.userId);
+      {/* 4 Participants (Top-Left Diagram): 2x2 Grid */}
+      {count === 4 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto my-auto">
+          {gridVisibleParticipants.map(renderTile)}
+        </div>
+      )}
 
-          const isCameraActive = isYou
-            ? (localCameraOn ?? true)
-            : (peers[participant.userId]?.videoEnabled ?? participant.canSendVideo);
+      {/* 5 or 6 Participants: 3 Columns x 2 Rows */}
+      {count > 4 && count <= 6 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 w-full max-w-6xl mx-auto my-auto">
+          {gridVisibleParticipants.map(renderTile)}
+        </div>
+      )}
 
-          const isMicMuted = isYou
-            ? !(localMicOn ?? true)
-            : (!participant.canSendAudio || peers[participant.userId]?.audioEnabled === false);
+      {/* 7 to 9 Participants: 3 Columns x 3 Rows */}
+      {count > 6 && count <= 9 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-6xl mx-auto my-auto">
+          {gridVisibleParticipants.map(renderTile)}
+        </div>
+      )}
 
-          return (
-            <VideoTile
-              key={participant.userId}
-              name={getParticipantDisplayName(participant)}
-              avatarUrl={getParticipantAvatar(participant)}
-              isYou={isYou}
-              host={participant.participantRole === 'HOST'}
-              muted={isMicMuted}
-              cameraOn={isCameraActive}
-              handRaised={isYou ? handRaised : false}
-              stream={isYou ? localStream : peers[participant.userId]?.stream}
-              speakerMuted={speakerMuted}
-              selectedSpeaker={selectedSpeaker}
-              screenSharing={isSharingScreen}
-              isSpeaking={Boolean(speakingMap[participant.userId])}
+      {/* 10 to 16 Participants: 4 Columns */}
+      {count > 9 && count <= 16 && !isGridOverflow && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 w-full max-w-7xl mx-auto my-auto">
+          {gridVisibleParticipants.map(renderTile)}
+        </div>
+      )}
+
+      {/* 17+ Participants (Bottom-Left Diagram): Dense Grid with +N more Overflow Tile */}
+      {(count > 16 || isGridOverflow) && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 w-full max-w-7xl mx-auto my-auto">
+          {gridVisibleParticipants.map(renderTile)}
+          {gridOverflowCount > 0 && (
+            <OverflowTile
+              count={gridOverflowCount}
+              onClick={onOpenParticipants}
             />
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
     </main>
   );
 };
