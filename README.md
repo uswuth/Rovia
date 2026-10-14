@@ -1,15 +1,15 @@
-# Intellmeet
+# IntellMeet
 
-AI-Powered Enterprise Meeting & Collaboration Platform
+**AI-Powered Enterprise Meeting & Collaboration Platform**
 
-> Progress-tracked README: what the product is, the feature list, and how much of it is implemented today.
->
-> - All commands and their purpose: [`commands.md`](./commands.md)
-> - Live progress tracker (source of truth): [`TASKS.md`](./TASKS.md)
-> - Full API surface with JSON examples: [`docs/API_ROUTES.md`](./docs/API_ROUTES.md)
-> - Technology stack and design choices: [`docs/STACK.md`](./docs/STACK.md)
-> - Architecture diagram (archify-generated) and flows: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
-> - Codebase quality audit, scorecard and fix roadmap: [`CODE_AUDIT.md`](./CODE_AUDIT.md)
+Real-time video meetings, AI meeting intelligence, and team collaboration for
+modern remote and hybrid teams. Built with the MERN stack.
+
+- [Features](#features) · [Tech stack](#tech-stack) · [Getting started](#getting-started)
+- [API reference](./docs/API_ROUTES.md) · [Architecture](./docs/ARCHITECTURE.md)
+- [Deployment](./DEPLOYMENT.md) · [Commands](./commands.md)
+
+Zidio Development · MERN Domain · March 2026
 
 ---
 
@@ -33,7 +33,6 @@ workspaces, and the post-meeting dashboard are completely wired end-to-end. What
 remains for final project submission is live cloud hosting, the PDF report, and the
 walkthrough demo video. The AI pipeline runs on hosted free-tier models (Groq for
 transcription, OpenRouter for summarisation), so no model weights are downloaded locally.
-See [`TASKS.md`](./TASKS.md) for the item-level source of truth.
 
 | Area | Status | Notes |
 | --- | --- | --- |

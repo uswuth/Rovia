@@ -17,10 +17,10 @@
     "build:client": "pnpm -r --filter client build",
     "openapi": "pnpm -r --filter server openapi",
     "secrets:generate": "node server/scripts/generate-secrets.mjs",
-    "docker:up": "pnpm secrets:generate && docker compose up --build -d",
+    "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f",
-    "docker:tools": "pnpm secrets:generate && docker compose --profile tools up --build -d"
+    "docker:tools": "docker compose --profile tools up -d",
+    "docker:logs": "docker compose logs -f"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

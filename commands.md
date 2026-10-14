@@ -10,6 +10,7 @@ commands from the repository root.
 | `pnpm install` | Installs dependencies for all workspace packages |
 | `cp .env.example .env` | Creates the root env file from the template |
 | `cp server/.env.example server/.env` | Creates the server env file from the template |
+| `pnpm docker:up` | Starts local MongoDB and the S3 store (see Docker below) |
 
 ## Development
 
@@ -37,43 +38,46 @@ commands from the repository root.
 
 | Command | What it does |
 | --- | --- |
-| `pnpm secrets:generate` | Generates `server/secrets/*.txt` for Docker |
+| `pnpm secrets:generate` | Generates `server/secrets/*.txt` to upload to Render |
 | `node server/scripts/generate-secrets.mjs --force` | Regenerates all secrets (invalidates existing tokens) |
 
-Secrets live in `server/secrets/` and are git-ignored. The API reads them from
-`/run/secrets/*_FILE` in Docker, or from `server/.env` in local development.
-There are no default secret values in code — a missing one stops the server.
+Secrets live in `server/secrets/` and are git-ignored. Upload each file under
+**Render → Secret Files**, or set the same values as environment variables in
+local development. There are no default secret values in code — a missing one
+stops the server with a named error.
 
 ## Docker
 
+Docker is **not used for deployment.** Production builds from source: Vercel
+builds the client, Render runs the API with its native Node runtime. Docker runs
+the third-party services you need locally so you do not have to stand up a real
+database or a real S3 account.
+
 | Command | What it does |
 | --- | --- |
-| `pnpm docker:up` | Generates secrets, then builds and starts the full stack |
-| `pnpm docker:down` | Stops and removes the containers |
+| `pnpm docker:up` | Starts local MongoDB and the S3-compatible store |
+| `pnpm docker:down` | Stops and removes those containers |
 | `pnpm docker:logs` | Follows container logs |
-| `pnpm docker:tools` | Starts the stack plus mongo-express and the S3 emulator |
-| `docker compose up --build` | Same as `docker:up` without the secret step |
-| `docker compose --profile tools up -d` | Starts only the optional tooling services |
-| `docker compose --profile localmongo up -d` | Starts a local MongoDB instead of Atlas |
-| `docker compose --profile s3ui up -d s3browser` | Starts the S3 emulator web UI |
+| `pnpm docker:tools` | Also starts the optional MongoDB and S3 web UIs |
+| `docker compose --profile tools up -d` | Same as `pnpm docker:tools` |
 | `docker compose down -v` | Stops everything and deletes the database volume |
-
-There is no `ai` profile: transcription and summarisation are hosted (Groq and
-OpenRouter), so nothing is built or downloaded for them. Add the two keys to
-`server/.env` and the pipeline runs as part of `POST /recordings/:id/complete`.
-
-`ffmpeg` must be on the server's PATH (or set `FFMPEG_PATH`). It demuxes the
-recording, drops silence and splits the audio into chunks before transcription.
 
 | Service | URL |
 | --- | --- |
-| Web client | http://localhost:3000 |
-| API + Swagger | http://localhost:5000 |
-| MongoDB UI (optional) | http://localhost:8081 |
-| S3 emulator (optional) | http://localhost:4566 |
+| Web client (pnpm dev) | http://localhost:5173 |
+| API + Swagger (pnpm dev) | http://localhost:5000 |
+| MongoDB (container) | mongodb://localhost:27017 |
+| S3 store (container) | http://localhost:4566 |
+| S3 web UI (optional) | http://localhost:9000 |
 
-Ports are configurable in `.env` via `CLIENT_PORT`, `SERVER_PORT`, and
-`MONGO_EXPRESS_PORT`.
+The client and API always run on the host with `pnpm dev`, never in a
+container, so a broken container is never mistaken for a broken application.
+
+There is no AI profile: transcription and summarisation are hosted (Groq and
+OpenRouter), so nothing is downloaded or built for them.
+
+`ffmpeg` must be on the server's PATH (or set `FFMPEG_PATH`). It prepares each
+speaker's audio before transcription.
 
 ## Per-package
 
@@ -84,9 +88,3 @@ Run from inside `client/` or `server/`:
 | `pnpm dev` | Dev server with hot reload |
 | `pnpm build` | Production build |
 | `pnpm lint` | Lint the package |
-
-## Architecture docs
-
-| Command | What it does |
-| --- | --- |
-| `node .agents/skills/archify/bin/archify.mjs finalize architecture <candidate.json> <out.html> --repo-root . --quality showcase --json` | Re-validates and regenerates the interactive architecture diagram (see [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)) |

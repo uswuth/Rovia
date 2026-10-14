@@ -1,0 +1,48 @@
+name: Keep API awake
+
+# Render's free web service spins down after 15 minutes idle and needs roughly
+# 50 seconds to wake, which a judge opening a shared demo link would sit
+# through. This pings the health endpoint every 10 minutes to hold it open.
+#
+# This runs here rather than as a Vercel cron because Vercel's Hobby plan
+# rejects any cron expression that fires more than once per day, which would
+# fail the deployment outright. GitHub Actions schedules every 5 minutes on all
+# plans and is free for a public repository.
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub may delay scheduled runs under load.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    # Nothing here touches the repository, so nothing needs a token.
+    timeout-minutes: 3
+    steps:
+      - name: Ping the API health endpoint
+        env:
+          RENDER_API_URL: ${{ vars.RENDER_API_URL }}
+        run: |
+          if [ -z "$RENDER_API_URL" ]; then
+            echo "RENDER_API_URL is not set."
+            echo "Add it under Settings -> Secrets -> Actions -> Variables."
+            exit 0
+          fi
+
+          url="${RENDER_API_URL%/}/api/v1/health"
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo "000")
+          echo "GET $url -> $code"
+
+          # A failure is reported but never fails the run: the service sleeping
+          # is the thing being prevented, so a transient error must not turn
+          # into a noisy red X on every scheduled run.
+          if [ "$code" = "200" ]; then
+            echo "API is awake."
+          else
+            echo "API did not answer 200. It may be cold, or the URL may be wrong."
+          fi

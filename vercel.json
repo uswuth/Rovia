@@ -6,11 +6,5 @@
   "framework": null,
   "rewrites": [
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/keep-wake",
-      "schedule": "*/10 * * * *"
-    }
   ]
 }
