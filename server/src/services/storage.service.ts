@@ -25,27 +25,48 @@ const baseConfig = {
 };
 
 /**
+ * Backblaze B2 answers uploads that carry `Expect: 100-continue` with an
+ * opaque 500 `InternalError` instead of honouring the handshake, so the
+ * header has to come off before the request is sent. Stripping it is safe for
+ * every S3-compatible backend.
+ */
+const withoutExpectContinue = (client: S3Client): S3Client => {
+  client.middlewareStack.add(
+    (next) => async (args) => {
+      delete (args.request as { headers: Record<string, unknown> }).headers.Expect;
+      return next(args);
+    },
+    { step: 'finalizeRequest', name: 'dropExpectContinue', override: true }
+  );
+  return client;
+};
+
+/**
  * Client the SERVER uses for its own calls (HeadObject, DeleteObject, reads for
  * transcription). In Docker this must be the in-network hostname.
  */
-const s3Internal = new S3Client({
-  ...baseConfig,
-  ...(env.AWS_ENDPOINT_URL ? { endpoint: env.AWS_ENDPOINT_URL } : {})
-});
+const s3Internal = withoutExpectContinue(
+  new S3Client({
+    ...baseConfig,
+    ...(env.AWS_ENDPOINT_URL ? { endpoint: env.AWS_ENDPOINT_URL } : {})
+  })
+);
 
 /**
  * Client used ONLY to presign URLs that a BROWSER will call. A browser cannot
  * resolve a Compose-internal hostname, so the signed URL must carry the
  * host-reachable endpoint. Signing is host-agnostic: only the URL differs.
  */
-const s3Public = new S3Client({
-  ...baseConfig,
-  ...(env.AWS_PUBLIC_ENDPOINT_URL
-    ? { endpoint: env.AWS_PUBLIC_ENDPOINT_URL }
-    : env.AWS_ENDPOINT_URL
-      ? { endpoint: env.AWS_ENDPOINT_URL }
-      : {})
-});
+const s3Public = withoutExpectContinue(
+  new S3Client({
+    ...baseConfig,
+    ...(env.AWS_PUBLIC_ENDPOINT_URL
+      ? { endpoint: env.AWS_PUBLIC_ENDPOINT_URL }
+      : env.AWS_ENDPOINT_URL
+        ? { endpoint: env.AWS_ENDPOINT_URL }
+        : {})
+  })
+);
 
 const requireBucket = (): string => {
   if (!env.AWS_S3_BUCKET) {
