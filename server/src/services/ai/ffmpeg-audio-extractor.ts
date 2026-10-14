@@ -35,6 +35,18 @@ const CHUNK_SECONDS = 600;
 const SILENCE_THRESHOLD_DB = -50;
 const SILENCE_MIN_DURATION_SECONDS = 1.5;
 
+/**
+ * ffmpeg selects its demuxer from the file extension, so the temporary copy has
+ * to carry the right one. The meeting recorder captures audio-only, but a video
+ * recording is still accepted for any caller that uses one.
+ */
+const sourceExtensionFor = (mimeType: string): string => {
+  const normalised = mimeType.trim().toLowerCase();
+  if (normalised.startsWith('audio/ogg')) return '.ogg';
+  if (normalised.startsWith('video/mp4')) return '.mp4';
+  return '.webm';
+};
+
 const runFfmpeg = (args: string[]): Promise<void> =>
   new Promise((resolve, reject) => {
     const child = spawn(env.FFMPEG_PATH || 'ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -53,8 +65,9 @@ const runFfmpeg = (args: string[]): Promise<void> =>
 export class FfmpegAudioExtractor implements AudioExtractor {
   async extract(input: AudioExtractionInput): Promise<AudioExtractionResult> {
     const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'intellmeet-audio-'));
-    // The source extension comes from the validated MIME type, never from the client.
-    const sourcePath = path.join(workDir, `source${input.recordingMimeType.includes('mp4') ? '.mp4' : '.webm'}`);
+    // The source extension comes from the validated MIME type, never from the
+    // client, because ffmpeg picks its demuxer from the file extension.
+    const sourcePath = path.join(workDir, `source${sourceExtensionFor(input.recordingMimeType)}`);
     const chunkPattern = path.join(workDir, 'chunk-%04d.flac');
 
     try {

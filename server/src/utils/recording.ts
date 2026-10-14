@@ -33,8 +33,16 @@ export const MAX_PENDING_RECORDINGS_PER_ORG = 5;
 /**
  * Validated against the MIME type MediaRecorder actually EMITTED, which is not
  * always the type the browser requested.
+ *
+ * Audio is what the meeting recorder captures: one track per participant, mono
+ * Opus at a low bitrate, so a full hour per speaker stays inside the
+ * transcription API's per-file ceiling without any server-side conversion. The
+ * video entries remain for any caller that still records a picture.
  */
 export const RECORDING_MIME_ALLOWLIST = [
+  'audio/webm',
+  'audio/webm;codecs=opus',
+  'audio/ogg;codecs=opus',
   'video/webm',
   'video/webm;codecs=vp8',
   'video/webm;codecs=vp8,opus',
@@ -48,9 +56,14 @@ export const RECORDING_MIME_ALLOWLIST = [
 export const isAllowedRecordingMimeType = (mimeType: string): boolean =>
   RECORDING_MIME_ALLOWLIST.some((allowed) => allowed.toLowerCase() === mimeType.trim().toLowerCase());
 
-/** Storage extension derives from the VALIDATED mime type, never hardcoded. */
+/**
+ * Storage extension derives from the VALIDATED mime type, never hardcoded.
+ * A recording key keeps its container so a mixed recording set stays playable.
+ */
 export const extensionForMimeType = (mimeType: string): string => {
   const normalised = mimeType.trim().toLowerCase();
+  if (normalised.startsWith('audio/webm')) return 'webm';
+  if (normalised.startsWith('audio/ogg')) return 'ogg';
   if (normalised.startsWith('video/mp4')) return 'mp4';
   if (normalised.startsWith('video/webm')) return 'webm';
   throw ApiError.badRequest(`Unsupported recording content type: ${mimeType}`);

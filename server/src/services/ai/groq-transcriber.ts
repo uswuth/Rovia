@@ -59,7 +59,14 @@ export class GroqTranscriber implements Transcriber {
     }
 
     const form = new FormData();
-    form.append('file', new Blob([new Uint8Array(audio)], { type: 'audio/flac' }), path.basename(input.filePath));
+    // The provider resamples to 16 kHz mono itself and accepts webm, ogg and
+    // flac alike, so the declared type must describe the bytes actually read
+    // from disk rather than what the browser originally emitted.
+    form.append(
+      'file',
+      new Blob([new Uint8Array(audio)], { type: input.mimeType ?? 'audio/webm' }),
+      path.basename(input.filePath)
+    );
     form.append('model', env.GROQ_TRANSCRIBE_MODEL || 'whisper-large-v3');
     form.append('response_format', 'verbose_json');
     // Greedy decoding. Summaries of the same recording must not change between

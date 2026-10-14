@@ -119,7 +119,8 @@ export class RecordingPostProcessingService {
         });
         workDir = extracted.filePaths.length > 0 ? path.dirname(extracted.filePaths[0]) : null;
 
-        const result = await this.transcribeChunks(extracted.filePaths, recordingId, label);
+        // The extractor always emits FLAC chunks, so that is the type to declare.
+      const result = await this.transcribeChunks(extracted.filePaths, recordingId, label, 'audio/flac');
         totalDurationMs += result.durationMs ?? 0;
         results.push({
           speakerId: speaker.speakerId,
@@ -182,7 +183,8 @@ export class RecordingPostProcessingService {
   private async transcribeChunks(
     filePaths: string[],
     recordingId: string,
-    label: string
+    label: string,
+    mimeType: string
   ): Promise<{ text: string; language: string | null; durationMs: number | null; segments: TranscriptionSegment[] }> {
     const texts: string[] = [];
     const segments: TranscriptionSegment[] = [];
@@ -190,7 +192,7 @@ export class RecordingPostProcessingService {
     let durationMs = 0;
 
     for (const [index, filePath] of filePaths.entries()) {
-      const chunk = await this.transcriber.transcribe({ filePath });
+      const chunk = await this.transcriber.transcribe({ filePath, mimeType });
       if (chunk.text) {
         texts.push(chunk.text);
       }

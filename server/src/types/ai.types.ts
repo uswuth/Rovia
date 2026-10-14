@@ -35,6 +35,8 @@ export interface TranscriptionInput {
   filePath: string;
   /** Omit for automatic language detection. */
   language?: string;
+  /** MIME type of the file on disk. Describes the bytes, not the original upload. */
+  mimeType?: string;
 }
 
 export interface TranscriptionSegment {
