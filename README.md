@@ -6,7 +6,7 @@ Real-time video meetings, AI meeting intelligence, and team collaboration for
 modern remote and hybrid teams. Built with the MERN stack.
 
 - [Features](#features) · [Tech stack](#tech-stack) · [Getting started](#getting-started)
-- [API reference](./docs/API_ROUTES.md) · [Architecture](./docs/ARCHITECTURE.md)
+- [Architecture](./docs/ARCHITECTURE.md) · [API reference](#implemented-api-surface)
 - [Deployment](./DEPLOYMENT.md) · [Commands](./commands.md)
 
 Zidio Development · MERN Domain · March 2026
@@ -37,7 +37,7 @@ transcription, OpenRouter for summarisation), so no model weights are downloaded
 | Area | Status | Notes |
 | --- | --- | --- |
 | Monorepo + tooling | ✅ | pnpm workspaces, TypeScript, ESLint, dev/build scripts |
-| API server core | ✅ | Express, helmet, CORS, cookie parser, 16 kb body limit, Swagger UI at `/api/docs` |
+| API server core | ✅ | Express, helmet, CORS, cookie parser, 16 kb body limit, Swagger UI at `/api/docs` (non-production) |
 | Response/error layer | ✅ | `ApiResponse`, `ApiError`, `notFoundHandler`, `errorHandler`, `asyncHandler` |
 | Auth (F01) | ✅ | Register, login, refresh, logout, `/auth/me`; JWT + bcrypt, httpOnly refresh cookie |
 | Organizations / teams (F06) | ✅ | Org details, member list, invite-code verify & regenerate |
@@ -47,7 +47,7 @@ transcription, OpenRouter for summarisation), so no model weights are downloaded
 | WebRTC video (F02) | ✅ | Peer mesh + Socket.io signaling (`useWebRtcMeeting`), Google Meet-style hysteresis, native AGC/AEC audio |
 | Meeting UI & Controls | ✅ | Meetings list, create flow, pre-join lobby, grid layout with dimmed avatar backgrounds, device selector |
 | Socket.io | ✅ | JWT handshake, meeting rooms, SDP/ICE relay, presence, in-call state |
-| Screen recording capture | ✅ | Browser capture contract measured and documented ([SCREEN_RECORDING_CAPTURE.md](./client/docs/SCREEN_RECORDING_CAPTURE.md)) |
+| Screen recording capture | ✅ | Browser MediaRecorder capture with one audio track per participant, uploaded directly to storage |
 | Recording upload + storage (F08) | ✅ | Presigned PUT direct to S3/R2 storage, HeadObject verification; verified end-to-end |
 | In-meeting chat (F04) | ✅ | Real-time `meeting:message` over Socket.io, auto-scroll lock (`MessageScroller`), unread badge, guest gate |
 | Post-meeting dashboard (F05) | ✅ | Meeting history, recording replay, transcript viewer, AI summary card, and action items |
@@ -55,7 +55,7 @@ transcription, OpenRouter for summarisation), so no model weights are downloaded
 | Analytics (F07) | 🟡 | Meeting counts and basic productivity metrics tracked; advanced reporting pending |
 | Docker / CI-CD | ✅ | Multi-stage Dockerfiles, Compose + file-based secrets; GitHub Actions lint+build for client and server |
 | Deployment | ✅ | Vercel (client) + Render (API) + Atlas (DB), zero cost — see [DEPLOYMENT.md](./DEPLOYMENT.md) |
-| Architecture diagram | ✅ | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), generated with the archify skill |
+| Architecture diagram | ✅ | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) · [interactive map](./docs/architecture-diagram.html) — archify-generated from source, restyled |
 | Tests | ⬜ | Integration tests pending |
 | Rate limiting / monitoring | ⬜ | Health endpoint exists; rate limiting & Prometheus/Grafana optional |
 
@@ -118,11 +118,12 @@ transcription, OpenRouter for summarisation), so no model weights are downloaded
 
 ## Implemented API Surface
 
-57 REST endpoints + 8 Socket.io events across system/health, auth,
-organizations, work roles, projects, meetings (with Q&A and polls), and
-recordings (with transcript/summary). The full route index with verified JSON
-request/response examples lives in **[`docs/API_ROUTES.md`](./docs/API_ROUTES.md)**;
-interactive Swagger UI at `GET /api/docs`.
+75 REST operations across 53 documented paths plus 24 typed Socket.io events
+across system/health, auth, organizations, work roles, projects, teams, tasks,
+meetings (with Q&A and polls), and recordings (with transcript/summary). The
+route index is generated from the `@openapi` JSDoc blocks — dump it with
+`pnpm openapi` or browse the interactive Swagger UI at `GET /api/docs`
+(non-production).
 
 ```
 GET    /api/v1/health · /api/v1/health/ready

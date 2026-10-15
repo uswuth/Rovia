@@ -63,7 +63,7 @@ Intellmeet-debug-ui/
 │   ├── scripts/         # generate-secrets.mjs
 │   └── floci/           # local S3-compatible storage helper (browser upload)
 ├── bruno/           # runnable API collection (auth → projects → meetings → …)
-├── docs/            # API_ROUTES.md, STACK.md, ARCHITECTURE.md
+├── docs/            # STACK.md, ARCHITECTURE.md, architecture-diagram.html
 └── .github/workflows/  # client + server CI
 ```
 
