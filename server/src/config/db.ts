@@ -3,15 +3,15 @@ import dns from 'dns';
 import { env } from './env.js';
 import { logger } from '../utils/logger.js';
 
-// Production Best Practice: Prioritize IPv4 DNS resolution for Node.js dual-stack networking
+// IPv4-first DNS avoids the Node dual-stack resolution issues with MongoDB SRV lookups
 try {
   dns.setDefaultResultOrder('ipv4first');
-  // In development environments, fallback to Google/Cloudflare DNS if local ISP DNS blocks SRV lookups
+  // Local ISP DNS often blocks SRV lookups
   if (env.NODE_ENV !== 'production') {
     dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
   }
 } catch {
-  // Gracefully fallback to default system DNS
+  // Ignore: keep the system default DNS behaviour
 }
 
 let isConnected = false;

@@ -21,10 +21,7 @@ export const findScopedTranscript = async (
 const findByRecording = async (recordingId: string, organizationId: string): Promise<TranscriptDocument | null> =>
   Transcript.findOne({ recording_id: recordingId, organization_id: organizationId });
 
-/**
- * Idempotency: one transcript per recording. A retry reuses the existing record
- * and moves it back to PROCESSING rather than creating a second one.
- */
+/** Idempotency: one transcript per recording. A retry reuses the existing record and moves it back to PROCESSING rather than creating a second one. */
 export const startTranscriptService = async (
   recordingId: string,
   organizationId: string

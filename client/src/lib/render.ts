@@ -1,10 +1,6 @@
 import type * as React from "react"
 
-/**
- * Props every `render` element is expected to support. Components in `components/ui`
- * clone the element passed through `render` and merge class names, children and
- * event handlers onto it, so the contract has to be explicit instead of `any`.
- */
+/** Props a `render` element must support: ui components clone it and merge classNames, children, handlers. */
 export type RenderableElementProps = {
   className?: string
   children?: React.ReactNode

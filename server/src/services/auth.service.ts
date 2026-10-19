@@ -42,7 +42,6 @@ export const registerUserService = async (
   let assignedOrgId: string | undefined;
 
   if (isCreatingOrg) {
-    // ── CASE 1: Toggle = TRUE (Creating Organization -> SuperAdmin) ──
     const orgName = (input.organizationName || '').trim();
     if (!orgName) {
       throw ApiError.badRequest('Organization name is required when creating an organization', [
@@ -55,8 +54,7 @@ export const registerUserService = async (
       .trim()
       .replace(/[^a-z0-9]/g, '-');
 
-    // Collision handling: try a random suffix, then a timestamp suffix, so a
-    // repeated collision can never surface as a raw duplicate-key 500.
+    // On slug collision, retry with a random then a timestamp suffix instead of a duplicate-key 500.
     const slugExists = async (slug: string) =>
       Boolean(await Organization.findOne({ organization_slug: slug }).lean());
     let finalSlug = baseSlug;
@@ -82,8 +80,7 @@ export const registerUserService = async (
     user.refreshToken = refreshToken;
     await user.save();
 
-    // 2. Create Organization with user as owner. If this fails, the half-created
-    // user is rolled back so a failed signup never consumes the email address.
+    // If org creation fails, roll back the half-created user so a failed signup frees the email.
     const newOrg = await Organization.create({
       organization_name: orgName,
       organization_slug: finalSlug,
@@ -94,11 +91,9 @@ export const registerUserService = async (
       throw error;
     });
 
-    // 3. Link organization to user
     user.organization_id = newOrg._id;
     await user.save();
 
-    // 4. Generate accessToken with organizationId included in the payload
     const accessToken = user.generateAccessToken();
 
     const populatedUser = await User.findById(user._id).populate('organization_id', ORGANIZATION_POPULATE);
@@ -152,7 +147,6 @@ export const loginUserService = async (input: IUserLoginInput): Promise<IAuthTok
     throw ApiError.unauthorized('Invalid email or password');
   }
 
-  // Check if account is temporarily locked
   if (user.locked_until && user.locked_until.getTime() > Date.now()) {
     const remainingMinutes = Math.ceil((user.locked_until.getTime() - Date.now()) / (60 * 1000));
     throw ApiError.tooManyRequests(
@@ -164,7 +158,7 @@ export const loginUserService = async (input: IUserLoginInput): Promise<IAuthTok
   if (!isPasswordValid) {
     user.failed_login_attempts = (user.failed_login_attempts || 0) + 1;
     if (user.failed_login_attempts >= 5) {
-      user.locked_until = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes lockout
+      user.locked_until = new Date(Date.now() + 15 * 60 * 1000);
       user.failed_login_attempts = 0;
       await user.save();
       throw ApiError.tooManyRequests(
@@ -175,13 +169,11 @@ export const loginUserService = async (input: IUserLoginInput): Promise<IAuthTok
     throw ApiError.unauthorized('Invalid email or password');
   }
 
-  // Reset lockout counters on successful authentication
   if (user.failed_login_attempts > 0 || user.locked_until) {
     user.failed_login_attempts = 0;
     user.locked_until = null;
   }
 
-  // Ensure organization owner is guaranteed SuperAdmin role
   if (user.organization_id) {
     const org = await Organization.findById(user.organization_id).select('organization_owner_id');
     if (org?.organization_owner_id && org.organization_owner_id.toString() === user._id.toString()) {
@@ -222,7 +214,6 @@ export const refreshAccessTokenService = async (incomingRefreshToken: string): P
     throw ApiError.unauthorized('Invalid or expired refresh token');
   }
 
-  // Ensure organization owner is guaranteed SuperAdmin role
   if (user.organization_id) {
     const org = await Organization.findById(user.organization_id).select('organization_owner_id');
     if (org?.organization_owner_id && org.organization_owner_id.toString() === user._id.toString()) {

@@ -430,7 +430,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
         </MessageScroller.Root>
       </MessageScroller.Provider>
 
-      {/* Chat Bottom Controls */}
+      {}
       <div className="shrink-0 pt-1 pb-1 mt-auto flex flex-col justify-end">
         {/* Real-time Typing Indicator with official shadcn shimmer */}
         {Object.keys(typingUsers).length > 0 && (
@@ -483,7 +483,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
         )}
       </div>
 
-      {/* Member Profile Modal */}
+      {}
       {selectedProfileUser && (
         <Modal
           open={Boolean(selectedProfileUser)}

@@ -7,10 +7,7 @@ export type MeetingJoinMode = 'INVITE_ONLY';
 export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER';
 export type MeetingParticipantStatus = 'INVITED' | 'JOINED' | 'LEFT';
 
-/**
- * Per-participant capabilities. A host can restrict an individual member
- * without affecting everyone else in the meeting.
- */
+/** Per-participant capabilities. A host can restrict an individual member without affecting everyone else in the meeting. */
 @modelOptions({ schemaOptions: { _id: false } })
 export class MeetingParticipantClass {
   @prop({ type: () => String, required: true, index: true })

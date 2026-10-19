@@ -8,25 +8,7 @@ import { ApiError } from '../../utils/apiError.js';
 import { downloadObjectToFile } from '../storage.service.js';
 import { AudioExtractionInput, AudioExtractionResult, AudioExtractor } from '../../types/index.js';
 
-/**
- * FFmpeg adapter for AudioExtractor.
- *
- * Reads the authoritative recording out of object storage into a temp file,
- * then produces the chunks the transcriber will upload.
- *
- * Three steps happen in one pass:
- *
- *  1. Remux to 16 kHz mono, which is what Whisper expects.
- *  2. Drop silence. Meetings are mostly dead air between sentences, and a
- *     hour-long recording is mostly dead air. Removing it cuts both the
- *     bytes uploaded and the words Whisper hallucinates over quiet audio.
- *  3. Encode lossless FLAC (roughly half the size of PCM at no quality cost)
- *     and split into chunks, because the transcription API caps a single
- *     upload at 25 MB and an hour of meeting audio is far larger than that.
- *
- * The original WebM is never modified. Every artefact here is temporary and is
- * deleted by the caller.
- */
+/** FFmpeg adapter for AudioExtractor. Reads the authoritative recording out of object storage into a temp file, then produces the chunks the transcriber will upload. Three steps happen in one pass: 1. Remux to 16 kHz mono, which is what Whisper expects. 2. Drop silence. Meetings are mostly dead air between sentences, and a hour-long recording is mostly dead air. Removing it cuts both the bytes uploaded and the words Whisper hallucinates over quiet audio. 3. Encode lossless FLAC (roughly half the size of PCM at no quality cost) and split into chunks, because the transcription API caps a single upload at 25 MB and an hour of meeting audio is far larger than that. The original WebM is never modified. Every artefact here is temporary and is deleted by the caller. */
 
 /** Comfortably under the provider's 25 MB per-file ceiling. */
 const CHUNK_SECONDS = 600;
@@ -35,11 +17,7 @@ const CHUNK_SECONDS = 600;
 const SILENCE_THRESHOLD_DB = -50;
 const SILENCE_MIN_DURATION_SECONDS = 1.5;
 
-/**
- * ffmpeg selects its demuxer from the file extension, so the temporary copy has
- * to carry the right one. The meeting recorder captures audio-only, but a video
- * recording is still accepted for any caller that uses one.
- */
+/** ffmpeg selects its demuxer from the file extension, so the temporary copy has to carry the right one. The meeting recorder captures audio-only, but a video recording is still accepted for any caller that uses one. */
 const sourceExtensionFor = (mimeType: string): string => {
   const normalised = mimeType.trim().toLowerCase();
   if (normalised.startsWith('audio/ogg')) return '.ogg';

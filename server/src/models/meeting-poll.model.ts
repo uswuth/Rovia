@@ -12,7 +12,6 @@ export class MeetingPollOptionClass {
   @prop({ type: () => String, required: true })
   public optionText!: string;
 
-  /** Internal only. The public toJSON exposes counts, never the voter list. */
   @prop({ type: () => [String], default: [] })
   public voterIds!: string[];
 }

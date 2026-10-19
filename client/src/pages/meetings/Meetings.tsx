@@ -23,10 +23,7 @@ import { shareOrCopy } from '@/lib/share';
 import { formatDuration } from '@/lib/format-date';
 import { formatDurationHuman } from '@/utils/duration';
 
-/**
- * `IN_PROGRESS` is a client-derived display state for a meeting inside its
- * scheduled window that the server has not yet marked LIVE.
- */
+/** `IN_PROGRESS` is client-derived: inside the scheduled window before the server marks it LIVE. */
 type MeetingDisplayStatus = MeetingStatus | 'IN_PROGRESS';
 
 export const Meetings: React.FC = () => {
@@ -86,14 +83,12 @@ export const Meetings: React.FC = () => {
     { enabled: isAuthenticated, list: true }
   );
 
-  // Join-window status depends on the current time
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
 
-  // Sort meetings: for upcoming tab, active/live meetings first, then earliest scheduled next; for past/all, most recent first
   const sortedMeetings = useMemo(() => {
     const rawMeetings = meetings ?? [];
     return [...rawMeetings].sort((a, b) => {
@@ -114,7 +109,6 @@ export const Meetings: React.FC = () => {
     });
   }, [meetings, currentTab]);
 
-  // Filter meetings based on debounced search query and tab selection
   const displayedMeetings = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
     return sortedMeetings.filter((m) => {
@@ -216,7 +210,6 @@ export const Meetings: React.FC = () => {
 
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
-      {/* Header Row: Heading & Action Buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
@@ -248,9 +241,7 @@ export const Meetings: React.FC = () => {
         </div>
       </div>
 
-      {/* Search & Project Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
-        {/* Search Box with Search Button */}
         <div className="flex items-center gap-2 flex-1 max-w-md">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -296,7 +287,6 @@ export const Meetings: React.FC = () => {
           </Button>
         </div>
 
-        {/* Project Selector Filter */}
         {projects.length > 0 && (
           <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto min-w-[220px]">
             <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium shrink-0">
@@ -326,7 +316,6 @@ export const Meetings: React.FC = () => {
         )}
       </div>
 
-      {/* Content Area */}
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (

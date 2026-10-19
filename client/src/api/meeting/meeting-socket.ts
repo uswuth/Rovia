@@ -7,10 +7,7 @@ import type {
 
 export type MeetingSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-/**
- * Lazily-created socket for signalling. The JWT travels in the handshake, so
- * the server can verify it before allowing any room join.
- */
+/** Lazily-created socket for signalling. The JWT travels in the handshake, so the server can verify it before allowing any room join. */
 let socket: MeetingSocket | null = null;
 
 export const getMeetingSocket = (visitorId?: string): MeetingSocket => {

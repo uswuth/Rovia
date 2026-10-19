@@ -17,13 +17,7 @@ export class TranscriptSegmentClass {
   public text!: string;
 }
 
-/**
- * One participant's speech, transcribed on its own track.
- *
- * Each speaker is captured and transcribed separately so crosstalk never reaches
- * the model. Speaker attribution comes from the roster the meeting already holds,
- * not from the audio, so it is exact rather than inferred.
- */
+/** One participant per track: no crosstalk reaches the model, and attribution comes from the roster, so it is exact. */
 @modelOptions({ schemaOptions: { _id: false } })
 export class TranscriptSpeakerClass {
   @prop({ type: () => String, required: true })

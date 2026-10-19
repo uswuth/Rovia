@@ -2,10 +2,7 @@ export interface FormatDateOptions extends Intl.DateTimeFormatOptions {
   includeTime?: boolean;
 }
 
-/**
- * Common date formatter that safely parses strings, numbers, or Date instances.
- * Returns null if the value is missing or invalid.
- */
+/** Parses a string, number or Date instance, returning null when missing or invalid. */
 export const formatDate = (
   dateVal?: unknown,
   options?: FormatDateOptions
@@ -40,15 +37,11 @@ export const formatDate = (
   });
 };
 
-/**
- * Formats a date without the time portion (e.g., 'Oct 11, 2026').
- */
+/** Formats a date without the time portion (e.g., 'Oct 11, 2026'). */
 export const formatDateOnly = (dateVal?: unknown): string | null =>
   formatDate(dateVal, { includeTime: false });
 
-/**
- * Formats duration in minutes to human readable string (e.g., 360 -> "6h", 90 -> "1h 30m", 45 -> "45m")
- */
+/** Formats duration in minutes to human readable string (e.g., 360 -> "6h", 90 -> "1h 30m", 45 -> "45m") */
 export const formatDuration = (minutes?: number | null): string => {
   if (!minutes || minutes <= 0) return '0m';
   const hrs = Math.floor(minutes / 60);

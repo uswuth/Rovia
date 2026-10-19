@@ -5,11 +5,7 @@ interface UseScrollFadeOptions {
   orientation?: 'vertical' | 'horizontal' | 'both';
 }
 
-/**
- * Hook to dynamically calculate scroll edge fading.
- * - Disables fade if there is no scroll overflow.
- * - Activates top/bottom/left/right edge fades dynamically based on user scroll position.
- */
+/** Returns a ref that writes --scroll-fade-* CSS variables and data-overflow flags for edge fades. */
 export function useScrollFade<T extends HTMLElement = HTMLDivElement>(
   options: UseScrollFadeOptions = {}
 ) {
@@ -32,9 +28,7 @@ export function useScrollFade<T extends HTMLElement = HTMLDivElement>(
         const scrollTop = el.scrollTop;
         const maxScroll = el.scrollHeight - el.clientHeight;
 
-        // Top edge fade: 0px when at top, up to `size` as user scrolls down
         const topFade = Math.min(scrollTop, size);
-        // Bottom edge fade: 0px when at bottom, up to `size` as user scrolls up
         const bottomFade = Math.min(maxScroll - scrollTop, size);
 
         el.style.setProperty('--scroll-fade-top', `${Math.max(0, topFade)}px`);
@@ -75,7 +69,6 @@ export function useScrollFade<T extends HTMLElement = HTMLDivElement>(
 
     el.addEventListener('scroll', handleScroll, { passive: true });
 
-    // Handle container or window resize
     const resizeObserver = new ResizeObserver(() => {
       updateFade();
     });

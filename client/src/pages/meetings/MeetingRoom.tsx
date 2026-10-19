@@ -38,7 +38,6 @@ import type { Meeting, MeetingParticipant, MeetingParticipantRaw, MeetingPreview
 import { normalizeParticipants } from '@/api/meeting/meeting.types';
 import type { MeetingChatMessage, RaisedHand } from '@/api/meeting/webrtc.types';
 
-// Modular Meeting Subcomponents
 import { MeetingHeader } from '@/components/meetings/MeetingHeader';
 import { MeetingVideoStage } from '@/components/meetings/MeetingVideoStage';
 import { MeetingControls, type PanelKey } from '@/components/meetings/MeetingControls';
@@ -57,7 +56,6 @@ export const MeetingRoom: React.FC = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
 
-  // Active view states
   const [panel, setPanel] = useState<PanelKey | null>('people');
   const [renderedPanel, setRenderedPanel] = useState<PanelKey | null>('people');
 
@@ -72,20 +70,17 @@ export const MeetingRoom: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<MeetingChatMessage[]>([]);
 
-  // In-call toggles
   const [micOn, setMicOn] = useState(() => (location.state as { initialMic?: boolean } | null)?.initialMic ?? true);
   const [cameraOn, setCameraOn] = useState(() => (location.state as { initialCamera?: boolean } | null)?.initialCamera ?? true);
   const [raisedHands, setRaisedHands] = useState<RaisedHand[]>([]);
   const isMyHandRaised = raisedHands.some((h) => h.userId === user?.userId);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Dialog & popover states
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [meetingEndedByHost, setMeetingEndedByHost] = useState(false);
 
-  // Recording & AI Summary
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(false);
 
   const locationState = location.state as {
@@ -98,7 +93,6 @@ export const MeetingRoom: React.FC = () => {
     preview?: MeetingPreview;
   } | null;
 
-  // Device selectors
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
@@ -195,7 +189,6 @@ export const MeetingRoom: React.FC = () => {
     return 'Member';
   };
 
-  // Query meeting details
   const { data: meeting, loading, error, refetch } = useQuery<Meeting>(
     queryKeys.meetings.detail(id),
     async () => {
@@ -229,7 +222,6 @@ export const MeetingRoom: React.FC = () => {
     { enabled: Boolean(id) && isAuthenticated }
   );
 
-  // Mark participant as JOINED upon entering room
   useEffect(() => {
     if (id && isAuthenticated) {
       joinMeeting(id).then(() => {
@@ -238,12 +230,11 @@ export const MeetingRoom: React.FC = () => {
     }
   }, [id, isAuthenticated, refetch]);
 
-  // WebRTC meeting hook
   const rtc = useWebRtcMeeting(id, Boolean(id) && isAuthenticated, {
     initialAudioDeviceId: locationState?.selectedMic,
     initialVideoDeviceId: locationState?.selectedCamera,
-    initialMic: locationState?.initialMic ?? true,
-    initialCamera: locationState?.initialCamera ?? false,
+    initialMic: micOn,
+    initialCamera: cameraOn,
     onPeerJoined: () => {
       void refetch();
     },
@@ -256,10 +247,7 @@ export const MeetingRoom: React.FC = () => {
 
   const recorder = useMeetingRecorder({ meetingId: id });
 
-  // Each participant is recorded on their own track. Remote audio only exists in
-  // the peer map, so the tracks are assembled at the moment capture starts rather
-  // than captured once. Names come from the roster so the transcript can
-  // attribute speech without any diarization.
+  // Remote audio only exists in the peer map, so tracks are assembled at capture start rather than once.
   const handleToggleRecording = useCallback(async () => {
     if (recorder.isRecording) {
       await recorder.stopRecording();
@@ -286,8 +274,7 @@ export const MeetingRoom: React.FC = () => {
     await recorder.startRecording(tracks);
   }, [recorder, rtc.localStream, rtc.peers, user?.userId, user?.userName, getParticipantDisplayName]);
 
-  // Elapsed time is derived from a one-second tick rather than a per-frame
-  // counter: the display only shows whole seconds, so a faster timer is waste.
+  // One-second tick, not per-frame: the display shows whole seconds only.
   const [recordingTick, setRecordingTick] = useState(0);
   useEffect(() => {
     if (!recorder.isRecording) return undefined;
@@ -296,7 +283,6 @@ export const MeetingRoom: React.FC = () => {
   }, [recorder.isRecording]);
   const recordingElapsedMs = recorder.isRecording ? recordingTick * 1000 : 0;
 
-  // Clean socket room leave on tab/window unload
   useEffect(() => {
     const handleUnload = () => {
       if (id) {
@@ -309,7 +295,6 @@ export const MeetingRoom: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [id]);
 
-  // Panel queries (Q&A and Polls)
   const questions = useQuery<MeetingQuestion[]>(
     queryKeys.meetings.questions(id),
     () => getMeetingQuestions(id),
@@ -322,7 +307,6 @@ export const MeetingRoom: React.FC = () => {
     { enabled: Boolean(id), list: true }
   );
 
-  // Listen for meeting:ended, meeting:poll-updated, meeting:question-updated, and meeting:participant-updated broadcast from socket
   useEffect(() => {
     if (!id || !isAuthenticated) return;
     const s = getMeetingSocket();
@@ -379,7 +363,6 @@ export const MeetingRoom: React.FC = () => {
     };
   }, [id, isAuthenticated, queryClient, questions, refetch, rtc, showToast, user?.userId]);
 
-  // Track Fullscreen state changes
   useEffect(() => {
     const handleFsChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
@@ -490,7 +473,6 @@ export const MeetingRoom: React.FC = () => {
     });
   }, []);
 
-  // Global Keyboard Shortcuts (Alt+C: Mic, Alt+V: Camera, Alt+B: Deafen, Alt+N: Mute All Three)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -529,7 +511,6 @@ export const MeetingRoom: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleToggleMic, handleToggleCamera, handleToggleSpeaker, handleMuteAllThree]);
 
-  // Enumerate media devices and synchronize with lobby selections
   useEffect(() => {
     const fetchDevices = async () => {
       try {
@@ -748,7 +729,6 @@ export const MeetingRoom: React.FC = () => {
   const joined = useMemo(() => {
     const list: MeetingParticipant[] = [];
 
-    // Current user (yourself) is actively live in the room
     if (user?.userId) {
       const rosterSelf = participants.find((p) => p.userId === user.userId);
       list.push({
@@ -759,12 +739,11 @@ export const MeetingRoom: React.FC = () => {
         participantStatus: 'JOINED',
         canSendAudio: micOn,
         canSendVideo: cameraOn,
-        canShareScreen: false,
+        canShareScreen: rtc.isScreenSharing,
         canUseChat: true,
       });
     }
 
-    // Only active dynamic peers currently connected in WebRTC / socket room
     for (const [peerId, peer] of Object.entries(rtc.peers)) {
       if (peerId && peerId !== user?.userId) {
         const rosterMatch = participants.find((p) => p.userId === peerId);
@@ -783,7 +762,7 @@ export const MeetingRoom: React.FC = () => {
     }
 
     return list;
-  }, [user, meeting, participants, rtc.peers, micOn, cameraOn]);
+  }, [user, meeting, participants, rtc.peers, rtc.isScreenSharing, micOn, cameraOn]);
 
   if (loading) {
     return (
@@ -807,7 +786,6 @@ export const MeetingRoom: React.FC = () => {
 
   return (
     <div className="flex h-dvh max-h-dvh flex-col bg-background text-foreground overflow-hidden">
-      {/* Toast alert */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-md bg-slate-900 text-white px-4 py-2 text-xs font-semibold shadow-xl flex items-center gap-2">
           <AlertCircle size={15} className="text-amber-400" />
@@ -815,7 +793,6 @@ export const MeetingRoom: React.FC = () => {
         </div>
       )}
 
-      {/* Top Navigation & Status Bar */}
       <MeetingHeader
         title={meeting.meetingTitle}
         connectedCount={joined.length}
@@ -829,13 +806,15 @@ export const MeetingRoom: React.FC = () => {
         onLowerHand={handleLowerHand}
       />
 
-      {/* Main Content: Video Stage on the Left, Collapsible Sidebar on the Right */}
       <div className="flex min-h-0 flex-1 flex-row overflow-hidden relative">
         <div className="flex-1 min-w-0 min-h-0 flex flex-col transition-all duration-300 ease-in-out bg-background">
           <MeetingVideoStage
+            title={meeting.meetingTitle}
             participants={joined}
             currentUserId={user?.userId}
             localStream={rtc.localStream}
+            screenStream={rtc.screenStream}
+            isScreenSharing={rtc.isScreenSharing}
             peers={rtc.peers}
             getParticipantDisplayName={getParticipantDisplayName}
             getParticipantAvatar={getParticipantAvatar}
@@ -847,7 +826,6 @@ export const MeetingRoom: React.FC = () => {
           />
         </div>
 
-        {/* Collapsible Aside Panel with smooth horizontal slide & un-shrink */}
         <div
           className={cn(
             "overflow-hidden transition-all duration-300 ease-in-out flex flex-col shrink-0 border-l z-20 bg-card shadow-xs",
@@ -931,7 +909,6 @@ export const MeetingRoom: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Controls Toolbar Dock */}
       <MeetingControls
         localStream={rtc.localStream}
         isRecording={recorder.isRecording}
@@ -978,6 +955,8 @@ export const MeetingRoom: React.FC = () => {
           setSelectedCamera(deviceId);
           void rtc.switchCamera(deviceId);
         }}
+        isScreenSharing={rtc.isScreenSharing}
+        onToggleScreenShare={rtc.toggleScreenShare}
         handRaised={isMyHandRaised}
         onToggleHandRaise={handleToggleHandRaise}
         isFullscreen={isFullscreen}
@@ -989,7 +968,6 @@ export const MeetingRoom: React.FC = () => {
         setShowSettingsModal={setShowSettingsModal}
       />
 
-      {/* Leave or End Call Dialog */}
       <MeetingLeaveModal
         open={showLeaveModal}
         isCreatorOrHost={isCreatorOrHost}
@@ -1000,14 +978,12 @@ export const MeetingRoom: React.FC = () => {
         onConfirmEndMeeting={confirmEndMeeting}
       />
 
-      {/* Meeting Ended for Everyone Dialog */}
       <MeetingEndedModal
         open={meetingEndedByHost}
         onReturnToMeetings={() => navigate('/meetings')}
         onGoToProjects={() => navigate('/projects')}
       />
 
-      {/* Participant Permissions Modal */}
       {editing && (
         <ParticipantSettingsModal
           key={editing.userId}
@@ -1020,7 +996,6 @@ export const MeetingRoom: React.FC = () => {
         />
       )}
 
-      {/* AI Summary: only meaningful once a recording has been uploaded. */}
       {(recorder.stage !== 'idle' || recorder.summary || recorder.transcript) && (
         <MeetingAiSummaryCard
           stage={recorder.stage}

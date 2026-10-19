@@ -42,7 +42,6 @@ export function NavMain({
   const { isMobile, state, setOpenMobile } = useSidebar()
   const isCollapsed = state === "collapsed"
 
-  // Persisted collapsible menu open/close states
   const [openStates, setOpenStates] = React.useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem("sidebar_collapsible_menu_states")
@@ -58,8 +57,7 @@ export function NavMain({
       try {
         localStorage.setItem("sidebar_collapsible_menu_states", JSON.stringify(updated))
       } catch {
-        // ignore storage errors
-      }
+              }
       return updated
     })
   }

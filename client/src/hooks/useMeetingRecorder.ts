@@ -28,18 +28,7 @@ export interface SpeakerTrack {
 /** Server allowlist. A type outside it is rejected by createRecording. */
 const ALLOWED_AUDIO_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'] as const;
 
-/**
- * Records every participant on their own track, then runs the AI pipeline.
- *
- * Tracks are captured separately and never mixed. Simultaneous speech is what
- * garbles a transcript, so mixing everyone into one stream is exactly what this
- * avoids. The server transcribes each track on its own and attributes the words
- * using the roster, then sends the attributed transcript to the summariser.
- *
- * Audio is captured mono at a low bitrate: speech only needs to be intelligible,
- * and it keeps a full hour per participant inside the provider's upload limit
- * without any server-side conversion step.
- */
+/** Records every participant on their own track, then runs the AI pipeline. Tracks are captured separately and never mixed. Simultaneous speech is what garbles a transcript, so mixing everyone into one stream is exactly what this avoids. The server transcribes each track on its own and attributes the words using the roster, then sends the attributed transcript to the summariser. Audio is captured mono at a low bitrate: speech only needs to be intelligible, and it keeps a full hour per participant inside the provider's upload limit without any server-side conversion step. */
 export const useMeetingRecorder = (options?: { meetingId?: string; projectId?: string }) => {
   const queryClient = useQueryClient();
 
@@ -112,11 +101,7 @@ export const useMeetingRecorder = (options?: { meetingId?: string; projectId?: s
     setStage('recording');
   }, []);
 
-  /**
-   * Stops every track and runs the upload chain. Each participant's audio goes
-   * to its own server-derived object; the recording is only reported successful
-   * once the server has verified them all.
-   */
+  /** Stops every track and runs the upload chain. Each participant's audio goes to its own server-derived object; the recording is only reported successful once the server has verified them all. */
   const stopRecording = useCallback(async () => {
     const recorders = recordersRef.current;
     if (recorders.length === 0) return;

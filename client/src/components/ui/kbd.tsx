@@ -3,9 +3,7 @@ import { cn } from '@/lib/utils';
 
 export type KbdProps = React.HTMLAttributes<HTMLElement>;
 
-/**
- * Standard shadcn-style Kbd component for displaying keyboard shortcuts
- */
+/** Standard shadcn-style Kbd component for displaying keyboard shortcuts */
 export const Kbd = React.forwardRef<HTMLElement, KbdProps>(
   ({ className, children, ...props }, ref) => {
     return (

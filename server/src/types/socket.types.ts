@@ -8,7 +8,6 @@ export interface MeetingSignalPayload {
 export interface ServerToClientEvents {
   notification: (data: { message: string; timestamp: string }) => void;
 
-  // ── Meeting signalling ────────────────────────────────────────────────────
   'meeting:peer-joined': (data: { userId: string }) => void;
   'meeting:peer-left': (data: { userId: string }) => void;
   'meeting:state': (data: { userId: string; state: Record<string, boolean | string> }) => void;
@@ -34,8 +33,7 @@ export interface ServerToClientEvents {
   'webrtc:ice': (data: MeetingSignalPayload) => void;
 }
 
-// Minimal structural shapes: the server never inspects SDP or ICE, it only
-// relays them, so these stay open rather than depending on DOM lib types.
+// The server only relays SDP/ICE and never inspects them, so these stay structural instead of DOM types.
 export interface RaisedHand {
   userId: string;
   userName?: string;

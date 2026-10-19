@@ -6,14 +6,7 @@ import { useQuery } from '@/hooks/useApi';
 import { queryKeys } from '@/api/queryClient';
 import { useQueryClient } from '@tanstack/react-query';
 
-/**
- * Loads the organization-scoped project list once per authenticated session.
- *
- * Only the selected *id* is stored. The project itself is derived from the list
- * during render, so the selection can never drift out of sync with the data and
- * no effect is needed to reconcile them. Signing out clears the whole query
- * cache in AuthContext, so there is nothing to clean up here.
- */
+/** Only the selected project id is stored; the project is derived from the list, so it cannot drift. */
 export const useProjects = () => {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
@@ -31,8 +24,6 @@ export const useProjects = () => {
   const selectedProject = useMemo(() => {
     if (projects.length === 0) return null;
     const match = projects.find((p) => getProjectId(p) === selectedProjectId);
-    // Fall back to the first project when nothing is selected, or when the
-    // selected project no longer exists in the list.
     return match ?? projects[0];
   }, [projects, selectedProjectId]);
 
@@ -42,8 +33,7 @@ export const useProjects = () => {
 
   const addProject = useCallback(
     (proj: Project) => {
-      // Seed the cache so the new project appears immediately, and keep the
-      // server as the source of truth for everything else.
+      // Seed the cache so the new project appears immediately; the server stays the source of truth.
       queryClient.setQueryData<Project[]>(queryKeys.projects.list(), (prev) =>
         prev ? [proj, ...prev] : [proj]
       );

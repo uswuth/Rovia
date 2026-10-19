@@ -23,8 +23,7 @@ const OrganizationContext = createContext<OrganizationContextValue | undefined>(
 
 const EMPTY_ORG: OrgInfo = { name: '' };
 
-/** `/auth/me` already returns the populated organization, so it is reused here
- *  instead of calling `/organizations/me` for the same fields. */
+/** `/auth/me` already returns the populated organization, avoiding a second `/organizations/me` call. */
 const toOrgInfo = (organizationId: unknown): OrgInfo => {
   if (!organizationId || typeof organizationId !== 'object') return EMPTY_ORG;
 
@@ -34,10 +33,7 @@ const toOrgInfo = (organizationId: unknown): OrgInfo => {
   };
 };
 
-/**
- * Organization details and its member roster, shared by the sidebar invite-code
- * modal and the dashboard so they are fetched once per session, not per mount.
- */
+/** Organization details and member roster, shared so they are fetched once per session, not per mount. */
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, user } = useAuth();
 
@@ -53,8 +49,7 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     await refetchMembers();
   }, [refetchMembers]);
 
-  // Members are server-authoritative, so a change re-reads the list rather
-  // than patching local state that may already be out of date.
+  // Members are server-authoritative: re-read the list rather than patch stale local state.
   const replaceMember = useCallback(() => {
     void refetchMembers();
   }, [refetchMembers]);

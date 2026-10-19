@@ -10,13 +10,7 @@ import type {
   UploadUrlResponse,
 } from './recording.types';
 
-/**
- * Recording + AI pipeline API.
- *
- * The client never constructs a storage key: the server derives it from the
- * caller's organization. Uploads go straight to object storage through a
- * presigned URL, so media bytes never pass through the API process.
- */
+/** Recording + AI pipeline API. The client never constructs a storage key: the server derives it from the caller's organization. Uploads go straight to object storage through a presigned URL, so media bytes never pass through the API process. */
 
 /** Server allowlist. A type outside it is rejected by createRecording. */
 const ALLOWED_CONTENT_TYPES = [

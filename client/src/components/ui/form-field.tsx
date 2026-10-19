@@ -12,10 +12,7 @@ interface FormFieldProps {
   children: React.ReactNode
 }
 
-/**
- * Label + control + error, so spacing and error placement are identical in
- * every form instead of being re-declared per page.
- */
+/** Label, control and error in one place so spacing and error placement stay consistent. */
 const FormField: React.FC<FormFieldProps> = ({
   label,
   htmlFor,

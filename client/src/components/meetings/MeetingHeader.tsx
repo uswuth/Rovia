@@ -22,7 +22,6 @@ export interface MeetingHeaderProps {
   onLowerHand?: (userId?: string) => void;
 }
 
-/** Top navigation and meeting status bar */
 export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
   title,
   connectedCount,
@@ -117,7 +116,6 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
 
   return (
     <header className="shrink-0 flex items-center justify-between border-b border-border/80 px-6 h-14 bg-card shadow-xs">
-      {/* Left: Meeting Title and Share Link Button */}
       <div className="flex items-center gap-3 min-w-0">
         <h1 className="truncate text-base font-bold text-foreground">{title}</h1>
         <Tooltip content={copied ? 'Link Shared / Copied!' : 'Share Meeting Link'} side="bottom">
@@ -133,7 +131,6 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
         </Tooltip>
       </div>
 
-      {/* Right: Raised Hands Pill, Participant Count & Network Status */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
         {raisedHands && raisedHands.length > 0 && (
           <div className="relative" ref={popoverRef}>
@@ -195,7 +192,6 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
                     const name = isYou ? 'You' : item.userName || 'Member';
                     const initial = name.charAt(0).toUpperCase() || 'U';
 
-                    // Top three have distinct tiered level tone backgrounds
                     const levelBg =
                       rank === 1
                         ? 'bg-accent/20 border-accent/40 shadow-xs'

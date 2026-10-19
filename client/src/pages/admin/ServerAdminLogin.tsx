@@ -58,7 +58,6 @@ export const ServerAdminLogin = () => {
         position: 'relative',
       }}
     >
-      {/* Soft Ambient Accent Bloom Overlay */}
       <Box
         sx={{
           position: 'absolute',
@@ -75,7 +74,6 @@ export const ServerAdminLogin = () => {
       />
 
       <Grid container sx={{ minHeight: '100dvh', width: '100%', position: 'relative', zIndex: 2 }}>
-        {/* ── Left Hero Column (Inset with all 4 corners rounded) ── */}
         <Grid
           size={{ xs: 12, lg: 6 }}
           sx={{
@@ -87,7 +85,6 @@ export const ServerAdminLogin = () => {
             boxSizing: 'border-box',
           }}
         >
-          {/* Inner Rounded Green Card */}
           <Box
             sx={{
               width: '100%',
@@ -106,7 +103,6 @@ export const ServerAdminLogin = () => {
                 '0 10px 30px -5px color-mix(in srgb, var(--custom-accent, #10b981) 30%, rgba(0,0,0,0.1)), 15px 0 45px -10px color-mix(in srgb, var(--custom-accent, #10b981) 40%, rgba(0,0,0,0.25))',
             }}
           >
-            {/* Top-right vibrant flare glow */}
             <Box
               sx={{
                 position: 'absolute',
@@ -123,7 +119,6 @@ export const ServerAdminLogin = () => {
               }}
             />
 
-            {/* Deep mesh shadow in bottom corner */}
             <Box
               sx={{
                 position: 'absolute',
@@ -140,7 +135,6 @@ export const ServerAdminLogin = () => {
               }}
             />
 
-            {/* Center mushy ambient color bloom */}
             <Box
               sx={{
                 position: 'absolute',
@@ -157,7 +151,6 @@ export const ServerAdminLogin = () => {
               }}
             />
 
-            {/* Fine grain noise texture overlay */}
             <Box
               sx={{
                 position: 'absolute',
@@ -172,7 +165,6 @@ export const ServerAdminLogin = () => {
               }}
             />
 
-            {/* Top Brand Mark */}
             <Box sx={{ position: 'relative', zIndex: 10 }}>
               <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
                 <IntellMeetLogo
@@ -195,7 +187,6 @@ export const ServerAdminLogin = () => {
               </Stack>
             </Box>
 
-            {/* Bottom Hero & Steps */}
             <Stack spacing={4} sx={{ position: 'relative', zIndex: 10, width: '100%' }}>
               <Stack
                 direction={{ xs: 'column', xl: 'row' }}
@@ -292,7 +283,6 @@ export const ServerAdminLogin = () => {
           </Box>
         </Grid>
 
-        {/* ── Right Form Panel ── */}
         <Grid
           size={{ xs: 12, lg: 6 }}
           sx={{
@@ -309,7 +299,6 @@ export const ServerAdminLogin = () => {
         >
           <Box sx={{ width: '100%', maxWidth: 440, mx: 'auto', my: 'auto' }}>
             <Stack spacing={2.5}>
-              {/* Brand Logo Header for Small Screens */}
               <Box sx={{ display: { xs: 'flex', lg: 'none' }, justifyContent: { xs: 'center', sm: 'flex-start' }, mb: 0.5 }}>
                 <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
                   <IntellMeetLogo size={26} />

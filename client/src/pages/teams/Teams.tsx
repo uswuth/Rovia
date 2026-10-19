@@ -108,7 +108,7 @@ export const Teams: React.FC = () => {
   return (
     <div className="w-full max-w-full min-w-0 bg-background text-foreground p-6 lg:p-8 space-y-6">
       <div className="w-full space-y-6">
-        {/* Page Header */}
+        {}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-foreground">
@@ -130,7 +130,7 @@ export const Teams: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter and Search Bar */}
+        {}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1">
             <Input
@@ -158,7 +158,7 @@ export const Teams: React.FC = () => {
           </div>
         </div>
 
-        {/* Data Table Container */}
+        {}
         {filteredTeams.length === 0 ? (
           <EmptyState
             icon={Users}
@@ -183,7 +183,7 @@ export const Teams: React.FC = () => {
           />
         )}
 
-        {/* Full Roster Detail Modal */}
+        {}
         {rosterModal && (
           <RosterDetailModal
             open={rosterModal.open}

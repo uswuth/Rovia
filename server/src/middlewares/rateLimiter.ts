@@ -6,10 +6,7 @@ interface RateLimitRecord {
   resetTime: number;
 }
 
-/**
- * In-memory sliding-window rate limiter.
- * Avoids extra third-party dependencies while providing solid brute-force protection.
- */
+/** In-memory sliding-window rate limiter. Avoids extra third-party dependencies while providing solid brute-force protection. */
 export const createRateLimiter = (options: {
   windowMs: number;
   max: number;

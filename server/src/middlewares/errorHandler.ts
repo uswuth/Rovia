@@ -30,8 +30,7 @@ export const errorHandler = (
     }));
     error = new ApiError(400, 'Validation failed: Please check the missing or invalid fields', errorsArray, err.stack);
   } else if ('code' in err && (err as MongoDuplicateKeyError).code === 11000) {
-    // Mongoose Duplicate Key Error
-    const mongoDupError = err as MongoDuplicateKeyError;
+        const mongoDupError = err as MongoDuplicateKeyError;
     const field = Object.keys(mongoDupError.keyValue)[0];
     error = new ApiError(400, `An account with that ${field} already exists.`, [], err.stack);
   } else if (err instanceof SyntaxError && 'status' in err && (err as unknown as { status: number }).status === 400 && 'body' in err) {

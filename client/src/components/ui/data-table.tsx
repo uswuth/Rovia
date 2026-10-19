@@ -19,58 +19,36 @@ export interface Column<T> {
   header: React.ReactNode;
   /** Key on the data object (supports dot notation like 'profile.name') */
   accessorKey?: keyof T | (string & {});
-  /** Custom render function for the cell (receives row item and index) */
   cell?: (row: T, index: number) => React.ReactNode;
-  /** Text alignment */
   align?: 'left' | 'center' | 'right';
-  /** Optional custom class for header cell (th) */
   headerClassName?: string;
-  /** Optional custom class for data cell (td) */
   className?: string;
-  /** Optional explicit width */
   width?: string | number;
-  /** Optional minimum width */
   minWidth?: string | number;
-  /** Optional maximum width */
   maxWidth?: string | number;
-  /** Optional inline cell style */
   style?: React.CSSProperties;
 }
 
 export interface DataTableProps<T> {
-  /** Column definitions */
   columns: Column<T>[];
-  /** Array of data items to render */
   data: T[];
   /** Custom row key extractor. Defaults to row.id, row._id, or index */
   keyExtractor?: (row: T, index: number) => string | number;
-  /** Loading state flag */
   loading?: boolean;
-  /** Number of skeleton rows to render during loading (default 5) */
   loadingRowCount?: number;
-  /** Message or component to render when data is empty */
   emptyMessage?: React.ReactNode;
-  /** Optional callback fired when a row is clicked */
   onRowClick?: (row: T, index: number) => void;
-  /** Optional table element className */
   className?: string;
-  /** Optional outer wrapper className */
   wrapperClassName?: string;
-  /** Alternate row background coloring */
   striped?: boolean;
-  /** Enable built-in pagination bar (default: true) */
   paginate?: boolean;
-  /** Default rows per page (default: 10) */
   pageSize?: number;
-  /** Available options for rows per page selector */
   pageSizeOptions?: number[];
-  /** Controlled page index (1-based) */
+  
   page?: number;
   /** Total item count if using server-side pagination */
   totalCount?: number;
-  /** Callback when page index changes */
   onPageChange?: (page: number) => void;
-  /** Callback when page size changes */
   onPageSizeChange?: (pageSize: number) => void;
 }
 
@@ -107,11 +85,9 @@ export function DataTable<T>({
   onPageChange: externalOnPageChange,
   onPageSizeChange: externalOnPageSizeChange,
 }: DataTableProps<T>) {
-  // Column resizing state
   const [columnWidths, setColumnWidths] = React.useState<Record<string, number>>({});
   const resizingRef = React.useRef<{ key: string; startX: number; startWidth: number } | null>(null);
 
-  // Internal pagination state
   const [internalPage, setInternalPage] = React.useState(1);
   const [internalPageSize, setInternalPageSize] = React.useState(initialPageSize);
 
@@ -136,7 +112,6 @@ export function DataTable<T>({
     }
   };
 
-  // Slice data if using client-side pagination
   const isServerPaginated = externalTotalCount != null && externalOnPageChange != null;
   const paginatedData = isServerPaginated || !paginate
     ? data
@@ -144,7 +119,6 @@ export function DataTable<T>({
 
   const horizontalScrollRef = useScrollFade<HTMLDivElement>({ orientation: 'horizontal' });
 
-  // Column drag-resize handlers
   const handleMouseDown = (e: React.MouseEvent, colKey: string, currentWidth?: string | number) => {
     e.preventDefault();
     e.stopPropagation();
@@ -223,7 +197,6 @@ export function DataTable<T>({
                       <span className="truncate">{col.header}</span>
                     </div>
 
-                    {/* Resizable handle divider */}
                     <div
                       onMouseDown={(e) => handleMouseDown(e, colKey, col.width)}
                       className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/60 active:bg-primary transition-colors z-10"
@@ -302,7 +275,6 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      {/* Pagination Footer */}
       {paginate && totalItems > 0 && (
         <Pagination
           currentPage={currentPage}

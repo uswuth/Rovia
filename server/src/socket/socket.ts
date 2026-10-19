@@ -46,11 +46,7 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
     cors: socketCorsOptions
   });
 
-  /**
-   * Verifies the handshake token and returns the caller's identity. The same
-   * JWT the REST API uses, so a socket client is exactly as trusted as a request.
-   * Rejects any connection without a valid JWT token.
-   */
+  /** Verifies the handshake token; a socket client is trusted exactly as much as a REST request. */
   const resolveIdentity = (
     token?: string
   ): { userId: string; organizationId: string; isSuperAdmin?: boolean } | null => {
@@ -84,8 +80,7 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
     socket.data.organizationId = identity.organizationId;
     socket.data.isSuperAdmin = identity.isSuperAdmin ?? false;
 
-    // Every socket joins a per-user room so signalling addressed to a userId
-    // (`io.to(user:<id>)`) always has a live target room to land in.
+    // Join a per-user room so `io.to(user:<id>)` signalling always has a live target.
     void socket.join(`user:${identity.userId}`);
 
     socket.on('meeting:join', async (meetingId: string, ack?: (result: { ok: boolean; peers?: string[]; error?: string }) => void) => {
@@ -105,7 +100,6 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
 
         const realMeetingId = meeting._id.toString();
 
-        // Check Organization Access: meeting organization must match user's organization (unless SuperAdmin)
         const isOrgMember =
           socket.data.isSuperAdmin ||
           (socket.data.organizationId && meeting.organization_id.toString() === socket.data.organizationId);
@@ -115,10 +109,6 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
           return;
         }
 
-        // Access check across 3 categories:
-        // 1. Team meeting (org > project > team)
-        // 2. Project meeting (org > project)
-        // 3. Organization meeting (org)
         let hasAccess = Boolean(socket.data.isSuperAdmin || meeting.created_by.toString() === userId);
 
         if (!hasAccess && meeting.meeting_participants.some((p) => String(p.userId) === userId)) {
@@ -259,9 +249,7 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       }
     });
 
-    // SDP and ICE are relayed untouched. The server never inspects media.
-    // Only a sender that actually joined this meeting may relay, and the target
-    // is the receiver's per-user room — never an arbitrary room name.
+    // SDP/ICE are relayed untouched; only a joined member may relay, and only to the target's user room.
     const relay = (event: 'webrtc:offer' | 'webrtc:answer' | 'webrtc:ice', field: 'webrtc:offer' | 'webrtc:answer' | 'webrtc:ice') => {
       socket.on(event, (payload: { meetingId: string; to: string; [key: string]: unknown }) => {
         if (!payload?.meetingId || !payload?.to) return;
@@ -310,7 +298,6 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
 
       const targetUserId = payload.userId || callerId;
 
-      // If user is lowering someone else's hand or all hands, verify host status
       if (targetUserId !== callerId) {
         const meeting = targetId.match(/^[0-9a-fA-F]{24}$/)
           ? await Meeting.findById(targetId)
@@ -336,11 +323,7 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       io?.to(`meeting:${targetId}`).emit('meeting:hands-updated', { hands });
     });
 
-    /**
-     * In-meeting chat. Roster membership and can_use_chat are re-checked
-     * against the database on every message with the same guard the REST Q&A
-     * routes use, so a host disabling chat takes effect immediately.
-     */
+    /** Chat: can_use_chat is re-checked against the DB per message, so a host disable takes effect at once. */
     socket.on(
       'meeting:message',
       async (

@@ -11,10 +11,10 @@ import {
 } from "@/components/ui/popover"
 
 export interface DateTimePickerProps {
-  value?: string // ISO string format: YYYY-MM-DDTHH:mm
-  onChange?: (value: string) => void
-  disabled?: boolean
-  id?: string
+  value?: string;
+  onChange?: (value: string) => void;
+  disabled?: boolean;
+  id?: string;
 }
 
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"))
@@ -81,10 +81,7 @@ const TimeScrollColumn: React.FC<TimeScrollColumnProps> = ({
   )
 }
 
-/**
- * Shadcn UI Date & Dynamic Time Picker component.
- * Provides interactive Popover Calendar for Date & dynamic Hours/Minutes/AM-PM picker for Time.
- */
+/** Shadcn UI Date & Dynamic Time Picker component. Provides interactive Popover Calendar for Date & dynamic Hours/Minutes/AM-PM picker for Time. */
 export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerProps>(
   ({ value, onChange, disabled, id }, ref) => {
     const [dateOpen, setDateOpen] = React.useState(false)

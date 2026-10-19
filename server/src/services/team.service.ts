@@ -37,7 +37,6 @@ export const createTeamService = async (input: {
     throw ApiError.notFound('Parent project not found in this organization');
   }
 
-  // Validate that all assigned team members & hosts belong to the parent project
   const projectMemberSet = new Set([
     ...project.project_hosts.map((id) => id.toString()),
     ...project.project_members.map((id) => id.toString())

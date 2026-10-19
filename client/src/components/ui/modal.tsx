@@ -15,11 +15,7 @@ interface ModalProps {
   showCloseButton?: boolean
 }
 
-/**
- * Centered modal used for every create/edit/confirm flow. Owns the overlay,
- * Escape handling, backdrop dismissal, focus containment and scroll locking, so
- * individual dialogs only supply content.
- */
+/** Centered modal used for every create/edit/confirm flow. Owns the overlay, Escape handling, backdrop dismissal, focus containment and scroll locking, so individual dialogs only supply content. */
 const Modal: React.FC<ModalProps> = ({
   open,
   onClose,

@@ -1,10 +1,4 @@
-/**
- * Recording, transcript and AI summary types.
- *
- * These mirror the server's toJSON projections exactly (see recording.model.ts,
- * transcript.model.ts and summary.model.ts). Every field is optional because the
- * client must handle a record that has not reached a terminal state yet.
- */
+/** Mirrors the server models' toJSON projections; fields are optional until the record is terminal. */
 
 export type RecordingStatus = 'PENDING' | 'READY' | 'FAILED' | 'DELETED';
 export type AiStatus = 'PENDING' | 'PROCESSING' | 'READY' | 'FAILED';

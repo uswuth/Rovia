@@ -72,7 +72,6 @@ export const CreateOrgMember: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState('');
 
-  // Derive organization ID
   const organizationId = typeof user?.organizationId === 'object'
     ? ((user.organizationId as unknown as Record<string, unknown>)?._id as string) || ((user.organizationId as unknown as Record<string, unknown>)?.organizationId as string) || ''
     : user?.organizationId || '';
@@ -199,7 +198,6 @@ export const CreateOrgMember: React.FC = () => {
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
       <div className="max-w-3xl mx-auto space-y-6">
-        {/* Header Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">

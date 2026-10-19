@@ -1,9 +1,6 @@
 import { cva, type VariantProps } from "@/lib/utils"
 
-/**
- * Status tones. These describe *data*, never brand colors — the app's single
- * accent stays emerald, so purple/blue/amber/red only ever signal a state.
- */
+/** Status tones describe data states, never brand colors; the app's single accent stays emerald. */
 export const badgeVariants = cva(
   "inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-[11px] font-medium capitalize whitespace-nowrap",
   {

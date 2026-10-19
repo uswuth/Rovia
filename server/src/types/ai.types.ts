@@ -1,10 +1,4 @@
-/**
- * Provider-neutral contracts for the local AI pipeline.
- *
- * The Recording domain depends on these three interfaces only. FFmpeg, Whisper
- * and Ollama are adapters behind them, so any one can be replaced without
- * touching the Recording API, models or orchestration.
- */
+/** Provider-neutral contracts for the local AI pipeline. The Recording domain depends on these three interfaces only. FFmpeg, Whisper and Ollama are adapters behind them, so any one can be replaced without touching the Recording API, models or orchestration. */
 
 export interface AudioExtractionInput {
   /** Server-derived storage key. Never supplied by a client. */
@@ -17,11 +11,7 @@ export interface AudioExtractionInput {
 }
 
 export interface AudioExtractionResult {
-  /**
-   * Absolute paths to temporary silence-trimmed, 16 kHz mono FLAC chunks.
-   * Split because a full meeting exceeds the transcription API's per-file
-   * ceiling. The caller must delete the containing directory when done.
-   */
+  /** Absolute paths to temporary silence-trimmed, 16 kHz mono FLAC chunks. Split because a full meeting exceeds the transcription API's per-file ceiling. The caller must delete the containing directory when done. */
   filePaths: string[];
   /** Combined duration across all chunks in milliseconds. */
   durationMs: number | null;
@@ -56,10 +46,7 @@ export interface TranscriptionResult {
 export interface RecordingSpeaker {
   speakerId: string;
   speakerName: string;
-  /**
-   * Index into the recording's speaker list. The storage key is derived from
-   * this, so a client cannot address another speaker's object.
-   */
+  /** Index into the recording's speaker list. The storage key is derived from this, so a client cannot address another speaker's object. */
   speakerIndex: number;
 }
 

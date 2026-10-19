@@ -5,14 +5,7 @@ import { OrganizationClass } from './organization.model.js';
 
 export type RecordingStatus = 'PENDING' | 'READY' | 'FAILED' | 'DELETED';
 
-/**
- * One participant's captured audio within a recording.
- *
- * Each speaker is stored as a separate object so tracks can be transcribed
- * independently. Crosstalk between simultaneous speakers is what garbles a
- * transcript, so mixing everyone into one stream is what we are avoiding here.
- * The storage key is server-derived and never sent to the client.
- */
+/** One participant's captured audio within a recording. Each speaker is stored as a separate object so tracks can be transcribed independently. Crosstalk between simultaneous speakers is what garbles a transcript, so mixing everyone into one stream is what we are avoiding here. The storage key is server-derived and never sent to the client. */
 @modelOptions({ schemaOptions: { _id: false } })
 export class RecordingSpeakerClass {
   @prop({ type: () => String, required: true })
@@ -107,10 +100,7 @@ export class RecordingClass {
     this.created_by = val;
   }
 
-  /**
-   * Server-derived from the caller's organization and this document's id.
-   * Never accepted from a request. Hidden from toJSON.
-   */
+  /** Server-derived from the caller's organization and this document's id. Never accepted from a request. Hidden from toJSON. */
   @prop({ type: () => String, required: true, unique: true, alias: 'storageKey' })
   public storage_key!: string;
 
@@ -121,11 +111,7 @@ export class RecordingClass {
     this.storage_key = val;
   }
 
-  /**
-   * One entry per participant who had audio captured. Keys are server-derived
-   * from this recording's organization and id, so a client can only ever address
-   * its own recording's own speakers.
-   */
+  /** One entry per participant who had audio captured. Keys are server-derived from this recording's organization and id, so a client can only ever address its own recording's own speakers. */
   @prop({ type: () => [RecordingSpeakerClass], default: [], alias: 'recordingSpeakers' })
   public recording_speakers!: Array<RecordingSpeakerClass>;
 
@@ -213,11 +199,7 @@ export class RecordingClass {
     this.project_id = val;
   }
 
-  /**
-   * Opaque id only. Deliberately NOT a ref: the Meeting domain does not exist
-   * yet, and a ref to a missing collection populates to null silently. Becomes
-   * a real foreign key when meetings land.
-   */
+  /** Opaque id only. Deliberately NOT a ref: the Meeting domain does not exist yet, and a ref to a missing collection populates to null silently. Becomes a real foreign key when meetings land. */
   @prop({ type: () => Types.ObjectId, index: true, default: null, alias: 'meetingId' })
   public meeting_id?: Types.ObjectId | null;
 

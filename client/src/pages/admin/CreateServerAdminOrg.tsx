@@ -95,7 +95,7 @@ export const CreateServerAdminOrg: React.FC = () => {
 
   return (
     <div className="w-full max-w-3xl space-y-6">
-      {/* Back button & Page Title */}
+      {}
       <div className="flex items-center gap-3 pb-2 border-b border-border/40">
         <Button
           variant="ghost"
@@ -122,10 +122,10 @@ export const CreateServerAdminOrg: React.FC = () => {
         </div>
       )}
 
-      {/* Form Container Card */}
+      {}
       <div className="rounded-sm border border-border/80 bg-card p-6 shadow-xs">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Organization Details Section */}
+          {}
           <div className="space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b border-border text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <Building2 size={14} className="text-emerald-500" />
@@ -183,7 +183,7 @@ export const CreateServerAdminOrg: React.FC = () => {
             </div>
           </div>
 
-          {/* Super Admin Primary Identity Section */}
+          {}
           <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 pb-2 border-b border-border text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <User size={14} className="text-emerald-500" />
@@ -225,7 +225,7 @@ export const CreateServerAdminOrg: React.FC = () => {
             </div>
           </div>
 
-          {/* Form Actions */}
+          {}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
             <Button
               type="button"
@@ -256,7 +256,7 @@ export const CreateServerAdminOrg: React.FC = () => {
         </form>
       </div>
 
-      {/* Generated Credentials Popup Modal */}
+      {}
       {generatedCreds && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="bg-card border border-border rounded-sm max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in-0 zoom-in-95">

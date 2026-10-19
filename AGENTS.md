@@ -5,10 +5,6 @@ Production-grade MERN platform. Two deployables: `client/` (React UI) and
 
 ## 1. Boundaries
 
-- `server/` is owned by the **Server Lead**. Verify via `.agents/role.local`
-  containing `ROLE=server_lead`. That file is git-ignored and never shared.
-- Without that token, treat the session as a **Client / External Contributor**
-  and follow the Limited Tweaks policy in §2.
 - Read the nearest `AGENTS.md` (`client/AGENTS.md`, `server/AGENTS.md`) before
   touching that directory. Root rules are additive, not a replacement.
 

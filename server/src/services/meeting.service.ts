@@ -22,14 +22,10 @@ import {
   MeetingJoinMode
 } from '../types/index.js';
 
-/**
- * Meeting service. Every lookup is tenant scoped, and a join code alone never
- * grants access: the organization always comes from the authenticated JWT.
- */
-
+/** Every lookup is tenant scoped; a join code alone never grants access (org comes from the JWT). */
 import { Types } from 'mongoose';
 
-/** Tenant scoped lookup: supports Mongo ObjectId or MEET001 joinCode. */
+/** Tenant scoped lookup: accepts a Mongo ObjectId or a MEET001 join code. */
 export const findScopedMeeting = async (meetingIdOrCode: string, organizationId: string): Promise<MeetingDocument> => {
   const query: Record<string, unknown> = { organization_id: organizationId };
   if (Types.ObjectId.isValid(meetingIdOrCode)) {
@@ -44,10 +40,7 @@ export const findScopedMeeting = async (meetingIdOrCode: string, organizationId:
   return meeting;
 };
 
-/**
- * Resolves a meeting from its shareable join code. Still tenant scoped: a code
- * from another organization resolves to nothing.
- */
+/** Resolves a meeting from its shareable join code; a code from another org resolves to nothing. */
 export const findScopedMeetingByJoinCode = async (
   joinCode: string,
   organizationId?: string
@@ -151,7 +144,7 @@ export const createMeetingService = async (
     throw ApiError.badRequest(`meetingDurationMinutes must be between 1 and ${MEETING_MAX_DURATION_MINUTES}`);
   }
 
-  // The limit may only be lowered. Raising it above the default is never allowed.
+  // The limit may only be lowered, never raised above the default.
   const requestedLimit = input.meetingParticipantLimit ?? MEETING_DEFAULT_PARTICIPANT_LIMIT;
   if (requestedLimit < 1 || requestedLimit > MEETING_DEFAULT_PARTICIPANT_LIMIT) {
     throw ApiError.badRequest(
@@ -243,7 +236,7 @@ export const createMeetingService = async (
 
   const scope = input.teamId ? 'team' : project ? 'project' : 'general';
 
-  // Build participant roles map: creator and top admins are always HOST, requested roles are respected
+  // Creator and top admins are always HOST; requested roles are respected.
   const requestedRoles = input.participantRoles || {};
   const participantsUsers = await User.find({ _id: { $in: uniqueRoster } }).select('user_role is_super_admin').lean();
   const topAdminSet = new Set(
@@ -305,11 +298,7 @@ const assertCanManageMeeting = (meeting: MeetingDocument, userId: string, userRo
   }
 };
 
-/**
- * Every in-meeting feature (chat, Q&A, polls) needs the same two checks, so
- * they live here rather than being re-declared per feature.
- */
-
+/** Shared chat/Q&A/polls checks live here so they are not re-declared per feature. */
 /** Loads a meeting and confirms the caller is on its roster. */
 export const assertMeetingParticipant = (meeting: MeetingDocument, userId: string): MeetingParticipantClass => {
   let participant = findParticipant(meeting, userId);
@@ -330,7 +319,7 @@ export const assertMeetingParticipant = (meeting: MeetingDocument, userId: strin
   return participant;
 };
 
-/** Loads a meeting and confirms the caller is on its roster AND may chat. */
+/** Confirms the caller is a participant AND may chat. */
 export const assertMeetingCanChat = (meeting: MeetingDocument, userId: string): void => {
   const participant = assertMeetingParticipant(meeting, userId);
   if (!participant.can_use_chat) {
@@ -338,7 +327,7 @@ export const assertMeetingCanChat = (meeting: MeetingDocument, userId: string): 
   }
 };
 
-/** Confirms the caller is a Host or Moderator in the meeting before asking questions. */
+/** Confirms the caller is a Host or Moderator before asking questions. */
 export const assertMeetingCanAskQuestion = (meeting: MeetingDocument, userId: string): void => {
   const participant = assertMeetingParticipant(meeting, userId);
   if (!participant.can_use_chat) {
@@ -436,7 +425,7 @@ export const joinMeetingService = async (
     return meeting;
   }
 
-  // Check access across 3 categories (Team, Project, Org):
+  // Access is checked across team, project, and org scope, in that order.
   const isCreator = meeting.created_by.toString() === userId;
   let hasScopeAccess = isCreator;
 
@@ -459,7 +448,7 @@ export const joinMeetingService = async (
       if (projMembers.includes(userId)) hasScopeAccess = true;
     }
   } else if (!hasScopeAccess && !meeting.project_id && !meeting.team_id) {
-    // Org / general scope: all members of the organization have access
+    // Org-scoped meetings are open to every member of the organization.
     hasScopeAccess = true;
   }
 

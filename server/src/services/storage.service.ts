@@ -5,11 +5,7 @@ import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { ApiError } from '../utils/apiError.js';
 
-/**
- * The only module that talks to object storage. Everything else goes through
- * these functions, so the local (Floci) and production (R2) difference is a
- * single environment variable rather than a code change: both speak S3.
- */
+/** The only module that talks to object storage. Everything else goes through these functions, so the local (Floci) and production (R2) difference is a single environment variable rather than a code change: both speak S3. */
 
 const credentials =
   env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
@@ -24,12 +20,7 @@ const baseConfig = {
   ...(credentials ? { credentials } : {})
 };
 
-/**
- * Backblaze B2 answers uploads that carry `Expect: 100-continue` with an
- * opaque 500 `InternalError` instead of honouring the handshake, so the
- * header has to come off before the request is sent. Stripping it is safe for
- * every S3-compatible backend.
- */
+/** Backblaze B2 answers uploads that carry `Expect: 100-continue` with an opaque 500 `InternalError` instead of honouring the handshake, so the header has to come off before the request is sent. Stripping it is safe for every S3-compatible backend. */
 const withoutExpectContinue = (client: S3Client): S3Client => {
   client.middlewareStack.add(
     (next) => async (args) => {
@@ -41,10 +32,7 @@ const withoutExpectContinue = (client: S3Client): S3Client => {
   return client;
 };
 
-/**
- * Client the SERVER uses for its own calls (HeadObject, DeleteObject, reads for
- * transcription). In Docker this must be the in-network hostname.
- */
+/** Client the SERVER uses for its own calls (HeadObject, DeleteObject, reads for transcription). In Docker this must be the in-network hostname. */
 const s3Internal = withoutExpectContinue(
   new S3Client({
     ...baseConfig,
@@ -52,11 +40,7 @@ const s3Internal = withoutExpectContinue(
   })
 );
 
-/**
- * Client used ONLY to presign URLs that a BROWSER will call. A browser cannot
- * resolve a Compose-internal hostname, so the signed URL must carry the
- * host-reachable endpoint. Signing is host-agnostic: only the URL differs.
- */
+/** Client used ONLY to presign URLs that a BROWSER will call. A browser cannot resolve a Compose-internal hostname, so the signed URL must carry the host-reachable endpoint. Signing is host-agnostic: only the URL differs. */
 const s3Public = withoutExpectContinue(
   new S3Client({
     ...baseConfig,

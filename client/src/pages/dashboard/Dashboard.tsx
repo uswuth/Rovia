@@ -68,7 +68,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-8">
-      {/* Page Header */}
+      {}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/40">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
@@ -80,7 +80,7 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Metric Cards Section */}
+      {}
       <div className="space-y-6">
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
@@ -88,7 +88,7 @@ export const Dashboard: React.FC = () => {
             <span>Workspace Overview</span>
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* No. of Projects */}
+            {}
             <div
               onClick={() => navigate('/projects')}
               className="relative overflow-hidden rounded-sm border border-border/80 bg-card p-5 flex items-center justify-between shadow-xs hover:border-blue-500/50 hover:shadow-md transition-all duration-200 cursor-pointer group"
@@ -105,7 +105,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* No. of Teams */}
+            {}
             <div
               onClick={() => navigate('/teams')}
               className="relative overflow-hidden rounded-sm border border-border/80 bg-card p-5 flex items-center justify-between shadow-xs hover:border-primary/50 hover:shadow-md transition-all duration-200 cursor-pointer group"
@@ -122,7 +122,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* No. of Meetings */}
+            {}
             <div
               onClick={() => navigate('/meetings')}
               className="relative overflow-hidden rounded-sm border border-border/80 bg-card p-5 flex items-center justify-between shadow-xs hover:border-purple-500/50 hover:shadow-md transition-all duration-200 cursor-pointer group"
@@ -139,7 +139,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* No. of Tasks */}
+            {}
             <div
               onClick={() => navigate('/tasks')}
               className="relative overflow-hidden rounded-sm border border-border/80 bg-card p-5 flex items-center justify-between shadow-xs hover:border-amber-500/50 hover:shadow-md transition-all duration-200 cursor-pointer group"
@@ -158,7 +158,7 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Organization Members Overview */}
+        {}
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
             <Users size={14} className="text-primary" />

@@ -16,9 +16,9 @@ export interface MemberRosterProps {
   members: Member[];
   /** Map of member ID -> role ('Host' | 'Member') */
   value: Record<string, 'Host' | 'Member'>;
-  /** Callback when roster assignments change */
+  
   onChange: (value: Record<string, 'Host' | 'Member'>) => void;
-  /** Panel title */
+  
   title?: string;
   /** Singular entity noun for dialogs/tooltips (e.g. "project", "meeting") */
   entityName?: string;
@@ -26,7 +26,7 @@ export interface MemberRosterProps {
   lockSuperAdmin?: boolean;
   /** Optional class name on outer container */
   className?: string;
-  /** Optional min-height for scroll area */
+  
   minHeight?: string;
   /** Name of the project or meeting to mention in confirmation dialogs */
   projectName?: string;

@@ -25,10 +25,7 @@ const RECORDING_POPULATE = [
   { path: 'created_by', select: USER_SELECT }
 ];
 
-/**
- * Every recording lookup is tenant-scoped: an id alone never grants access.
- * Recording.findById(id) must never appear in this file.
- */
+/** Every recording lookup is tenant-scoped: an id alone never grants access. Recording.findById(id) must never appear in this file. */
 const findScopedRecording = async (recordingId: string, organizationId: string): Promise<RecordingDocument> => {
   const recording = await Recording.findOne({ _id: recordingId, organization_id: organizationId });
   if (!recording) {

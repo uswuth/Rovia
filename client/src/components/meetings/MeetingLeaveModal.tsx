@@ -11,7 +11,7 @@ export interface MeetingLeaveModalProps {
   onConfirmEndMeeting: () => void;
 }
 
-/** Google Meet style dialog allowing host to either leave or end call for all, and attendees to leave */
+/** Google Meet style dialog: the host may leave or end the call for everyone; attendees only leave. */
 export const MeetingLeaveModal: React.FC<MeetingLeaveModalProps> = ({
   open,
   isCreatorOrHost,

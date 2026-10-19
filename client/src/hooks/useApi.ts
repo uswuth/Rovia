@@ -8,25 +8,12 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query';
 
-/**
- * Thin wrappers over TanStack Query.
- *
- * The wrappers exist for two reasons:
- *  1. envelope unwrapping (`{ success, message, data }` → `data`) happens once,
- *     here, instead of at every call site
- *  2. the return shape is normalised to `loading` / `refetch` so components read
- *     the same way regardless of which layer produced the data
- */
+/** Thin wrappers over TanStack Query. The wrappers exist for two reasons: 1. envelope unwrapping (`{ success, message, data }` → `data`) happens once, here, instead of at every call site 2. the return shape is normalised to `loading` / `refetch` so components read the same way regardless of which layer produced the data */
 
 /** Any of the per-resource API functions; each resolves to an AxiosResponse. */
 type Fetcher = () => Promise<{ data: unknown }>;
 
-/**
- * The API envelope is `{ success, message, data, meta? }`. List endpoints put
- * `{ items, pagination }` inside `data` (see buildPaginatedResult on the
- * server), while single resources put the object itself there. Both shapes are
- * unwrapped here so components only ever see the payload they asked for.
- */
+/** The API envelope is `{ success, message, data, meta? }`. List endpoints put `{ items, pagination }` inside `data` (see buildPaginatedResult on the server), while single resources put the object itself there. Both shapes are unwrapped here so components only ever see the payload they asked for. */
 const unwrapOne = <T,>(response: unknown): T =>
   (response as { data: { data: T } }).data.data;
 
@@ -45,11 +32,7 @@ interface AppQueryOptions {
   enabled?: boolean;
   /** Overrides the client default for this query. */
   staleTime?: number;
-  /**
-   * Set for list endpoints. Unwraps the `{ items, pagination }` payload so the
-   * result is always a plain array. Without this a paginated list arrives as an
-   * object, and any `.map` / `.filter` on it throws.
-   */
+  /** Set for list endpoints. Unwraps the `{ items, pagination }` payload so the result is always a plain array. Without this a paginated list arrives as an object, and any `.map` / `.filter` on it throws. */
   list?: boolean;
   /** Optional polling interval in milliseconds, or false to disable. */
   refetchInterval?: number | false;

@@ -26,9 +26,7 @@ export interface LoginDTO {
   password: string;
 }
 
-// Matches IUserRegisterInput on server.
-// `userName` / `userEmail` are canonical. `name` / `email` are deprecated aliases
-// the server still accepts — do not send them.
+// Matches IUserRegisterInput on server; `name`/`email` are deprecated aliases — do not send them.
 export interface SignupDTO {
   userName: string;
   userEmail: string;

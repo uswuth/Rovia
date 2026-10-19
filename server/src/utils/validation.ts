@@ -5,7 +5,6 @@ export interface FieldValidationError {
   message: string;
 }
 
-/** A field that must be present. */
 export type RequiredField<T> = keyof T & string;
 
 const isBlank = (value: unknown): boolean =>
@@ -49,11 +48,7 @@ export const validateTitle = (title: string, fieldName = 'title'): void => {
   }
 };
 
-/**
- * Strips `//` and block comments from a JSON string while leaving comment-like
- * sequences inside string literals untouched (e.g. "https://example.com").
- * Dev-only convenience for commenting out credentials in API clients.
- */
+/** Strips JSON comments while preserving comment-like text inside strings (dev-only convenience). */
 export const stripJsonComments = (input: string): string => {
   let output = '';
   let inString = false;

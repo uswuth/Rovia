@@ -16,11 +16,7 @@ import {
 
 const router: Router = Router();
 
-/**
- * In-meeting features. Every route requires authentication, and every service
- * re-checks that the caller is on the meeting roster and permitted to chat, so
- * an authenticated non-participant cannot read or write meeting content.
- */
+/** Every service re-checks roster membership and permissions, so non-participants cannot read or write. */
 router.use(authenticateUser);
 
 /**

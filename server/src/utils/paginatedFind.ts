@@ -7,15 +7,7 @@ export interface PaginateOptions {
   populate?: { path: string; select: string }[];
 }
 
-/**
- * Runs a paginated find + matching countDocuments in parallel and wraps the
- * result in the standard paginated envelope. Every list endpoint uses this so
- * paging, sorting, and the meta shape cannot drift between resources.
- *
- * Generic over the document type, so callers pass their real model and get real
- * types back without `any. Mongoose's populated-document types are not
- * expressible here, hence the single cast at the return.
- */
+/** Paginated find + count in the standard envelope; the return cast covers Mongoose's populated types. */
 export const findPaginated = async <TDoc, TResult = TDoc>(
   model: Model<TDoc>,
   filter: RootFilterQuery<TDoc>,

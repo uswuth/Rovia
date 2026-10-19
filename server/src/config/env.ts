@@ -18,10 +18,7 @@ if (fs.existsSync(envLocalPath)) {
   dotenv.config();
 }
 
-// Docker/Kubernetes mount secrets as files under /run/secrets. Reading from a
-// file keeps credentials out of the image, the process list and CI logs.
-// Never fall back to a built-in default for a secret: a missing value must fail
-// loudly rather than silently sign tokens with a publicly known key.
+// Secrets are read from <NAME>_FILE mounts and never defaulted: a missing value must fail loudly.
 const readSecret = (name: string): string | undefined => {
   const filePath = process.env[`${name}_FILE`];
   if (!filePath) return undefined;
@@ -70,8 +67,7 @@ const validateEnv = (): void => {
     process.exit(1);
   }
 
-  // Object-storage credentials are only fatal in production. In development the
-  // storage spike is opt-in, so a missing key must not stop the whole server.
+  // Object-storage credentials are fatal only in production; dev storage is opt-in.
   if (isProduction && (!s3AccessKeyId || !s3SecretKey)) {
     console.error(
       '[CONFIG ERROR] Missing required configuration:\n  - AWS_ACCESS_KEY_ID (or AWS_ACCESS_KEY_ID_FILE)\n' +
@@ -96,11 +92,8 @@ export const env: Readonly<EnvConfig> = Object.freeze({
   JWT_REFRESH_EXPIRY: process.env.JWT_REFRESH_EXPIRY || '7d',
   ROOT_SHARED_SECRET: rootSharedSecret as string,
   SERVER_ADMIN_INITIAL_PASSWORD: serverAdminInitialPassword,
-  // Non-secret S3 settings may have defaults. The credentials may not: they go
-  // through resolveSecret so a missing value fails loudly instead of signing
-  // with a publicly known key.
-  // Internal endpoint: used by the server for HeadObject/Delete/reads. In Docker
-  // this must be the Compose-internal hostname.
+  // S3 credentials go through resolveSecret, never a default; non-secret settings may default.
+  // Internal endpoint: used for HeadObject/Delete/reads; must be the Compose-internal hostname in Docker.
   AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL || 'http://localhost:4566',
   // Host-reachable endpoint: only used when presigning URLs a browser will call.
   AWS_PUBLIC_ENDPOINT_URL: process.env.AWS_PUBLIC_ENDPOINT_URL || 'http://localhost:4566',
@@ -109,17 +102,10 @@ export const env: Readonly<EnvConfig> = Object.freeze({
   AWS_SECRET_ACCESS_KEY: s3SecretKey,
   AWS_S3_BUCKET: process.env.AWS_S3_BUCKET || 'intellmeet-bucket',
 
-  // ── AI pipeline ───────────────────────────────────────────────────────────
-  // Transcription and summarisation are hosted (Groq and OpenRouter free tiers),
-  // so no model weights are downloaded and no AI container runs on this host.
-  // FFmpeg still runs locally: it normalises the stored recording into the
-  // 16 kHz mono WAV that the transcriber expects.
+  // AI is hosted (Groq/OpenRouter); FFmpeg still runs locally to make the 16 kHz mono WAV the transcriber expects.
   FFMPEG_PATH: process.env.FFMPEG_PATH || 'ffmpeg',
 
-  // Same rule as every other secret: resolved from <NAME>_FILE then <NAME>, and
-  // deliberately NOT validated at boot. The AI pipeline is opt-in, so a missing
-  // key must not stop the whole server; the adapters fail loudly with a 503 only
-  // when someone actually asks for a transcript or summary.
+  // Deliberately unvalidated: the AI pipeline is opt-in, so a missing key only 503s on request.
   GROQ_API_KEY: resolveSecret('GROQ_API_KEY'),
   GROQ_BASE_URL: process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
   GROQ_TRANSCRIBE_MODEL: process.env.GROQ_TRANSCRIBE_MODEL || 'whisper-large-v3',
@@ -127,11 +113,9 @@ export const env: Readonly<EnvConfig> = Object.freeze({
   GROQ_TIMEOUT_MS: parseInt(process.env.GROQ_TIMEOUT_MS || '600000', 10),
   OPENROUTER_API_KEY: resolveSecret('OPENROUTER_API_KEY'),
   OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-  // A free text model. Audio is not available on the free tier, so the
-  // transcript always comes from GROQ_API_KEY and only text goes here.
+  // Free text model: audio is not on the free tier, so only the transcript text goes here.
   OPENROUTER_SUMMARY_MODEL: process.env.OPENROUTER_SUMMARY_MODEL || 'nvidia/nemotron-3-super-120b-a12b:free',
-  // Tried in order when the primary model is rate-limited or answers unusably.
-  // Verified to honour response_format json_object, which weaker free models do not.
+  // Tried in order when the primary model is rate-limited; verified to honour json_object responses.
   OPENROUTER_FALLBACK_MODELS: (process.env.OPENROUTER_FALLBACK_MODELS ??
     'nvidia/nemotron-3-ultra-550b-a55b:free,poolside/laguna-s-2.1:free,liquid/lfm-2.5-2.6b:free')
     .split(',')

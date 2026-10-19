@@ -91,7 +91,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
   return (
     <div ref={containerRef} className={cn('relative w-full text-left', className)}>
-      {/* Trigger button */}
       <button
         type="button"
         id={id}
@@ -135,10 +134,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         </div>
       </button>
 
-      {/* Popover Dropdown */}
       {open && (
         <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[220px] rounded-md border border-border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 overflow-hidden">
-          {/* Search Bar */}
           <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border/60 bg-muted/20">
             <Search size={13} className="text-muted-foreground shrink-0" />
             <input
@@ -160,7 +157,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             )}
           </div>
 
-          {/* Options List */}
           <div className="max-h-56 overflow-y-auto p-1 divide-y-0 text-xs">
             {allowClear && (
               <button

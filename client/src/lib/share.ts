@@ -1,8 +1,4 @@
-/**
- * Global native sharing utility with clipboard fallback.
- * Uses the Web Share API (Windows native share, macOS share sheet, Linux, mobile).
- * If unsupported or denied, falls back to copying the link to clipboard.
- */
+/** Native Web Share API with a clipboard fallback when it is unsupported or denied. */
 
 export interface ShareOptions {
   title?: string;
@@ -31,11 +27,10 @@ export async function shareOrCopy(options: ShareOptions): Promise<ShareResult> {
       if (err instanceof Error && err.name === 'AbortError') {
         return 'cancelled';
       }
-      // If native share encountered an error, proceed to fallback clipboard copy
+      // Non-abort share errors fall through to the clipboard copy.
     }
   }
 
-  // Fallback to clipboard
   try {
     if (navigator?.clipboard?.writeText) {
       await navigator.clipboard.writeText(url);

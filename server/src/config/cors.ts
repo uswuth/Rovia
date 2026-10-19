@@ -7,7 +7,6 @@ const parseAllowedOrigins = (): string[] | string | boolean => {
     return env.CORS_ORIGIN.split(',').map((origin) => origin.trim());
   }
   
-  // Default development origins
   return [
     'http://localhost:5173',
     'http://localhost:3000',

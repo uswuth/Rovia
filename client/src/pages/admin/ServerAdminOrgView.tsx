@@ -65,7 +65,6 @@ export const ServerAdminOrgView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Edit Modal State
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     organizationName: '',
@@ -74,7 +73,6 @@ export const ServerAdminOrgView: React.FC = () => {
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Delete Confirmation Dialog State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [confirmName, setConfirmName] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -196,7 +194,6 @@ export const ServerAdminOrgView: React.FC = () => {
 
   return (
     <div className="w-full space-y-6">
-      {/* Header with Title and Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/40">
         <div className="flex items-center gap-3">
           <Button
@@ -245,7 +242,6 @@ export const ServerAdminOrgView: React.FC = () => {
         </div>
       </div>
 
-      {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="rounded-sm border border-border/80 bg-card p-4 space-y-1">
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase">
@@ -288,9 +284,7 @@ export const ServerAdminOrgView: React.FC = () => {
         </div>
       </div>
 
-      {/* Organization Details and Primary SuperAdmin Info */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Org Info */}
         <div className="rounded-sm border border-border/80 bg-card p-6 space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-border text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <Building2 size={14} className="text-emerald-500" />
@@ -335,7 +329,6 @@ export const ServerAdminOrgView: React.FC = () => {
           </div>
         </div>
 
-        {/* SuperAdmin Owner */}
         <div className="rounded-sm border border-border/80 bg-card p-6 space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-border text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <ShieldCheck size={14} className="text-emerald-500" />
@@ -363,7 +356,6 @@ export const ServerAdminOrgView: React.FC = () => {
         </div>
       </div>
 
-      {/* Edit Organization Modal */}
       {isEditOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="bg-card border border-border rounded-sm max-w-md w-full p-6 shadow-xl space-y-4 animate-in fade-in-0 zoom-in-95">
@@ -437,7 +429,6 @@ export const ServerAdminOrgView: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
       {isDeleteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="bg-card border border-destructive/40 rounded-sm max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in-0 zoom-in-95">

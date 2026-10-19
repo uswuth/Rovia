@@ -79,7 +79,6 @@ const PollItem: React.FC<{
                       : 'border-border bg-muted/30 text-foreground'
                   )}
                 >
-                  {/* Background Progress Fill */}
                   <div
                     className={cn(
                       'absolute inset-y-0 left-0 transition-all duration-300 rounded-xs pointer-events-none',
@@ -99,7 +98,6 @@ const PollItem: React.FC<{
                 </div>
               </button>
 
-              {/* Voters List breakdown - host/manager only */}
               {canManage && option.voterIds && option.voterIds.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1 pl-1 pt-0.5">
                   <span className="text-[10px] text-muted-foreground/70 mr-1 flex items-center gap-1">
@@ -258,7 +256,6 @@ export const MeetingPolls: React.FC<MeetingPollsProps> = ({
         <span className="text-xs font-semibold text-muted-foreground">In-Meeting Polls</span>
       )}
 
-      {/* Repositioned New Poll Button (Primary with Accent Color) or Status */}
       {canManage && !composing && !hasOpenPoll && (
         <Button
           size="xs"
@@ -326,7 +323,7 @@ export const MeetingPolls: React.FC<MeetingPollsProps> = ({
       {headerToolbar}
 
       <div ref={scrollFadeRef} className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5 no-scrollbar scroll-fade-y">
-        {/* One active poll limit rule notice */}
+        {/* Only one poll can be open at a time. */}
         {canManage && hasOpenPoll && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">
             <AlertCircle size={14} className="shrink-0" />

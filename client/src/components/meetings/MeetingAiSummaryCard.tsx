@@ -14,13 +14,7 @@ interface MeetingAiSummaryCardProps {
   onCopyTranscript?: () => void;
 }
 
-/**
- * Post-meeting AI summary card.
- *
- * The transcript is shown in full and copyable: it is the raw log the user
- * pastes into any external AI when they want a summary this card did not
- * produce (for example after a summarisation rate-limit failure).
- */
+/** Transcript is shown in full and copyable so it can be pasted into any external AI tool. */
 export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
   stage,
   error,
@@ -44,8 +38,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard access can be denied; the textarea below is selectable, so
-      // the text is still reachable by hand.
+      // Clipboard access can be denied; the textarea below stays selectable as a fallback.
       setCopied(false);
     }
     onCopyTranscript?.();
@@ -152,8 +145,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
               </Button>
             </div>
 
-            {/* Each person was recorded on their own track, so their words are
-                shown separately rather than as one interleaved block. */}
+            {/* Each participant was recorded on their own track, so their words are shown separately. */}
             {speakers.length > 0 ? (
               <div className="space-y-2">
                 {speakers.map((speaker) => (

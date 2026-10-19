@@ -1,7 +1,4 @@
-/**
- * Centralized Entity Prefix Registry for Code Generation.
- * Frozen dictionary of prefixes to prevent accidental typos, spelling changes, or data corruption.
- */
+/** Centralized Entity Prefix Registry for Code Generation. Frozen dictionary of prefixes to prevent accidental typos, spelling changes, or data corruption. */
 export const ENTITY_PREFIXES = Object.freeze({
   PROJECT: 'PRJT',
   TASK: 'TASK',

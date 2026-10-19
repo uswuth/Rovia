@@ -169,8 +169,7 @@ export const Tasks: React.FC = () => {
     try {
       await updateTaskApi(taskId, { taskStatus: newStatus });
     } catch (err: unknown) {
-      // Revert optimistic update on error
-      setTasks((prevTasks) =>
+            setTasks((prevTasks) =>
         prevTasks.map((t) => {
           const idStr = (t.taskId || t._id) as string;
           if (idStr === taskId) {

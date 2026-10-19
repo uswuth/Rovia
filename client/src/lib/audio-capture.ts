@@ -1,20 +1,4 @@
-/**
- * Capture-side audio processing for meetings — always on, no UI toggle.
- *
- * Two layers, because no single mechanism covers every browser:
- *
- * Layer 1 — getUserMedia constraints. Chromium honors these (Chrome, Edge,
- * Brave, Opera, Samsung Internet, Helium, Arc, Vivaldi); Firefox honors the
- * standard three; Safari ignores audio-processing constraints entirely.
- *
- * Layer 2 — a Web Audio chain inserted between mic and WebRTC. Works on every
- * engine and is the only thing that helps on Safari / iOS.
- *
- * Room-meeting "buzzing" has three causes:
- * - Feedback loop (mic picks up speaker output) -> echo cancellation
- * - Steady electrical hum below ~100Hz (ground loop, cheap USB mic) -> high-pass
- * - Level pumping when someone leans in / steps back -> compression
- */
+/** Capture-side audio processing for meetings — always on, no UI toggle. Two layers, because no single mechanism covers every browser: Layer 1 — getUserMedia constraints. Chromium honors these (Chrome, Edge, Brave, Opera, Samsung Internet, Helium, Arc, Vivaldi); Firefox honors the standard three; Safari ignores audio-processing constraints entirely. Layer 2 — a Web Audio chain inserted between mic and WebRTC. Works on every engine and is the only thing that helps on Safari / iOS. Room-meeting "buzzing" has three causes: - Feedback loop (mic picks up speaker output) -> echo cancellation - Steady electrical hum below ~100Hz (ground loop, cheap USB mic) -> high-pass - Level pumping when someone leans in / steps back -> compression */
 interface ChromeAudioConstraints extends MediaTrackConstraints {
   googEchoCancellation?: boolean;
   googNoiseSuppression?: boolean;

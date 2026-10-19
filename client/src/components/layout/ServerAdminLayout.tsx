@@ -34,8 +34,7 @@ export const ServerAdminLayout: React.FC = () => {
         setPrometheusStatus(res.data.data.metrics.prometheusStatus);
       }
     } catch {
-      // Ignored
-    } finally {
+          } finally {
       setRefreshing(false);
     }
   }, [navigate]);
@@ -54,8 +53,7 @@ export const ServerAdminLayout: React.FC = () => {
         }
       })
       .catch(() => {
-        // Ignored
-      });
+              });
 
     return () => {
       isMounted = false;
@@ -68,8 +66,7 @@ export const ServerAdminLayout: React.FC = () => {
     navigate('/server-admin/login', { replace: true });
   };
 
-  // Derive breadcrumb label
-  const getBreadcrumbLabel = () => {
+    const getBreadcrumbLabel = () => {
     const path = location.pathname;
     if (path.includes('/organizations/new')) return 'Organizations / New';
     if (path.match(/\/organizations\/[a-zA-Z0-9_-]+/)) return 'Organizations / Details';
@@ -80,7 +77,7 @@ export const ServerAdminLayout: React.FC = () => {
 
   return (
     <div className="flex h-dvh w-full bg-background text-foreground overflow-hidden">
-      {/* ── Server Admin Sidebar ── */}
+      {}
       <aside className="w-64 border-r border-border bg-card flex flex-col justify-between shrink-0 select-none">
         <div className="flex flex-col">
           {/* Brand Header with separator matching top bar height (h-14) */}
@@ -96,7 +93,7 @@ export const ServerAdminLayout: React.FC = () => {
             </div>
           </div>
 
-          {/* Navigation Links */}
+          {}
           <nav className="p-3 space-y-1">
             <NavLink
               to="/server-admin/dashboard"

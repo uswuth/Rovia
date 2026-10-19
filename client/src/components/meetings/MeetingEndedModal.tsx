@@ -8,7 +8,6 @@ export interface MeetingEndedModalProps {
   onGoToProjects: () => void;
 }
 
-/** Modal dialog shown when the host has ended the meeting for everyone */
 export const MeetingEndedModal: React.FC<MeetingEndedModalProps> = ({
   open,
   onReturnToMeetings,

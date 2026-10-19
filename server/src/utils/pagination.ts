@@ -26,11 +26,7 @@ const toPositiveInt = (value: unknown, fallback: number): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-/**
- * Normalises `?page` / `?limit` into skip/limit. Malformed or out-of-range
- * values fall back to defaults rather than erroring, so a bad query param
- * never breaks a list endpoint.
- */
+/** Normalises `?page` / `?limit` into skip/limit; malformed values fall back to defaults. */
 export const getPagination = (query: Record<string, unknown> = {}): PaginationParams => {
   const page = toPositiveInt(query.page, 1);
   const limit = Math.min(toPositiveInt(query.limit, DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE);

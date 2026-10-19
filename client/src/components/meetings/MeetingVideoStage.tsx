@@ -1,13 +1,18 @@
 import React from 'react';
 import { VideoTile } from './VideoTile';
 import { OverflowTile } from './OverflowTile';
+import { cn } from '@/lib/utils';
+import { useTimeFormat } from '@/context/TimeFormatContext';
 import type { MeetingParticipant } from '@/api/meeting/meeting.types';
 
 export interface MeetingVideoStageProps {
+  title?: string;
   participants: MeetingParticipant[];
   currentUserId?: string;
   localStream?: MediaStream | null;
-  peers: Record<string, { stream: MediaStream | null; videoEnabled?: boolean; audioEnabled?: boolean }>;
+  screenStream?: MediaStream | null;
+  isScreenSharing?: boolean;
+  peers: Record<string, { stream: MediaStream | null; screenStream?: MediaStream | null; videoEnabled?: boolean; audioEnabled?: boolean; isScreenSharing?: boolean }>;
   getParticipantDisplayName: (p: { userId?: string; userName?: string; name?: string }) => string;
   getParticipantAvatar: (p: { userId?: string }) => string | undefined;
   speakerMuted?: boolean;
@@ -17,11 +22,13 @@ export interface MeetingVideoStageProps {
   onOpenParticipants?: () => void;
 }
 
-/** Main central stage containing participant video tiles */
 export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
+  title,
   participants,
   currentUserId,
   localStream,
+  screenStream,
+  isScreenSharing = false,
   peers,
   getParticipantDisplayName,
   getParticipantAvatar,
@@ -31,6 +38,15 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
   localMicOn,
   onOpenParticipants,
 }) => {
+  const { formatTimeStr } = useTimeFormat();
+  const [currentTime, setCurrentTime] = React.useState<Date>(() => new Date());
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [speakingMap, setSpeakingMap] = React.useState<Record<string, boolean>>({});
   const [speakerQueue, setSpeakerQueue] = React.useState<string[]>([]);
   const speakerQueueRef = React.useRef(speakerQueue);
@@ -38,7 +54,6 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
     speakerQueueRef.current = speakerQueue;
   }, [speakerQueue]);
 
-  // Active speaker sound detection via Web Audio Analyser
   React.useEffect(() => {
     const AudioContextClass =
       window.AudioContext ||
@@ -89,11 +104,7 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
     let animId: number;
     let lastDispatchTime = 0;
 
-    // Google Meet Active Speaker Stability & Hysteresis parameters:
-    // 1. Energy smoothing (EMA) to filter audio pops and clicks.
-    // 2. Minimum hold duration (2500ms): Current speaker cannot be bounced around erratically.
-    // 3. Sustained speech requirement (1200ms): A contender must talk steadily to displace the active speaker.
-    // 4. Simultaneous speech: All active speakers highlight, but grid tiles remain stably anchored.
+    // Hysteresis tuning: smooth energy, a 2.5s speaker hold, and 1.2s of sustained speech to displace.
     const voiceEnergy: Record<string, number> = {};
     const speechStartTime: Record<string, number> = {};
     const hangover: Record<string, number> = {};
@@ -118,7 +129,6 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
         }
         const instantAvg = sum / data.length;
 
-        // Exponential moving average (smooths out instantaneous fluctuations)
         const prevEma = voiceEnergy[userId] || 0;
         const ema = prevEma * 0.75 + instantAvg * 0.25;
         voiceEnergy[userId] = ema;
@@ -154,8 +164,6 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
           return nextSpeaking;
         });
 
-        // Hysteresis Speaker Promotion Logic:
-        // Identify the strongest contender who has demonstrated sustained speech
         let bestContenderId: string | null = null;
         let bestContenderEnergy = 0;
 
@@ -174,7 +182,6 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
         const isCurrentStillSpeaking = Boolean(currentDominantSpeaker && nextSpeaking[currentDominantSpeaker]);
         const isHoldExpired = now - dominantPromotedAt >= MIN_HOLD_DURATION_MS;
 
-        // Switch dominant speaker only if hold expired or current speaker is silent
         const canSwitch = !currentDominantSpeaker || isHoldExpired || !isCurrentStillSpeaking;
 
         if (bestContenderId && bestContenderId !== currentDominantSpeaker && canSwitch) {
@@ -233,16 +240,15 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
 
   const renderTile = (participant: MeetingParticipant) => {
     const isYou = participant.userId === currentUserId;
-
+    const peerState = peers[participant.userId];
+    const peerHasVideoTrack = Boolean(peerState?.stream?.getVideoTracks().some((t) => t.enabled));
     const isCameraActive = isYou
       ? (localCameraOn ?? true)
-      : Boolean(peers[participant.userId]?.videoEnabled);
+      : (peerState?.videoEnabled !== false || peerHasVideoTrack);
 
     const isMicMuted = isYou
       ? !(localMicOn ?? true)
       : (!participant.canSendAudio || peers[participant.userId]?.audioEnabled === false);
-
-    const peerState = peers[participant.userId];
 
     return (
       <VideoTile
@@ -261,8 +267,7 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
     );
   };
 
-  // Grid overflow setup:
-  // Dense grid capacity: 20 slots (19 video tiles + 1 overflow tile, as illustrated in the bottom-left layout)
+    // Dense grid capacity: 20 slots (19 video tiles + 1 overflow tile, as illustrated in the bottom-left layout)
   const MAX_GRID_TILES = 20;
   const isGridOverflow = orderedParticipants.length > MAX_GRID_TILES;
   const gridVisibleParticipants = isGridOverflow
@@ -273,6 +278,101 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
     : 0;
 
   const count = gridVisibleParticipants.length;
+
+  // Detect if any user (you or a remote peer) is sharing screen with an active video track
+  const peerSharing = Object.entries(peers).find(
+    ([, p]) =>
+      (p.isScreenSharing && ((p.screenStream && p.screenStream.getVideoTracks().length > 0) || (p.stream && p.stream.getVideoTracks().length > 0))) ||
+      (p.screenStream && p.screenStream.getVideoTracks().length > 0) ||
+      p.stream?.getVideoTracks().some((t) => t.label?.toLowerCase().includes('screen'))
+  );
+
+  const activePresenter = isScreenSharing
+    ? {
+        userId: currentUserId || 'you',
+        name: 'You',
+        stream: screenStream || localStream,
+        isYou: true,
+      }
+    : peerSharing
+    ? {
+        userId: peerSharing[0],
+        name: getParticipantDisplayName({ userId: peerSharing[0] }),
+        stream:
+          peerSharing[1].screenStream && peerSharing[1].screenStream.getVideoTracks().length > 0
+            ? peerSharing[1].screenStream
+            : peerSharing[1].screenStream || null,
+        isYou: false,
+      }
+    : null;
+
+  const spotlightContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const [isScreenFullscreen, setIsScreenFullscreen] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleFsChange = () => {
+      setIsScreenFullscreen(Boolean(document.fullscreenElement && document.fullscreenElement === spotlightContainerRef.current));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleScreenFullscreen = React.useCallback(() => {
+    if (!document.fullscreenElement) {
+      if (spotlightContainerRef.current?.requestFullscreen) {
+        spotlightContainerRef.current.requestFullscreen().catch(() => {});
+      } else {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
+
+  if (activePresenter && activePresenter.stream) {
+    return (
+      <main className="flex min-h-0 flex-1 flex-col lg:flex-row items-center justify-center p-3 lg:p-4 gap-3 bg-transparent overflow-hidden w-full h-full transition-all duration-300 ease-in-out">
+        {/* Spotlight Presentation: Fills available container cleanly, centered with natural margin, no extra letterboxing */}
+        <div
+          ref={spotlightContainerRef}
+          className={cn(
+            "flex-1 min-w-0 min-h-0 h-full w-full flex items-center justify-center rounded-xs overflow-hidden bg-transparent relative",
+            isScreenFullscreen && "fixed inset-0 w-screen h-screen z-50 rounded-none border-none p-0 m-0 bg-black flex items-center justify-center overflow-hidden"
+          )}
+        >
+          <VideoTile
+            key={`presentation-${activePresenter.userId}`}
+            name={activePresenter.name}
+            isYou={activePresenter.isYou}
+            host={false}
+            muted={true}
+            cameraOn={true}
+            stream={activePresenter.stream}
+            speakerMuted={false}
+            selectedSpeaker={selectedSpeaker}
+            isSpeaking={false}
+            isScreenShare={true}
+            fillContainer={true}
+            isFullscreen={isScreenFullscreen}
+            onToggleFullscreen={toggleScreenFullscreen}
+            meetingTitle={title}
+            meetingTime={formatTimeStr(currentTime)}
+          />
+        </div>
+
+        {/* Right-aligned Participant Filmstrip: Centered vertically so tiles don't stick awkwardly to the top */}
+        {!isScreenFullscreen && (
+          <div className="w-full lg:w-72 xl:w-80 h-48 lg:h-full shrink-0 flex flex-row lg:flex-col items-center justify-center gap-3 overflow-x-auto lg:overflow-y-auto py-auto pr-1">
+            {orderedParticipants.map((p) => (
+              <div key={p.userId} className="w-64 lg:w-full aspect-video shrink-0 max-h-[220px]">
+                {renderTile(p)}
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-0 flex-1 flex-col items-center justify-center p-4 lg:p-6 bg-transparent overflow-y-auto w-full h-full transition-all duration-300 ease-in-out">

@@ -43,14 +43,7 @@ const allGranted: ParticipantPermissions = {
   canUseChat: true,
 };
 
-/**
- * Per-member capability toggles. Chat also gates questions, answers and votes
- * server-side, so the label says so rather than implying it is chat only.
- *
- * State is seeded from props, and the parent keys this component by participant
- * id so switching members remounts it with fresh values. Syncing through an
- * effect instead is rejected by the project's own React rules.
- */
+/** Chat also gates Q&A/votes server-side; parent remounts per participant, so state is seeded from props. */
 export const ParticipantSettingsModal = ({
   participant,
   onClose,

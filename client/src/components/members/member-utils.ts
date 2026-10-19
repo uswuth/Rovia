@@ -25,10 +25,7 @@ export const getRoleCategory = (member: Member): 'SUPER_ADMIN' | 'ADMIN' | 'MEMB
   return 'MEMBERS';
 };
 
-/**
- * Normalizes a member entry (either a string ID or populated Member object)
- * into a strict, strongly-typed Member object according to the server payload contract.
- */
+/** Normalizes a member entry (either a string ID or populated Member object) into a strict, strongly-typed Member object according to the server payload contract. */
 export const normalizeMember = (m: Member | string): Member => {
   if (typeof m === 'string') {
     return {
@@ -54,10 +51,7 @@ export const normalizeMember = (m: Member | string): Member => {
   };
 };
 
-/**
- * Deduplicates and normalizes an array of member entries (e.g. hosts and members combined)
- * strictly by member userId.
- */
+/** Deduplicates and normalizes an array of member entries (e.g. hosts and members combined) strictly by member userId. */
 export const normalizeMemberList = (
   rawMembers: (Member | string | undefined | null)[]
 ): Member[] => {

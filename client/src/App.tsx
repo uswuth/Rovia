@@ -77,11 +77,7 @@ const GuestRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-/**
- * Authenticates without SidebarLayout, for routes that own the whole viewport
- * (the meeting room). Reusing ProtectedRoute would force the sidebar frame onto
- * a full-screen surface.
- */
+/** Authenticates without SidebarLayout so full-screen routes (the meeting room) own the viewport. */
 const MeetingRoomRoute = () => {
   const { isAuthenticated, loading } = useAuth();
   if (loading) {
@@ -126,15 +122,12 @@ const App = () => (
                         }
                       />
 
-                      {/* Full-screen routes: authenticated, but no sidebar frame. */}
-                      {/* Public meeting pre-join lobby for link recipients & visitors */}
                       <Route path="/meetings/join/:code" element={<MeetingLobby />} />
 
                       <Route element={<MeetingRoomRoute />}>
                         <Route path="/meetings/:id/room" element={<MeetingRoom />} />
                       </Route>
 
-                      {/* Server Admin Control Plane Routes (Strictly Isolated) */}
                       <Route path="/server-admin" element={<Navigate to="/server-admin/dashboard" replace />} />
                       <Route path="/server-admin/login" element={<ServerAdminLogin />} />
                       <Route element={<ServerAdminLayout />}>
@@ -146,7 +139,6 @@ const App = () => (
                         <Route path="/server-admin/telemetry" element={<ServerAdminTelemetry />} />
                       </Route>
 
-                      {/* Protected Dashboard Routes with SidebarLayout */}
                       <Route element={<ProtectedRoute />}>
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/organization/members" element={<OrgMembers />} />
@@ -181,7 +173,7 @@ const App = () => (
         </TimeFormatProvider>
       </ThemeProvider>
     </BrowserRouter>
-    {/* Devtools are stripped from the production bundle by the Vite build. */}
+    {/* Vite strips devtools from the production bundle. */}
     <ReactQueryDevtools initialIsOpen={false} />
   </QueryClientProvider>
 );

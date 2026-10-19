@@ -75,7 +75,6 @@ export const CreateMeeting: React.FC = () => {
   );
   const teams = useMemo(() => teamsData || [], [teamsData]);
 
-  // Default schedule start date/time dynamically based on current user time (rounded up to next 5 minutes)
   const [defaultStart] = useState(() => {
     const now = new Date();
     const mins = now.getMinutes();
@@ -146,7 +145,6 @@ export const CreateMeeting: React.FC = () => {
       });
   }, [projects, isGlobalAdmin, currentUserId]);
 
-  // Compute sub-team member IDs if a team is selected
   const activeTeamMemberIds = useMemo<Set<string> | null>(() => {
     if (!watchedTeamId || watchedTeamId === 'NONE') return null;
     const tObj = teams.find((t) => ((t.teamId || t._id) as string) === watchedTeamId);
@@ -173,7 +171,6 @@ export const CreateMeeting: React.FC = () => {
     return set;
   }, [teams, watchedTeamId]);
 
-  // Fetch full project details (including project_members and hosts) for the selected project
   const { data: selectedProjectDetails } = useQuery<Project>(
     queryKeys.projects.detail(selectedProjectId || ''),
     () => getProjectById(selectedProjectId || ''),
@@ -226,7 +223,6 @@ export const CreateMeeting: React.FC = () => {
     return false;
   }, [isGlobalAdmin, selectedTeamObj, activeProject, currentUserId]);
 
-  // Extract set of user IDs assigned to this project
   const projectMemberIds = useMemo<Set<string>>(() => {
     const set = new Set<string>();
     if (!activeProject) return set;
@@ -254,7 +250,7 @@ export const CreateMeeting: React.FC = () => {
     return set;
   }, [activeProject]);
 
-  // Data isolation filter: show only members assigned to this team (or project if no team selected) (+ SuperAdmin/Admin)
+  // Data isolation: only members of the selected team/project, plus SuperAdmin/Admin
   const projectFilteredMembers = useMemo(() => {
     if (!members) return [];
     if (!selectedProjectId) return members;
@@ -263,19 +259,16 @@ export const CreateMeeting: React.FC = () => {
       const mId = getMemberId(m);
       const category = getRoleCategory(m);
 
-      // SuperAdmin and Admin have global access across projects/meetings
       if (category === 'SUPER_ADMIN' || category === 'ADMIN' || m.isSuperAdmin) {
         return true;
       }
 
       if (!mId) return false;
 
-      // If a specific sub-team is selected, restrict candidate pool to that team
       if (activeTeamMemberIds) {
         return activeTeamMemberIds.has(mId);
       }
 
-      // Otherwise, show all project members
       return projectMemberIds.has(mId);
     });
   }, [members, selectedProjectId, projectMemberIds, activeTeamMemberIds]);
@@ -292,19 +285,16 @@ export const CreateMeeting: React.FC = () => {
     setValue('meetingScheduledAt', defaultStart);
   }, [defaultStart, setValue]);
 
-  // Pre-assign hosts whenever selected project or team changes
   useEffect(() => {
     // Defer to avoid synchronous setState in effect (React Compiler warning)
     const timer = setTimeout(() => {
       setAssignedRoles((prev) => {
         const next: Record<string, 'Host' | 'Member'> = {};
 
-        // 1. Current user is always seeded as Host
         if (user?.userId) {
           next[user.userId] = 'Host';
         }
 
-        // 2. Lock TopAdmins (SuperAdmin & Admin) as Host
         if (members) {
           members.forEach((m) => {
             const cat = getRoleCategory(m);
@@ -315,7 +305,6 @@ export const CreateMeeting: React.FC = () => {
           });
         }
 
-        // 3. Pre-assign team hosts if team is selected, or project hosts if project is selected
         const extractHostIds = (hostsArray: unknown[] = []): string[] => {
           return hostsArray
             .map((h) => {
@@ -359,7 +348,6 @@ export const CreateMeeting: React.FC = () => {
     return () => clearTimeout(timer);
   }, [selectedProjectId, watchedTeamId, selectedTeamObj, activeProject, user?.userId, members]);
 
-  // Only pre-assign creator as Host by default
   const seededCreatorRef = useRef(Boolean(user?.userId));
   useEffect(() => {
     if (!seededCreatorRef.current && user?.userId) {
@@ -435,7 +423,6 @@ export const CreateMeeting: React.FC = () => {
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
       <div className="w-full space-y-6">
-        {/* Top Header Row with Title and Inline Back Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
@@ -480,7 +467,6 @@ export const CreateMeeting: React.FC = () => {
           create.mutate(values as CreateMeetingFormValues);
         })}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            {/* LEFT COLUMN: Meeting Details Form Fields */}
             <div className="lg:col-span-7 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {lockedProjectId ? (
@@ -694,7 +680,6 @@ export const CreateMeeting: React.FC = () => {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Pre-assign Members List using common MemberRoster */}
             <div className="lg:col-span-5">
               <MemberRoster
                 members={projectFilteredMembers}

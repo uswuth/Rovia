@@ -23,6 +23,8 @@ import {
   Sun,
   Moon,
   Monitor,
+  ScreenShare,
+  ScreenShareOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
@@ -88,6 +90,10 @@ export interface MeetingControlsProps {
   selectedCamera: string;
   onSelectCamera: (deviceId: string) => void;
 
+  // Screen Share
+  isScreenSharing?: boolean;
+  onToggleScreenShare?: () => void;
+
   // Hand
   handRaised: boolean;
   onToggleHandRaise: () => void;
@@ -131,6 +137,8 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   videoInputs,
   selectedCamera,
   onSelectCamera,
+  isScreenSharing = false,
+  onToggleScreenShare,
   handRaised,
   onToggleHandRaise,
   isFullscreen,
@@ -1095,6 +1103,24 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                 </button>
               </Tooltip>
             </div>
+
+            {/* Screen Share Button */}
+            {onToggleScreenShare && (
+              <Tooltip content={isScreenSharing ? 'Stop Presenting Screen' : 'Share Screen'} side="top">
+                <button
+                  type="button"
+                  onClick={onToggleScreenShare}
+                  className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-all cursor-pointer ${
+                    isScreenSharing
+                      ? 'bg-accent text-accent-foreground border-accent shadow-md scale-105'
+                      : 'border-border bg-card text-foreground hover:bg-secondary'
+                  }`}
+                  aria-label={isScreenSharing ? 'Stop Presenting Screen' : 'Share Screen'}
+                >
+                  {isScreenSharing ? <ScreenShareOff size={18} /> : <ScreenShare size={18} />}
+                </button>
+              </Tooltip>
+            )}
 
             {/* Hand Raise Button */}
             <Tooltip content={handRaised ? 'Lower Hand' : 'Raise Hand'} side="top">

@@ -1,28 +1,10 @@
 import { ApiError } from './apiError.js';
 import { assertObjectId } from './objectId.js';
 
-/**
- * Recording limits and policy. Values are measured, not guessed — see
- * client/docs/SCREEN_RECORDING_CAPTURE.md for the browser spike that produced
- * them.
- */
+/** Recording limits and policy. Values are measured, not guessed — see client/docs/SCREEN_RECORDING_CAPTURE.md for the browser spike that produced them. */
 
-/**
- * Recorded meetings are captured whole, so there is no duration cap. A one-hour
- * meeting is ordinary input, not an abuse case: the browser is the only thing
- * holding the buffer, so a cap here would only reject a meeting the user
- * legitimately wanted transcribed.
- *
- * What still needs a ceiling is object SIZE, because a client controls its own
- * upload. That limit is a POLICY value, and complete() treats the object store's
- * reported length as the fact and deletes anything larger.
- *
- * Sized for a long recording: ~2 hours of screen-and-audio VP8 at 1 Mbps is
- * roughly 900 MB. Whisper never sees this file — the server demuxes it to
- * trimmed 16 kHz mono FLAC before transcription — so this only bounds storage.
- */
-export const MAX_RECORDING_SIZE_BYTES = 1_073_741_824; // 1 GiB
-
+/** Recorded meetings are captured whole, so there is no duration cap. A one-hour meeting is ordinary input, not an abuse case: the browser is the only thing holding the buffer, so a cap here would only reject a meeting the user legitimately wanted transcribed. What still needs a ceiling is object SIZE, because a client controls its own upload. That limit is a POLICY value, and complete() treats the object store's reported length as the fact and deletes anything larger. Sized for a long recording: ~2 hours of screen-and-audio VP8 at 1 Mbps is roughly 900 MB. Whisper never sees this file — the server demuxes it to trimmed 16 kHz mono FLAC before transcription — so this only bounds storage. */
+export const MAX_RECORDING_SIZE_BYTES = 1_073_741_824; 
 export const RECORDING_TTL_DAYS = 30;
 export const UPLOAD_URL_TTL_SECONDS = 120;
 export const DOWNLOAD_URL_TTL_SECONDS = 300;
@@ -30,15 +12,7 @@ export const DOWNLOAD_URL_TTL_SECONDS = 300;
 /** One in-flight upload per organization, mirroring the PROJECT_*_LIMIT pattern. */
 export const MAX_PENDING_RECORDINGS_PER_ORG = 5;
 
-/**
- * Validated against the MIME type MediaRecorder actually EMITTED, which is not
- * always the type the browser requested.
- *
- * Audio is what the meeting recorder captures: one track per participant, mono
- * Opus at a low bitrate, so a full hour per speaker stays inside the
- * transcription API's per-file ceiling without any server-side conversion. The
- * video entries remain for any caller that still records a picture.
- */
+/** Validated against the MIME type MediaRecorder actually EMITTED, which is not always the type the browser requested. Audio is what the meeting recorder captures: one track per participant, mono Opus at a low bitrate, so a full hour per speaker stays inside the transcription API's per-file ceiling without any server-side conversion. The video entries remain for any caller that still records a picture. */
 export const RECORDING_MIME_ALLOWLIST = [
   'audio/webm',
   'audio/webm;codecs=opus',
@@ -56,10 +30,7 @@ export const RECORDING_MIME_ALLOWLIST = [
 export const isAllowedRecordingMimeType = (mimeType: string): boolean =>
   RECORDING_MIME_ALLOWLIST.some((allowed) => allowed.toLowerCase() === mimeType.trim().toLowerCase());
 
-/**
- * Storage extension derives from the VALIDATED mime type, never hardcoded.
- * A recording key keeps its container so a mixed recording set stays playable.
- */
+/** Storage extension derives from the VALIDATED mime type, never hardcoded. A recording key keeps its container so a mixed recording set stays playable. */
 export const extensionForMimeType = (mimeType: string): string => {
   const normalised = mimeType.trim().toLowerCase();
   if (normalised.startsWith('audio/webm')) return 'webm';

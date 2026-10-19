@@ -95,7 +95,7 @@ export const UserProfile: React.FC = () => {
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header Navigation */}
+        {}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
@@ -115,7 +115,7 @@ export const UserProfile: React.FC = () => {
           </Button>
         </div>
 
-        {/* Profile Card Header */}
+        {}
         <div className="rounded-sm border border-border bg-card p-6 shadow-xs flex flex-col sm:flex-row items-center sm:items-start gap-5">
           <Avatar className="h-20 w-20 rounded-full shrink-0 border border-border">
             <AvatarImage src={member.avatarUrl} alt={name} />
@@ -143,7 +143,7 @@ export const UserProfile: React.FC = () => {
           </div>
         </div>
 
-        {/* Detailed Profile Information Grid */}
+        {}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Box 1: Account & Platform Attributes */}
           <div className="rounded-sm border border-border bg-card p-5 space-y-4">
@@ -190,7 +190,7 @@ export const UserProfile: React.FC = () => {
             </div>
           </div>
 
-          {/* Box 2: Personal Contact Information */}
+          {}
           <div className="rounded-sm border border-border bg-card p-5 space-y-4">
             <h3 className="text-sm font-bold text-foreground flex items-center gap-2 pb-2 border-b border-border/50">
               <Phone size={16} className="text-primary" />

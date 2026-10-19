@@ -36,7 +36,7 @@ services:
         # Set this to your Vercel URL. No wildcard in production.
         sync: false
       - key: AWS_REGION
-        value: auto
+        value: us-east-005
       - key: AWS_S3_BUCKET
         sync: false
       - key: AWS_ENDPOINT_URL

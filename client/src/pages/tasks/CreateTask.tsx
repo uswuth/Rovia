@@ -180,7 +180,6 @@ export const CreateTask: React.FC = () => {
     };
   }, [id, reset]);
 
-  // Compute member candidate pool from selected team or project while preserving org roles
   const candidateMemberPool = useMemo<Member[]>(() => {
     if (!orgMembers || orgMembers.length === 0) return [];
 
@@ -323,7 +322,6 @@ export const CreateTask: React.FC = () => {
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
       <div className="w-full space-y-6">
-        {/* Top Header Row with Title and Inline Back Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
@@ -350,7 +348,6 @@ export const CreateTask: React.FC = () => {
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            {/* LEFT COLUMN: Task Details Form Fields */}
             <div className="lg:col-span-7 space-y-5">
               <FormField label="Task Title" htmlFor="task-title" required error={errors.taskTitle?.message}>
                 <Input id="task-title" {...register('taskTitle')} placeholder="e.g. Implement OAuth JWT Refresh Endpoint" />
@@ -480,7 +477,6 @@ export const CreateTask: React.FC = () => {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Task Assignees Selection using MemberRoster */}
             <div className="lg:col-span-5">
               <MemberRoster
                 members={candidateMemberPool}

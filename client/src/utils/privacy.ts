@@ -1,8 +1,4 @@
-/**
- * Utility to partially mask user email addresses for privacy.
- * Example: "arlo@solution.com" -> "ar***@solution.com"
- * Example: "john.doe@domain.com" -> "jo***@domain.com"
- */
+/** Masks an email as "ar***@domain.com", keeping only the first two characters of the local part. */
 export function maskEmail(email?: string): string {
   if (!email || !email.includes('@')) {
     return 'us***@intellmeet.com';

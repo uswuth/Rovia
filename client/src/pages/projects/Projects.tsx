@@ -47,7 +47,7 @@ export const Projects: React.FC = () => {
   const [gridPageSize, setGridPageSize] = useState(6);
   const [rosterModal, setRosterModal] = useState<ProjectRosterModalState | null>(null);
 
-  // Fetch all meetings to accurately count meetings per project
+  // All meetings are fetched so the per-project meeting count is accurate.
   const { data: meetings } = useQuery<Meeting[]>(
     queryKeys.meetings.list(),
     () => getMeetings(),
@@ -78,7 +78,6 @@ export const Projects: React.FC = () => {
 
   return (
     <div className="w-full max-w-full min-w-0 bg-background text-foreground p-6 lg:p-8 space-y-6">
-      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
@@ -91,7 +90,6 @@ export const Projects: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          {/* View Mode Toggle */}
           <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
             <button
               type="button"
@@ -131,7 +129,6 @@ export const Projects: React.FC = () => {
         </div>
       </div>
 
-      {/* Projects Content Area */}
       {loading ? (
         viewMode === 'table' ? (
           <DataTable
@@ -148,7 +145,6 @@ export const Projects: React.FC = () => {
           </div>
         )
       ) : filteredProjects.length === 0 ? (
-        /* Empty State Card when no projects exist */
         <EmptyState
           icon={FolderPlus}
           title={currentTab === 'ALL' ? 'No projects created yet' : `No ${currentTab} projects found`}
@@ -162,7 +158,6 @@ export const Projects: React.FC = () => {
           accentColor="emerald"
         />
       ) : viewMode === 'table' ? (
-        /* Projects Table View */
         <DataTable
           columns={columns}
           data={filteredProjects}
@@ -314,7 +309,6 @@ export const Projects: React.FC = () => {
         );
       })()}
 
-      {/* Full Roster Detail Modal */}
       {rosterModal && (
         <RosterDetailModal
           open={rosterModal.open}

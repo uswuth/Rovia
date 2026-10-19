@@ -4,19 +4,7 @@ import { ApiError } from '../../utils/apiError.js';
 import { timeoutSignal } from '../../utils/ai.js';
 import { SummarizationInput, SummarizationResult, SummaryActionItem, Summarizer } from '../../types/index.js';
 
-/**
- * OpenRouter adapter for Summarizer.
- *
- * Talks the OpenAI-compatible /chat/completions shape against a free text model.
- * Only text is ever sent: the transcript. No audio, no meeting metadata.
- *
- * The model is instructed to stay grounded in the transcript, and its output is
- * validated defensively before it is stored, so a malformed response is a
- * failure rather than corrupt data.
- *
- * Validation is hand-rolled on purpose: the server has no schema library and
- * adding one would introduce a new architectural style.
- */
+/** OpenRouter adapter for Summarizer. Talks the OpenAI-compatible /chat/completions shape against a free text model. Only text is ever sent: the transcript. No audio, no meeting metadata. The model is instructed to stay grounded in the transcript, and its output is validated defensively before it is stored, so a malformed response is a failure rather than corrupt data. Validation is hand-rolled on purpose: the server has no schema library and adding one would introduce a new architectural style. */
 
 const groundedPrompt = (transcript: string, recordingTitle?: string): string => `You summarise meeting transcripts.
 

@@ -55,7 +55,6 @@ export const CreateProject: React.FC = () => {
   const { members: orgMembers } = useOrganization();
   const { addProject } = useProject();
 
-  // Fetch existing project if in edit mode
   const { data: existingProject, loading: projectLoading } = useQuery<Project>(
     queryKeys.projects.detail(id || ''),
     () => getProjectById(id || ''),
@@ -74,8 +73,6 @@ export const CreateProject: React.FC = () => {
   const watchedName = useWatch({ control, name: 'name' });
   const projectName = watchedName || existingProject?.projectName || existingProject?.name;
 
-  // Default roster: SuperAdmins are always Hosts, plus any hosts/members already
-  // saved on the project being edited.
   const defaultRoles = useMemo<Record<string, 'Host' | 'Member'>>(() => {
     const roleMap: Record<string, 'Host' | 'Member'> = {};
 
@@ -103,8 +100,7 @@ export const CreateProject: React.FC = () => {
     return roleMap;
   }, [orgMembers, existingProject]);
 
-  // Reseed the editable roster whenever the defaults change, instead of syncing
-  // it in an effect.
+  // Reseed the editable roster when defaults change, rather than syncing it in an effect.
   const [seededRoles, setSeededRoles] = useState(defaultRoles);
   const [assignedRoles, setAssignedRoles] = useState(defaultRoles);
   if (seededRoles !== defaultRoles) {
@@ -112,7 +108,6 @@ export const CreateProject: React.FC = () => {
     setAssignedRoles(defaultRoles);
   }
 
-  // Populate the form fields in edit mode once the project is fetched
   useEffect(() => {
     if (!isEditMode || !existingProject) return;
     reset({
@@ -168,7 +163,6 @@ export const CreateProject: React.FC = () => {
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
       <div className="w-full space-y-6">
-        {/* Top Header Row with Title and Inline Back Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
@@ -195,7 +189,6 @@ export const CreateProject: React.FC = () => {
 
         <form onSubmit={handleSubmit((values) => saveMutation.mutate(values))}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            {/* LEFT COLUMN: Project Details Form Fields */}
             <div className="lg:col-span-7 space-y-5">
               <FormField label="Project Name" htmlFor="project-name" required error={errors.name?.message}>
                 <Input id="project-name" {...register('name')} />
@@ -259,7 +252,6 @@ export const CreateProject: React.FC = () => {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Project Member Role Assignment */}
             <div className="lg:col-span-5">
               <MemberRoster
                 members={orgMembers ?? []}

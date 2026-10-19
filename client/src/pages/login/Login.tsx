@@ -70,7 +70,7 @@ export const Login = () => {
         position: 'relative',
       }}
     >
-      {/* Soft Ambient Accent Bloom Overlay */}
+      {}
       <Box
         sx={{
           position: 'absolute',
@@ -99,7 +99,7 @@ export const Login = () => {
             boxSizing: 'border-box',
           }}
         >
-          {/* Inner Rounded Green Card */}
+          {}
           <Box
             sx={{
               width: '100%',
@@ -118,7 +118,7 @@ export const Login = () => {
                 '0 10px 30px -5px color-mix(in srgb, var(--custom-accent, #10b981) 30%, rgba(0,0,0,0.1)), 15px 0 45px -10px color-mix(in srgb, var(--custom-accent, #10b981) 40%, rgba(0,0,0,0.25))',
             }}
           >
-            {/* Top-right vibrant sunny flare glow */}
+            {}
             <Box
               sx={{
                 position: 'absolute',
@@ -152,7 +152,7 @@ export const Login = () => {
               }}
             />
 
-            {/* Center mushy ambient color bloom */}
+            {}
             <Box
               sx={{
                 position: 'absolute',
@@ -169,7 +169,7 @@ export const Login = () => {
               }}
             />
 
-            {/* Fine grain noise texture overlay */}
+            {}
             <Box
               sx={{
                 position: 'absolute',
@@ -184,7 +184,7 @@ export const Login = () => {
               }}
             />
 
-            {/* Top Brand Mark */}
+            {}
             <Box sx={{ position: 'relative', zIndex: 10 }}>
               <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
                 <IntellMeetLogo
@@ -207,7 +207,7 @@ export const Login = () => {
               </Stack>
             </Box>
 
-            {/* Bottom Hero & Steps */}
+            {}
             <Stack spacing={4} sx={{ position: 'relative', zIndex: 10, width: '100%' }}>
               <Stack
                 direction={{ xs: 'column', xl: 'row' }}

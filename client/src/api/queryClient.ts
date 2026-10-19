@@ -39,9 +39,7 @@ export const createQueryClient = (): QueryClient =>
   new QueryClient({
     defaultOptions: {
       queries: {
-        // Auth and project data change on user action, not on a timer. 30s of
-        // freshness removes the duplicate-request problem entirely; the
-        // dev-only refetch window keeps debugging honest.
+        // Auth and project data change on user action, not on a timer; staleTime absorbs duplicate requests.
         staleTime: 60_000,
         gcTime: 5 * 60_000,
         refetchOnWindowFocus: false,

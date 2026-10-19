@@ -73,9 +73,7 @@ export function getAvatarTileBorderByName(name: string): string {
   return AVATAR_TILE_BORDER_PALETTES[index];
 }
 
-/**
- * High-contrast, vibrant, light active speaker border without dirty gray shadow/ring halos
- */
+/** High-contrast active speaker border, with no gray shadow/ring halos. */
 export const AVATAR_SPEAKER_BORDER_PALETTES = [
   'border border-emerald-400 ring-2 ring-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]',
   'border border-blue-400 ring-2 ring-blue-500/40 shadow-[0_0_12px_rgba(59,130,246,0.25)]',

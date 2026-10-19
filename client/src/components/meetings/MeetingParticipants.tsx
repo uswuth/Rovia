@@ -72,7 +72,7 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Pinned Raised Hands Panel */}
+      {}
       {raisedHands.length > 0 && (
         <div className="rounded-xs border border-border/80 bg-card p-3 shadow-xs space-y-2.5">
           <div className="flex items-center justify-between">

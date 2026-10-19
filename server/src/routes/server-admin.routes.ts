@@ -13,7 +13,6 @@ import { authenticateUser, authorizeRoles } from '../middlewares/auth.middleware
 
 const router: Router = Router();
 
-// Fully protected server admin routes
 /**
  * @openapi
  * /api/v1/server-admin/login:
@@ -45,9 +44,8 @@ const router: Router = Router();
  *       401:
  *         description: Invalid Server Admin credentials
  */
-router.post('/login', asyncHandler(loginServerAdmin));
+router.post('/server-admin/login', asyncHandler(loginServerAdmin));
 
-// Requires ServerAdmin role authorization
 /**
  * @openapi
  * /api/v1/server-admin/metrics:
@@ -66,7 +64,7 @@ router.post('/login', asyncHandler(loginServerAdmin));
  *       403:
  *         description: Forbidden (ServerAdmin role required)
  */
-router.get('/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
+router.get('/server-admin/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
 
 /**
  * @openapi
@@ -86,7 +84,7 @@ router.get('/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHan
  *       403:
  *         description: Forbidden (ServerAdmin role required)
  */
-router.get('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(listAllOrganizationsServerAdmin));
+router.get('/server-admin/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(listAllOrganizationsServerAdmin));
 
 /**
  * @openapi
@@ -104,7 +102,7 @@ router.get('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), as
  *         required: true
  *         schema:
  *           type: string
- *         description: Mongo ObjectId of the organization.
+ *           description: Mongo ObjectId of the organization.
  *     responses:
  *       200:
  *         description: Organization details retrieved successfully
@@ -115,7 +113,7 @@ router.get('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), as
  *       404:
  *         description: Organization not found
  */
-router.get('/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getOrgDetailsServerAdmin));
+router.get('/server-admin/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getOrgDetailsServerAdmin));
 
 /**
  * @openapi
@@ -163,7 +161,7 @@ router.get('/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmi
  *       403:
  *         description: Forbidden (ServerAdmin role required)
  */
-router.post('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(createOrgWithCredentials));
+router.post('/server-admin/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(createOrgWithCredentials));
 
 /**
  * @openapi
@@ -191,9 +189,9 @@ router.post('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), a
  *             properties:
  *               organizationName:
  *                 type: string
- *               organizationLocation:
+ *                 organizationLocation:
  *                 type: string
- *               organizationDescription:
+ *                 organizationDescription:
  *                 type: string
  *     responses:
  *       200:
@@ -240,6 +238,6 @@ router.patch('/organizations/:orgId', authenticateUser, authorizeRoles('ServerAd
  *       404:
  *         description: Organization not found
  */
-router.delete('/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(deleteOrgServerAdmin));
+router.delete('/server-admin/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(deleteOrgServerAdmin));
 
 export default router;

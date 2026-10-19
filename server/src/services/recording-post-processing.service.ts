@@ -28,22 +28,7 @@ import {
   failSummaryService
 } from './summary.service.js';
 
-/**
- * Orchestrates the AI pipeline. It contains no FFmpeg, transcription or
- * summarisation logic: those live behind the three injected interfaces, so the
- * Recording domain can be tested with fakes and any provider can be swapped.
- *
- * Transcription runs on Groq (whisper-large-v3) and summarisation on the
- * OpenRouter free tier. Both are hosted, so no model weights are downloaded to
- * this host and no AI container is required.
- *
- * Failure policy: a failed stage marks its OWN record FAILED. The recording
- * stays READY, and a later stage failure never invalidates an earlier success,
- * so summarisation can be retried without retranscribing.
- *
- * Today this runs inline from complete(). Replacing that call with an enqueue
- * is the only change needed to move to a worker.
- */
+/** Orchestrates the AI pipeline. It contains no FFmpeg, transcription or summarisation logic: those live behind the three injected interfaces, so the Recording domain can be tested with fakes and any provider can be swapped. Transcription runs on Groq (whisper-large-v3) and summarisation on the OpenRouter free tier. Both are hosted, so no model weights are downloaded to this host and no AI container is required. Failure policy: a failed stage marks its OWN record FAILED. The recording stays READY, and a later stage failure never invalidates an earlier success, so summarisation can be retried without retranscribing. Today this runs inline from complete(). Replacing that call with an enqueue is the only change needed to move to a worker. */
 export class RecordingPostProcessingService {
   constructor(
     private readonly audioExtractor: AudioExtractor = new FfmpegAudioExtractor(),
