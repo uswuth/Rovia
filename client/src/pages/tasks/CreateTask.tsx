@@ -314,7 +314,7 @@ export const CreateTask: React.FC = () => {
     return (
       <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
         <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-96 w-full rounded-xl" />
+        <Skeleton className="h-96 w-full rounded-sm" />
       </div>
     );
   }

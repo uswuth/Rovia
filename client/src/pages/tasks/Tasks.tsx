@@ -169,7 +169,7 @@ export const Tasks: React.FC = () => {
     try {
       await updateTaskApi(taskId, { taskStatus: newStatus });
     } catch (err: unknown) {
-            setTasks((prevTasks) =>
+      setTasks((prevTasks) =>
         prevTasks.map((t) => {
           const idStr = (t.taskId || t._id) as string;
           if (idStr === taskId) {
@@ -261,7 +261,7 @@ export const Tasks: React.FC = () => {
     return (
       <div className="w-full max-w-full min-w-0 bg-background text-foreground p-6 lg:p-8 space-y-6">
         <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-96 w-full rounded-xl" />
+        <Skeleton className="h-96 w-full rounded-sm" />
       </div>
     );
   }

@@ -399,7 +399,7 @@ export const MeetingLobby: React.FC = () => {
             <p className="text-xs text-muted-foreground">Connecting to meeting lobby...</p>
           </div>
         ) : error || !preview ? (
-          <div className="flex max-w-md flex-col items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+          <div className="flex max-w-md flex-col items-center gap-4 rounded-sm border border-destructive/30 bg-destructive/5 p-6 text-center">
             <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
               <AlertCircle size={24} />
             </div>
@@ -430,7 +430,7 @@ export const MeetingLobby: React.FC = () => {
           <div className="grid w-full max-w-5xl grid-cols-1 items-start gap-10 lg:grid-cols-12">
             {/* Left 7 cols: Video Preview & Device Controls */}
             <div className="flex flex-col gap-4 lg:col-span-7">
-              <div className="group relative aspect-video w-full overflow-hidden rounded-xl border border-slate-800 bg-slate-950 text-white shadow-xl">
+              <div className="group relative aspect-video w-full overflow-hidden rounded-sm border border-slate-800 bg-slate-950 text-white shadow-xl">
                 {/* Live Video feed */}
                 {cameraEnabled && !mediaPermissionDenied ? (
                   <video
@@ -472,8 +472,8 @@ export const MeetingLobby: React.FC = () => {
                     type="button"
                     onClick={toggleMic}
                     className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${micEnabled
-                        ? 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
-                        : 'bg-red-600 text-white hover:bg-red-700 shadow-red-600/30'
+                      ? 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
+                      : 'bg-red-600 text-white hover:bg-red-700 shadow-red-600/30'
                       }`}
                     title={micEnabled ? 'Mute Mic' : 'Unmute Mic'}
                   >
@@ -484,8 +484,8 @@ export const MeetingLobby: React.FC = () => {
                     type="button"
                     onClick={toggleCamera}
                     className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${cameraEnabled
-                        ? 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
-                        : 'bg-red-600 text-white hover:bg-red-700 shadow-red-600/30'
+                      ? 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
+                      : 'bg-red-600 text-white hover:bg-red-700 shadow-red-600/30'
                       }`}
                     title={cameraEnabled ? 'Turn Camera Off' : 'Turn Camera On'}
                   >
@@ -496,8 +496,8 @@ export const MeetingLobby: React.FC = () => {
                     type="button"
                     onClick={() => setShowDeviceSettings(!showDeviceSettings)}
                     className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${showDeviceSettings
-                        ? 'bg-emerald-600 text-white shadow-emerald-600/30'
-                        : 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
+                      ? 'bg-emerald-600 text-white shadow-emerald-600/30'
+                      : 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
                       }`}
                     title="Device Preferences"
                   >

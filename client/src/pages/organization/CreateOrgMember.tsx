@@ -190,7 +190,7 @@ export const CreateOrgMember: React.FC = () => {
     return (
       <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6 max-w-3xl mx-auto">
         <Skeleton className="h-10 w-36" />
-        <Skeleton className="h-96 w-full rounded-xl" />
+        <Skeleton className="h-96 w-full rounded-sm" />
       </div>
     );
   }
