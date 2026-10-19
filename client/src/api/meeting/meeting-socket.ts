@@ -18,7 +18,8 @@ export const getMeetingSocket = (visitorId?: string): MeetingSocket => {
   }
 
   const token = getAccessToken();
-  socket = io('/', {
+  const socketUrl = (import.meta.env.VITE_API_BASE_URL as string).replace(/\/+$/, '');
+  socket = io(socketUrl, {
     auth: token ? { token } : { visitorId },
     transports: ['polling', 'websocket']
   });
