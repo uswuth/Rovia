@@ -52,11 +52,7 @@ services:
       - key: FFMPEG_PATH
         value: ffmpeg
 
-    # Secrets arrive as files, never as build args or image layers.
-    secretFiles:
       - key: MONGO_URI
-        # Generate locally: pnpm secrets:generate, then upload via Render's
-        # "Secret Files" tab or `render secret-files put`.
         sync: false
       - key: JWT_ACCESS_SECRET
         sync: false
