@@ -1,10 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd client && npm run build",
-  "outputDirectory": "client/dist",
-  "installCommand": "cd client && npm install",
-  "framework": null,
-  "rewrites": [
-    { "source": "/((?!assets/).*)", "destination": "/index.html" }
-  ]
+  "services": {
+    "client": {
+      "root": "client",
+      "framework": "vite",
+      "installCommand": "cd client && pnpm install",
+      "buildCommand": "cd client && pnpm run build",
+      "outputDirectory": "client/dist",
+      "rewrites": [
+        {
+          "source": "/((?!assets/).*)",
+          "destination": "/index.html"
+        }
+      ]
+    }
+  }
 }
