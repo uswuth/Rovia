@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createQueryClient } from '@/api/queryClient';
@@ -100,8 +100,7 @@ const App = () => {
   useSEO();
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ThemeProvider>
+      <ThemeProvider>
           <TimeFormatProvider>
             <AuthProvider>
               <ProjectProvider>
@@ -179,7 +178,6 @@ const App = () => {
           </AuthProvider>
         </TimeFormatProvider>
       </ThemeProvider>
-      </BrowserRouter>
       {/* Vite strips devtools from the production bundle. */}
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
