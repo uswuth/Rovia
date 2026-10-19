@@ -17,7 +17,7 @@ export const MeetingEndedModal: React.FC<MeetingEndedModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-2xl space-y-4 text-center">
+      <div className="w-full max-w-sm rounded-xs border border-border bg-card p-6 shadow-2xl space-y-4 text-center">
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
           <PhoneOff size={24} />
         </div>
