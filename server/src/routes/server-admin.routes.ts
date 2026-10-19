@@ -48,13 +48,18 @@ router.post('/login', asyncHandler(loginServerAdmin));
 router.post('/server-admin/login', asyncHandler(loginServerAdmin));
 
 router.get('/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
+router.post('/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
 router.get('/server-admin/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
+router.post('/server-admin/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
 
 router.get('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(listAllOrganizationsServerAdmin));
+router.post('/organizations/list', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(listAllOrganizationsServerAdmin));
 router.get('/server-admin/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(listAllOrganizationsServerAdmin));
 
 router.get('/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getOrgDetailsServerAdmin));
+router.post('/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getOrgDetailsServerAdmin));
 router.get('/server-admin/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getOrgDetailsServerAdmin));
+router.post('/server-admin/organizations/:orgId', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getOrgDetailsServerAdmin));
 
 router.post('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(createOrgWithCredentials));
 router.post('/server-admin/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(createOrgWithCredentials));

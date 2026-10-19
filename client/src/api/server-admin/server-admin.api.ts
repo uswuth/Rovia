@@ -22,15 +22,15 @@ export const loginServerAdminApi = async (payload: ServerAdminLoginPayload) => {
 
 // v1: Public-facing endpoints (no special auth beyond bearerAuth)
 export const getServerMetricsApi = async () => {
-  return await api.post('/server-admin/metrics', {});
+  return await api.get('/server-admin/metrics');
 };
 
 export const getAllOrganizationsServerAdminApi = async () => {
-  return await api.post('/server-admin/organizations', {});
+  return await api.get('/server-admin/organizations');
 };
 
 export const getOrgDetailsServerAdminApi = async (orgId: string) => {
-  return await api.post(`/server-admin/organizations/${orgId}`, { orgId });
+  return await api.get(`/server-admin/organizations/${orgId}`);
 };
 
 export const createOrgWithCredentialsApi = async (payload: CreateOrgWithCredentialsPayload) => {
