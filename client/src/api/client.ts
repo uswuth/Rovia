@@ -21,8 +21,10 @@ export const getAccessToken = () => {
   return _accessToken;
 };
 
+const apiBase = `${(import.meta.env.VITE_API_BASE_URL as string).replace(/\/+$/, '')}/api/v1`;
+
 const client = axios.create({
-  baseURL: '/api/v1',
+  baseURL: apiBase,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });

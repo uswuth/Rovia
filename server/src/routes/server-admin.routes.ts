@@ -189,9 +189,9 @@ router.post('/server-admin/organizations', authenticateUser, authorizeRoles('Ser
  *             properties:
  *               organizationName:
  *                 type: string
- *                 organizationLocation:
+ *               organizationLocation:
  *                 type: string
- *                 organizationDescription:
+ *               organizationDescription:
  *                 type: string
  *     responses:
  *       200:
