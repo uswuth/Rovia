@@ -290,20 +290,69 @@ export const getOrgDetailsServerAdminService = async (orgId: string) => {
 };
 
 export const createOrgAndGenerateCredentialsService = async (input: {
-  organizationName: string;
+  organizationName?: string;
+  organization_name?: string;
+  name?: string;
+  orgName?: string;
   organizationLocation?: string;
+  organization_location?: string;
+  location?: string;
   organizationDescription?: string;
-  adminName: string;
-  adminEmail: string;
+  organization_description?: string;
+  description?: string;
+  adminName?: string;
+  admin_name?: string;
+  adminEmail?: string;
+  admin_email?: string;
+  email?: string;
 }) => {
-  const { organizationName, organizationLocation, organizationDescription, adminName, adminEmail } = input;
+  const orgName = (
+    input.organizationName ||
+    input.organization_name ||
+    input.name ||
+    input.orgName ||
+    ''
+  ).trim();
 
-  if (!organizationName || !organizationName.trim()) {
+  const orgLocation = (
+    input.organizationLocation ||
+    input.organization_location ||
+    input.location ||
+    ''
+  ).trim();
+
+  const orgDesc = (
+    input.organizationDescription ||
+    input.organization_description ||
+    input.description ||
+    ''
+  ).trim();
+
+  const admName = (
+    input.adminName ||
+    input.admin_name ||
+    `${orgName} Admin`
+  ).trim();
+
+  const admEmail = (
+    input.adminEmail ||
+    input.admin_email ||
+    input.email ||
+    ''
+  ).trim().toLowerCase();
+
+  if (!orgName) {
     throw ApiError.badRequest('Organization name is required');
   }
-  if (!adminEmail || !adminEmail.trim()) {
+  if (!admEmail) {
     throw ApiError.badRequest('Client Admin email is required');
   }
+
+  const organizationName = orgName;
+  const organizationLocation = orgLocation;
+  const organizationDescription = orgDesc;
+  const adminName = admName;
+  const adminEmail = admEmail;
 
   const baseSlug = organizationName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'org';
   const existingOrg = await Organization.findOne({ organization_slug: baseSlug });
