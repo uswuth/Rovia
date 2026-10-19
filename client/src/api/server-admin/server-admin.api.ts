@@ -14,6 +14,42 @@ export interface CreateOrgWithCredentialsPayload {
   adminEmail: string;
 }
 
+export interface WeeklyTrendItem {
+  week: string;
+  meetings: number;
+  attendees: number;
+  tasksCompleted: number;
+  avgDurationMin: number;
+  productivityScore: number;
+}
+
+export interface MeetingStatusItem {
+  status: string;
+  count: number;
+}
+
+export interface ServerMetricsData {
+  prometheusStatus?: string;
+  grafanaStatus?: string;
+  activeConnections?: number;
+  apiLatencyMs?: number;
+  systemMemoryMB?: number;
+  totalOrganizations?: number;
+  totalUsers?: number;
+  activeUsers?: number;
+  totalMeetings?: number;
+  totalTasks?: number;
+  totalRecordings?: number;
+  weeklyTrends?: WeeklyTrendItem[];
+  meetingsByStatus?: MeetingStatusItem[];
+}
+
+export interface ServerMetricsResponse {
+  uptime?: number;
+  timestamp?: string;
+  metrics?: ServerMetricsData;
+}
+
 // Server Admin Login - uses v1 API version
 // All endpoints use /api/v1/server-admin/...
 export const loginServerAdminApi = async (payload: ServerAdminLoginPayload) => {
