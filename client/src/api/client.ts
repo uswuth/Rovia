@@ -22,7 +22,7 @@ export const getAccessToken = () => {
 };
 
 const client = axios.create({
-  baseURL: (import.meta.env.VITE_API_BASE_URL as string) || '/api/v1',
+  baseURL: '/api/v1',
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -44,7 +44,7 @@ let isRefreshing = false;
 type RefreshWaiter = {
   resolve: (token: string) => void;
   reject: (error: unknown) => void;
-  };
+};
 let refreshQueue: RefreshWaiter[] = [];
 
 client.interceptors.response.use(

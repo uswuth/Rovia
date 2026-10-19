@@ -14,23 +14,21 @@ import taskRouter from './task.routes.js';
 
 const router: Router = Router();
 
-// Version 1 API routes
-router.use('/v1/health', healthRouter);
-router.use('/v1/auth', authRouter);
-router.use('/v1/user-details', userDetailsRouter);
-router.use('/v1/organizations', organizationRouter);
-router.use('/v1/work-roles', workRoleRouter);
-router.use('/v1/projects', projectRouter);
-router.use('/v1/teams', teamRouter);
-router.use('/v1/tasks', taskRouter);
-router.use('/v1/recordings', recordingRouter);
-router.use('/v1/server-admin', serverAdminRouter);
+router.use('/health', healthRouter);
+router.use('/auth', authRouter);
+router.use('/user-details', userDetailsRouter);
+router.use('/organizations', organizationRouter);
+router.use('/work-roles', workRoleRouter);
+router.use('/projects', projectRouter);
+router.use('/teams', teamRouter);
+router.use('/tasks', taskRouter);
+router.use('/recordings', recordingRouter);
+router.use('/server-admin', serverAdminRouter);
 
-// Version 0 Server Admin Control Plane alias
-router.use('/v0/server-admin', serverAdminRouter);
+
 
 // Meeting routes. Q&A and polls share the /meetings prefix.
-router.use('/v1/meetings', meetingRouter);
-router.use('/v1/meetings', meetingQaPollRouter);
+router.use('/meetings', meetingRouter);
+router.use('/meetings', meetingQaPollRouter);
 
 export default router;

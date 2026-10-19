@@ -13,7 +13,6 @@ import { tolerantJsonParser } from './middlewares/tolerantJson.js';
 
 const app: Application = express();
 
-// Security Middlewares
 app.use(
   helmet({
     contentSecurityPolicy: env.NODE_ENV === 'production' ? {
@@ -39,7 +38,6 @@ app.use(
 );
 app.use(cors(corsOptions));
 
-// Body Parsers & Cookie Parser
 // In development we accept comments and trailing commas in JSON bodies so
 // credentials can be toggled in an API client without editing the payload.
 if (env.NODE_ENV === 'production') {
@@ -69,7 +67,6 @@ if (env.NODE_ENV !== 'production') {
   }
 }
 
-// Friendly API Root Welcome Endpoints
 const rootWelcomeHandler = (_req: Request, res: Response): Response => {
   return ApiResponse.success(res, 'Welcome to IntellMeet API', {
     service: 'IntellMeet Backend API',
@@ -87,10 +84,8 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', message: 'IntellMeet Server is ready' });
 });
 
-// Mount Central API Router
-app.use('/api', apiRouter);
+app.use('/api/v1', apiRouter);
 
-// 404 & Centralized Error Handlers
 app.use(notFoundHandler);
 app.use(errorHandler);
 
