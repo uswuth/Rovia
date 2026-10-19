@@ -6,6 +6,7 @@ import {
   MEETING_MAX_DURATION_MINUTES
 } from '../models/meeting.model.js';
 import { Project } from '../models/project.model.js';
+import { Team } from '../models/team.model.js';
 import { User } from '../models/user.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { validateTitle } from '../utils/validation.js';
@@ -21,14 +22,10 @@ import {
   MeetingJoinMode
 } from '../types/index.js';
 
-/**
- * Meeting service. Every lookup is tenant scoped, and a join code alone never
- * grants access: the organization always comes from the authenticated JWT.
- */
-
+/** Every lookup is tenant scoped; a join code alone never grants access (org comes from the JWT). */
 import { Types } from 'mongoose';
 
-/** Tenant scoped lookup: supports Mongo ObjectId or MEET001 joinCode. */
+/** Tenant scoped lookup: accepts a Mongo ObjectId or a MEET001 join code. */
 export const findScopedMeeting = async (meetingIdOrCode: string, organizationId: string): Promise<MeetingDocument> => {
   const query: Record<string, unknown> = { organization_id: organizationId };
   if (Types.ObjectId.isValid(meetingIdOrCode)) {
@@ -43,10 +40,7 @@ export const findScopedMeeting = async (meetingIdOrCode: string, organizationId:
   return meeting;
 };
 
-/**
- * Resolves a meeting from its shareable join code. Still tenant scoped: a code
- * from another organization resolves to nothing.
- */
+/** Resolves a meeting from its shareable join code; a code from another org resolves to nothing. */
 export const findScopedMeetingByJoinCode = async (
   joinCode: string,
   organizationId?: string
@@ -63,15 +57,34 @@ export const findScopedMeetingByJoinCode = async (
 };
 
 /** The project's roster: members and hosts, which is the only assignable set. */
-const loadProjectRoster = async (projectId: string, organizationId: string): Promise<Set<string>> => {
-  const project = await Project.findOne({ _id: projectId, organization_id: organizationId });
+const loadProjectRoster = async (
+  projectIdOrCode: string,
+  organizationId: string
+): Promise<{
+  roster: Set<string>;
+  hosts: Set<string>;
+  project: import('../models/project.model.js').ProjectDocument;
+}> => {
+  const isMongoId = Types.ObjectId.isValid(projectIdOrCode);
+  const project = await Project.findOne({
+    $or: [
+      ...(isMongoId ? [{ _id: projectIdOrCode }] : []),
+      { project_code: projectIdOrCode },
+      { project_code: projectIdOrCode.toUpperCase() }
+    ],
+    organization_id: organizationId
+  });
   if (!project) {
     throw ApiError.notFound('Project not found');
   }
-  return new Set([
-    ...project.project_members.map(toObjectIdString),
-    ...project.project_hosts.map(toObjectIdString)
-  ]);
+  return {
+    roster: new Set([
+      ...project.project_members.map(toObjectIdString),
+      ...project.project_hosts.map(toObjectIdString)
+    ]),
+    hosts: new Set(project.project_hosts.map(toObjectIdString)),
+    project
+  };
 };
 
 const assertUsersInOrganization = async (userIds: string[], organizationId: string): Promise<string[]> => {
@@ -115,7 +128,6 @@ export const createMeetingService = async (
   userId: string
 ): Promise<MeetingDocument> => {
   requireOrganizationId(organizationId, 'create a meeting');
-  assertObjectId(input.projectId, 'projectId');
 
   const title = (input.meetingTitle || '').trim();
   validateTitle(title, 'meetingTitle');
@@ -127,12 +139,12 @@ export const createMeetingService = async (
     ]);
   }
 
-  const duration = input.meetingDurationMinutes ?? 30;
+  const duration = input.meetingDurationMinutes ?? 360;
   if (duration < 1 || duration > MEETING_MAX_DURATION_MINUTES) {
     throw ApiError.badRequest(`meetingDurationMinutes must be between 1 and ${MEETING_MAX_DURATION_MINUTES}`);
   }
 
-  // The limit may only be lowered. Raising it above the default is never allowed.
+  // The limit may only be lowered, never raised above the default.
   const requestedLimit = input.meetingParticipantLimit ?? MEETING_DEFAULT_PARTICIPANT_LIMIT;
   if (requestedLimit < 1 || requestedLimit > MEETING_DEFAULT_PARTICIPANT_LIMIT) {
     throw ApiError.badRequest(
@@ -140,31 +152,77 @@ export const createMeetingService = async (
     );
   }
 
-  const roster = await loadProjectRoster(input.projectId, organizationId);
-  const project = await Project.findOne({ _id: input.projectId, organization_id: organizationId });
-  if (project) {
+  let project: import('../models/project.model.js').ProjectDocument | null = null;
+  let roster = new Set<string>();
+  let projectHosts = new Set<string>();
+
+  if (input.projectId && input.projectId.trim() && input.projectId !== 'NONE') {
+    const loaded = await loadProjectRoster(input.projectId, organizationId);
+    roster = loaded.roster;
+    projectHosts = loaded.hosts;
+    project = loaded.project;
     const projectStatus = (project.project_status || '').toLowerCase();
     if (projectStatus === 'completed' || projectStatus === 'archived') {
       throw ApiError.badRequest(`Cannot schedule meetings for a ${projectStatus} project. Change project status to active first.`);
     }
   }
-  const creator = await User.findById(userId).lean();
-  const isSuperAdmin = creator?.user_role === 'SuperAdmin' || creator?.is_super_admin === true;
 
-  // The creator must belong to the project as a member/host, unless they are a SuperAdmin.
-  if (!isSuperAdmin && !roster.has(userId)) {
-    throw ApiError.forbidden('Only project members or hosts can create a meeting for this project');
+  let team: import('../models/team.model.js').TeamClass | null = null;
+  let teamHosts = new Set<string>();
+
+  if (input.teamId && input.teamId.trim() && input.teamId !== 'NONE') {
+    const isMongoId = Types.ObjectId.isValid(input.teamId);
+    const foundTeam = await Team.findOne({
+      $or: [
+        ...(isMongoId ? [{ _id: input.teamId }] : []),
+        { team_code: input.teamId },
+        { team_code: input.teamId.toUpperCase() }
+      ],
+      organization_id: organizationId
+    });
+    if (!foundTeam) {
+      throw ApiError.notFound('Team not found');
+    }
+    team = foundTeam;
+    teamHosts = new Set((foundTeam.team_hosts || []).map(toObjectIdString));
+  }
+
+  const creator = await User.findById(userId).lean();
+  const creatorRole = (creator?.user_role || '').toUpperCase();
+  const isSuperOrAdmin = Boolean(
+    creator?.is_super_admin === true ||
+    creatorRole === 'SUPERADMIN' ||
+    creatorRole === 'SUPER_ADMIN' ||
+    creatorRole === 'ADMIN'
+  );
+
+  if (!isSuperOrAdmin) {
+    if (team) {
+      const isTeamHost = teamHosts.has(userId);
+      const isParentProjectHost = Boolean(project && projectHosts.has(userId));
+      if (!isTeamHost && !isParentProjectHost) {
+        throw ApiError.forbidden('Only project/team hosts, Admins, or SuperAdmins can create meetings');
+      }
+    } else if (project) {
+      if (!projectHosts.has(userId)) {
+        throw ApiError.forbidden('Only project/team hosts, Admins, or SuperAdmins can create meetings');
+      }
+    } else {
+      throw ApiError.forbidden('Only project/team hosts, Admins, or SuperAdmins can create meetings');
+    }
   }
 
   const requested = input.participantIds?.length
     ? await assertUsersInOrganization(input.participantIds, organizationId)
     : [];
-  const outsiders = requested.filter((id) => !roster.has(id));
-  if (!isSuperAdmin && outsiders.length > 0) {
-    // An organization invite code does not bypass this for ordinary members.
-    throw ApiError.badRequest('Participants must be members or hosts of the selected project', [
-      { field: 'participantIds', message: `Not a project member: ${outsiders.join(', ')}` }
-    ]);
+
+  if (project && !isSuperOrAdmin) {
+    const outsiders = requested.filter((id) => !roster.has(id));
+    if (outsiders.length > 0) {
+      throw ApiError.badRequest('Participants must be members or hosts of the selected project', [
+        { field: 'participantIds', message: `Not a project member: ${outsiders.join(', ')}` }
+      ]);
+    }
   }
 
   const uniqueRoster = [...new Set([userId, ...requested])];
@@ -176,9 +234,36 @@ export const createMeetingService = async (
 
   const joinCode = await generateSessionCode(Meeting as unknown as CodeGeneratorModel, organizationId);
 
+  const scope = input.teamId ? 'team' : project ? 'project' : 'general';
+
+  // Creator and top admins are always HOST; requested roles are respected.
+  const requestedRoles = input.participantRoles || {};
+  const participantsUsers = await User.find({ _id: { $in: uniqueRoster } }).select('user_role is_super_admin').lean();
+  const topAdminSet = new Set(
+    participantsUsers
+      .filter((u) => {
+        const role = (u.user_role || '').toUpperCase();
+        return u.is_super_admin === true || role === 'SUPERADMIN' || role === 'SUPER_ADMIN' || role === 'ADMIN';
+      })
+      .map((u) => u._id.toString())
+  );
+
+  const meetingParticipants = uniqueRoster.map((id) => {
+    let assignedRole: 'HOST' | 'MEMBER' = 'MEMBER';
+    if (id === userId || topAdminSet.has(id)) {
+      assignedRole = 'HOST';
+    } else if (requestedRoles[id]) {
+      const normalized = requestedRoles[id].toUpperCase();
+      assignedRole = normalized === 'HOST' ? 'HOST' : 'MEMBER';
+    }
+    return buildParticipant(id, assignedRole);
+  });
+
   const meeting = new Meeting({
     organization_id: organizationId,
-    project_id: input.projectId,
+    project_id: project ? project._id : undefined,
+    team_id: input.teamId && input.teamId !== 'NONE' ? input.teamId : undefined,
+    scope,
     created_by: userId,
     meeting_title: title,
     meeting_description: (input.meetingDescription || '').trim(),
@@ -188,7 +273,7 @@ export const createMeetingService = async (
     meeting_scheduled_at: scheduledAt,
     meeting_duration_minutes: duration,
     meeting_participant_limit: requestedLimit,
-    meeting_participants: uniqueRoster.map((id) => buildParticipant(id, id === userId ? 'HOST' : 'MEMBER'))
+    meeting_participants: meetingParticipants
   });
   await meeting.save();
   return meeting;
@@ -199,35 +284,58 @@ const findParticipant = (meeting: MeetingDocument, userId: string) =>
   meeting.meeting_participants.find((p) => p.userId === userId);
 
 /** Hosts and moderators may change settings; ordinary members may not. */
-const assertCanManageMeeting = (meeting: MeetingDocument, userId: string): void => {
+const assertCanManageMeeting = (meeting: MeetingDocument, userId: string, userRole?: string): void => {
   const participant = findParticipant(meeting, userId);
   const isCreator = toObjectIdString(meeting.created_by) === userId;
+  const isSuperOrAdmin = Boolean(
+    userRole && ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes(userRole.toUpperCase())
+  );
+  const pRole = (participant?.participant_role || '').toUpperCase();
   const isManager =
-    isCreator || participant?.participant_role === 'HOST' || participant?.participant_role === 'MODERATOR';
+    isCreator || isSuperOrAdmin || pRole === 'HOST' || pRole === 'MODERATOR';
   if (!isManager) {
     throw ApiError.forbidden('Only a meeting host or moderator can do that');
   }
 };
 
-/**
- * Every in-meeting feature (chat, Q&A, polls) needs the same two checks, so
- * they live here rather than being re-declared per feature.
- */
-
+/** Shared chat/Q&A/polls checks live here so they are not re-declared per feature. */
 /** Loads a meeting and confirms the caller is on its roster. */
 export const assertMeetingParticipant = (meeting: MeetingDocument, userId: string): MeetingParticipantClass => {
-  const participant = findParticipant(meeting, userId);
+  let participant = findParticipant(meeting, userId);
+  const isCreator = toObjectIdString(meeting.created_by) === userId;
+  if (!participant && isCreator) {
+    participant = buildParticipant(userId, 'HOST');
+    participant.participant_status = 'JOINED';
+    participant.joined_at = new Date();
+    meeting.meeting_participants.push(participant);
+    void meeting.save().catch(() => {});
+  } else if (participant && isCreator && participant.participant_role !== 'HOST') {
+    participant.participant_role = 'HOST';
+    void meeting.save().catch(() => {});
+  }
   if (!participant) {
     throw ApiError.forbidden('You are not a participant in this meeting');
   }
   return participant;
 };
 
-/** Loads a meeting and confirms the caller is on its roster AND may chat. */
+/** Confirms the caller is a participant AND may chat. */
 export const assertMeetingCanChat = (meeting: MeetingDocument, userId: string): void => {
   const participant = assertMeetingParticipant(meeting, userId);
   if (!participant.can_use_chat) {
     throw ApiError.forbidden('Chat is disabled for you in this meeting');
+  }
+};
+
+/** Confirms the caller is a Host or Moderator before asking questions. */
+export const assertMeetingCanAskQuestion = (meeting: MeetingDocument, userId: string): void => {
+  const participant = assertMeetingParticipant(meeting, userId);
+  if (!participant.can_use_chat) {
+    throw ApiError.forbidden('Chat is disabled for you in this meeting');
+  }
+  const isHostOrMod = participant.participant_role === 'HOST' || participant.participant_role === 'MODERATOR';
+  if (!isHostOrMod) {
+    throw ApiError.forbidden('Only hosts and moderators can create questions in Q&A');
   }
 };
 
@@ -317,15 +425,45 @@ export const joinMeetingService = async (
     return meeting;
   }
 
-  if (meeting.meeting_join_mode === 'INVITE_ONLY') {
-    throw ApiError.forbidden('This meeting is invite only. Ask a host to add you.');
+  // Access is checked across team, project, and org scope, in that order.
+  const isCreator = meeting.created_by.toString() === userId;
+  let hasScopeAccess = isCreator;
+
+  if (!hasScopeAccess && meeting.team_id) {
+    const { Team } = await import('../models/team.model.js');
+    const team = await Team.findById(meeting.team_id).lean();
+    if (team) {
+      const teamMembers = [...(team.team_hosts || []), ...(team.team_members || [])].map((id) => String(id));
+      if (teamMembers.includes(userId)) hasScopeAccess = true;
+    }
+  } else if (!hasScopeAccess && meeting.project_id) {
+    const { Project } = await import('../models/project.model.js');
+    const project = await Project.findById(meeting.project_id).lean();
+    if (project) {
+      const projMembers = [
+        String(project.created_by || ''),
+        ...(project.project_hosts || []).map((id) => String(id)),
+        ...(project.project_members || []).map((id) => String(id)),
+      ];
+      if (projMembers.includes(userId)) hasScopeAccess = true;
+    }
+  } else if (!hasScopeAccess && !meeting.project_id && !meeting.team_id) {
+    // Org-scoped meetings are open to every member of the organization.
+    hasScopeAccess = true;
+  }
+
+  if (!hasScopeAccess) {
+    throw ApiError.forbidden('You do not have access to this meeting.');
   }
 
   if (meeting.meeting_participants.length >= meeting.meeting_participant_limit) {
     throw ApiError.badRequest('This meeting has reached its participant limit');
   }
 
-  meeting.meeting_participants.push(buildParticipant(userId));
+  const newPart = buildParticipant(userId, isCreator ? 'HOST' : 'MEMBER');
+  newPart.participant_status = 'JOINED';
+  newPart.joined_at = new Date();
+  meeting.meeting_participants.push(newPart);
   await meeting.save();
   return meeting;
 };
@@ -362,13 +500,16 @@ export const addMeetingParticipantsService = async (
   const meeting = await findScopedMeeting(meetingId, organizationId);
   assertCanManageMeeting(meeting, userId);
 
-  const roster = await loadProjectRoster(toObjectIdString(meeting.project_id), organizationId);
   const requested = await assertUsersInOrganization(participantIds, organizationId);
-  const outsiders = requested.filter((id) => !roster.has(id));
-  if (outsiders.length > 0) {
-    throw ApiError.badRequest('Participants must be members or hosts of the meeting project', [
-      { field: 'participantIds', message: `Not a project member: ${outsiders.join(', ')}` }
-    ]);
+
+  if (meeting.project_id) {
+    const { roster } = await loadProjectRoster(toObjectIdString(meeting.project_id), organizationId);
+    const outsiders = requested.filter((id) => !roster.has(id));
+    if (outsiders.length > 0) {
+      throw ApiError.badRequest('Participants must be members or hosts of the meeting project', [
+        { field: 'participantIds', message: `Not a project member: ${outsiders.join(', ')}` }
+      ]);
+    }
   }
 
   const existing = new Set(meeting.meeting_participants.map((p) => p.userId));
@@ -413,12 +554,17 @@ export const updateMeetingParticipantSettingsService = async (
   return meeting;
 };
 
-export const startMeetingService = async (meetingId: string, organizationId: string, userId: string) => {
+export const startMeetingService = async (
+  meetingId: string,
+  organizationId: string,
+  userId: string,
+  userRole?: string
+) => {
   requireOrganizationId(organizationId, 'start a meeting');
   assertObjectId(meetingId, 'meetingId');
 
   const meeting = await findScopedMeeting(meetingId, organizationId);
-  assertCanManageMeeting(meeting, userId);
+  assertCanManageMeeting(meeting, userId, userRole);
   if (meeting.meeting_status === 'ENDED' || meeting.meeting_status === 'CANCELLED') {
     throw ApiError.badRequest('This meeting has already finished');
   }
@@ -428,12 +574,17 @@ export const startMeetingService = async (meetingId: string, organizationId: str
   return meeting;
 };
 
-export const endMeetingService = async (meetingId: string, organizationId: string, userId: string) => {
+export const endMeetingService = async (
+  meetingId: string,
+  organizationId: string,
+  userId: string,
+  userRole?: string
+) => {
   requireOrganizationId(organizationId, 'end a meeting');
   assertObjectId(meetingId, 'meetingId');
 
   const meeting = await findScopedMeeting(meetingId, organizationId);
-  assertCanManageMeeting(meeting, userId);
+  assertCanManageMeeting(meeting, userId, userRole);
   meeting.meeting_status = 'ENDED';
   meeting.meeting_ended_at = new Date();
   await meeting.save();

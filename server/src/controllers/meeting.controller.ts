@@ -21,6 +21,7 @@ import {
   MeetingJoinMode,
   MeetingStatus
 } from '../types/index.js';
+import { getIO } from '../socket/socket.js';
 
 const JOIN_MODES: MeetingJoinMode[] = ['INVITE_ONLY'];
 const MEETING_STATUSES: MeetingStatus[] = ['SCHEDULED', 'LIVE', 'ENDED', 'CANCELLED'];
@@ -105,17 +106,28 @@ export const updateMeetingParticipantSettings = async (req: Request, res: Respon
     participantId,
     permissions
   );
+
+  try {
+    getIO().to(`meeting:${req.params.id}`).emit('meeting:participant-updated', {
+      meetingId: req.params.id,
+      participantId,
+      permissions,
+    });
+  } catch {
+    // Socket might not be active in test environments
+  }
+
   return ApiResponse.success(res, 'Participant settings updated successfully', meeting, 200);
 };
 
 export const startMeeting = async (req: Request, res: Response): Promise<Response> => {
   const { organizationId, userId } = getRequestScope(req);
-  const meeting = await startMeetingService(req.params.id, organizationId, userId);
+  const meeting = await startMeetingService(req.params.id, organizationId, userId, req.user?.role);
   return ApiResponse.success(res, 'Meeting started successfully', meeting, 200);
 };
 
 export const endMeeting = async (req: Request, res: Response): Promise<Response> => {
   const { organizationId, userId } = getRequestScope(req);
-  const meeting = await endMeetingService(req.params.id, organizationId, userId);
+  const meeting = await endMeetingService(req.params.id, organizationId, userId, req.user?.role);
   return ApiResponse.success(res, 'Meeting ended successfully', meeting, 200);
 };

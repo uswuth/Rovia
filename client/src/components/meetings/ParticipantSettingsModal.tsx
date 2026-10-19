@@ -26,7 +26,7 @@ const PERMISSIONS: ReadonlyArray<{
   { key: 'canSendAudio', label: 'Microphone', hint: 'Allow this member to speak' },
   { key: 'canSendVideo', label: 'Camera', hint: 'Allow this member to send video' },
   { key: 'canShareScreen', label: 'Screen share', hint: 'Allow this member to present' },
-  { key: 'canUseChat', label: 'Chat, Q&A and polls', hint: 'Allow this member to post anything' },
+  { key: 'canUseChat', label: 'Chat & Polls', hint: 'Allow posting in chat & answering Q&A' },
 ];
 
 const permissionsOf = (participant: MeetingParticipant): ParticipantPermissions => ({
@@ -43,14 +43,7 @@ const allGranted: ParticipantPermissions = {
   canUseChat: true,
 };
 
-/**
- * Per-member capability toggles. Chat also gates questions, answers and votes
- * server-side, so the label says so rather than implying it is chat only.
- *
- * State is seeded from props, and the parent keys this component by participant
- * id so switching members remounts it with fresh values. Syncing through an
- * effect instead is rejected by the project's own React rules.
- */
+/** Chat also gates Q&A/votes server-side; parent remounts per participant, so state is seeded from props. */
 export const ParticipantSettingsModal = ({
   participant,
   onClose,

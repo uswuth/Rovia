@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "./button"
@@ -14,11 +15,7 @@ interface ModalProps {
   showCloseButton?: boolean
 }
 
-/**
- * Centered modal used for every create/edit/confirm flow. Owns the overlay,
- * Escape handling, backdrop dismissal, focus containment and scroll locking, so
- * individual dialogs only supply content.
- */
+/** Centered modal used for every create/edit/confirm flow. Owns the overlay, Escape handling, backdrop dismissal, focus containment and scroll locking, so individual dialogs only supply content. */
 const Modal: React.FC<ModalProps> = ({
   open,
   onClose,
@@ -60,9 +57,9 @@ const Modal: React.FC<ModalProps> = ({
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-white/40 dark:bg-black/70 p-4 backdrop-blur-xs cursor-pointer transition-opacity"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 dark:bg-black/85 p-4 backdrop-blur-sm cursor-pointer transition-opacity"
       onClick={onClose}
     >
       <div
@@ -73,11 +70,11 @@ const Modal: React.FC<ModalProps> = ({
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
         className={cn(
-          "w-full max-w-md space-y-5 rounded-xl border border-border/80 bg-card p-6 shadow-2xl outline-none cursor-default animate-in fade-in-0 zoom-in-95 duration-150",
+          "w-full max-w-md space-y-5 rounded-xs border border-border/80 bg-card p-6 shadow-2xl outline-none cursor-default animate-in fade-in-0 zoom-in-95 duration-150",
           className
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+        <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-base font-bold leading-tight text-foreground">
               {title}
@@ -101,12 +98,13 @@ const Modal: React.FC<ModalProps> = ({
         {children}
 
         {footer && (
-          <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+          <div className="flex items-center justify-end gap-2 pt-2">
             {footer}
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

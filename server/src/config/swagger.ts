@@ -43,11 +43,7 @@ const swaggerOptions: Options = {
 
 export const swaggerSpec = swaggerJSDoc(swaggerOptions);
 
-/**
- * Writes the generated spec to server/openapi.json.
- * Dev-only: never called when NODE_ENV=production, so the file is not
- * read or written on a production host.
- */
+/** Writes the generated spec to server/openapi.json. Dev-only: never called when NODE_ENV=production, so the file is not read or written on a production host. */
 export const writeOpenApiFile = (outputPath: string): boolean => {
   if (env.NODE_ENV === 'production') {
     return false;

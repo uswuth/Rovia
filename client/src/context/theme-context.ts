@@ -6,6 +6,8 @@ export type ThemeContextType = {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  accentColor: string;
+  setAccentColor: (color: string) => void;
 };
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);

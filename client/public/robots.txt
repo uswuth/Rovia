@@ -1,0 +1,11 @@
+# robots.txt — the public demo is indexable, the API is not.
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /server-admin
+Disallow: /meetings/
+Disallow: /organizations
+Disallow: /projects
+Disallow: /settings
+
+Sitemap: https://intellmeet.vercel.app/sitemap.xml

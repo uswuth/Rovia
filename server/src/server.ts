@@ -15,19 +15,17 @@ const __dirname = path.dirname(__filename);
 
 const httpServer = http.createServer(app);
 
-// Initialize Socket.io attached to the HTTP server
 initSocket(httpServer);
 
 const startServer = async (): Promise<void> => {
   try {
-    // Connect to MongoDB
     await connectDB();
     await seedInitialServerAdminService();
 
     writeOpenApiFile(path.resolve(__dirname, '../openapi.json'));
 
-    httpServer.listen(env.PORT, () => {
-      logger.info(`IntellMeet Server listening on port ${env.PORT} [${env.NODE_ENV}]`);
+    httpServer.listen(env.PORT, '0.0.0.0', () => {
+      logger.info(`IntellMeet Server listening on port ${env.PORT} [${env.NODE_ENV}] on 0.0.0.0`);
       logger.info(`Health check available at: http://localhost:${env.PORT}/api/v1/health`);
       logger.info(`Swagger API Docs available at: http://localhost:${env.PORT}/api/docs`);
     });
@@ -38,7 +36,6 @@ const startServer = async (): Promise<void> => {
   }
 };
 
-// Graceful shutdown handlers
 const handleShutdown = (signal: string): void => {
   logger.info(`Received ${signal}. Gracefully shutting down IntellMeet server...`);
   httpServer.close(async () => {

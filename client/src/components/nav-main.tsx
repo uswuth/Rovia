@@ -42,7 +42,6 @@ export function NavMain({
   const { isMobile, state, setOpenMobile } = useSidebar()
   const isCollapsed = state === "collapsed"
 
-  // Persisted collapsible menu open/close states
   const [openStates, setOpenStates] = React.useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem("sidebar_collapsible_menu_states")
@@ -58,8 +57,7 @@ export function NavMain({
       try {
         localStorage.setItem("sidebar_collapsible_menu_states", JSON.stringify(updated))
       } catch {
-        // ignore storage errors
-      }
+              }
       return updated
     })
   }
@@ -144,7 +142,7 @@ export function NavMain({
                           <Link 
                             to={subItem.url} 
                             onClick={handleNavClick}
-                            className={`w-full cursor-pointer ${isSubActive ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium' : ''}`}
+                            className={`w-full cursor-pointer ${isSubActive ? 'bg-primary/10 text-primary font-medium' : ''}`}
                           >
                             {subItem.title}
                           </Link>

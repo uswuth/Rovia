@@ -16,11 +16,7 @@ import {
 
 const router: Router = Router();
 
-/**
- * In-meeting features. Every route requires authentication, and every service
- * re-checks that the caller is on the meeting roster and permitted to chat, so
- * an authenticated non-participant cannot read or write meeting content.
- */
+/** Every service re-checks roster membership and permissions, so non-participants cannot read or write. */
 router.use(authenticateUser);
 
 /**
@@ -65,6 +61,54 @@ router.post(
   })
 );
 
+/**
+ * @openapi
+ * /api/v1/meetings/{id}/questions:
+ *   get:
+ *     summary: List meeting questions
+ *     description: >
+ *       Requires roster membership. Returns questions for the meeting oldest
+ *       first, paginated, with an optional status filter. Callers who are not
+ *       on the roster are rejected rather than shown an empty list.
+ *     tags:
+ *       - Meeting Q&A
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [OPEN, ANSWERED, DISMISSED]
+ *         description: Restrict to one question status.
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Questions retrieved, with a pagination meta envelope
+ *       400:
+ *         description: Validation failed (invalid meeting id)
+ *       403:
+ *         description: Not a participant of this meeting
+ *       404:
+ *         description: Meeting not found
+ */
 router.get(
   '/:id/questions',
   asyncHandler(async (req, res) => {
@@ -212,6 +256,54 @@ router.post(
     })
   );
 
+/**
+ * @openapi
+ * /api/v1/meetings/{id}/polls:
+ *   get:
+ *     summary: List meeting polls
+ *     description: >
+ *       Requires roster membership. Returns polls for the meeting oldest first,
+ *       paginated, with an optional status filter. Unlike poll creation and
+ *       closing, any participant may read polls — not only hosts and moderators.
+ *     tags:
+ *       - Meeting Polls
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [OPEN, CLOSED]
+ *         description: Restrict to one poll status.
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Polls retrieved, with a pagination meta envelope
+ *       400:
+ *         description: Validation failed (invalid meeting id)
+ *       403:
+ *         description: Not a participant of this meeting
+ *       404:
+ *         description: Meeting not found
+ */
 router.get(
   '/:id/polls',
   asyncHandler(async (req, res) => {

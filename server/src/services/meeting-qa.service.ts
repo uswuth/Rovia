@@ -3,7 +3,7 @@ import { ApiError } from '../utils/apiError.js';
 import { assertObjectId } from '../utils/objectId.js';
 import { requireOrganizationId } from '../utils/scope.js';
 import { findPaginated } from '../utils/paginatedFind.js';
-import { findScopedMeeting, assertMeetingParticipant, assertMeetingCanChat } from './meeting.service.js';
+import { findScopedMeeting, assertMeetingParticipant, assertMeetingCanAskQuestion } from './meeting.service.js';
 
 /** Tenant scoped: a question from another organization is never reachable. */
 const findScopedQuestion = async (questionId: string, organizationId: string): Promise<MeetingQuestionDocument> => {
@@ -24,7 +24,7 @@ export const askQuestionService = async (
   assertObjectId(meetingId, 'meetingId');
 
   const meeting = await findScopedMeeting(meetingId, organizationId);
-  assertMeetingCanChat(meeting, userId);
+  assertMeetingCanAskQuestion(meeting, userId);
 
   const text = (questionText || '').trim();
   if (!text) {

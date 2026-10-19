@@ -21,10 +21,7 @@ export const findScopedTranscript = async (
 const findByRecording = async (recordingId: string, organizationId: string): Promise<TranscriptDocument | null> =>
   Transcript.findOne({ recording_id: recordingId, organization_id: organizationId });
 
-/**
- * Idempotency: one transcript per recording. A retry reuses the existing record
- * and moves it back to PROCESSING rather than creating a second one.
- */
+/** Idempotency: one transcript per recording. A retry reuses the existing record and moves it back to PROCESSING rather than creating a second one. */
 export const startTranscriptService = async (
   recordingId: string,
   organizationId: string
@@ -54,13 +51,17 @@ export const startTranscriptService = async (
 export const completeTranscriptService = async (
   transcriptId: string,
   organizationId: string,
-  result: TranscriptionResult
+  result: TranscriptionResult & {
+    /** Per-participant text. Omitted by callers that transcribe a single track. */
+    speakers?: Array<{ speakerId: string; speakerName: string; speakerText: string; speakerDurationMs: number; spoke: boolean }>;
+  }
 ): Promise<TranscriptDocument> => {
   const transcript = await findScopedTranscript(transcriptId, organizationId);
   transcript.transcript_text = result.text;
   transcript.transcript_language = result.language;
   transcript.transcript_duration_ms = result.durationMs ?? 0;
   transcript.transcript_segments = result.segments;
+  transcript.transcript_speakers = result.speakers ?? [];
   transcript.transcript_status = 'READY';
   await transcript.save();
   return transcript;

@@ -23,10 +23,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const queryClient = useQueryClient();
 
-  // The session is restored through TanStack Query rather than a useEffect, so
-  // StrictMode's double mount joins the in-flight request instead of sending a
-  // second one, and the result is cached for the rest of the session.
-  // Tracked as state because localStorage alone never triggers a re-render.
+  // Session restored via TanStack Query (StrictMode-safe, cached); state because localStorage never re-renders.
   const [hasToken, setHasToken] = useState(() => getAccessToken() !== null);
 
   const { data, error } = useQuery<User>(queryKeys.auth.me, () => authApi.getMe(), {
@@ -40,10 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setHasToken(false);
   }, [queryClient]);
 
-  // A rejected profile means the token is no longer usable. This only touches
-  // external systems (localStorage + the query cache); the signed-out state is
-  // derived from `error` below rather than being set here, which would cause a
-  // cascading render. A ref keeps it to a single clear per failed session.
+  // A ref clears once per failed session; signed-out state is derived from `error` to avoid a cascading render.
   const clearedForError = useRef(false);
   useEffect(() => {
     if (error && hasToken && !clearedForError.current) {

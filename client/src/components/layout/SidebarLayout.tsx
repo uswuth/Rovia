@@ -32,10 +32,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   useAuth();
   const location = useLocation();
 
-  // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  // Notifications state & click-outside ref
   const notificationRef = useRef<HTMLDivElement>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(3);
@@ -66,7 +64,6 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
     },
   ]);
 
-  // Click outside to close notifications popover
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -90,14 +87,12 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
     setUnreadCount(0);
   };
 
-  // `useMutation` invalidates the projects query and `addProject` seeds the
-  // cache, so calling `refreshProjects()` here would just be a second request.
+  // `refreshProjects()` would be a second request: the mutation invalidates and `addProject` seeds the cache.
   const handleProjectCreated = (newProj: Project) => {
     addProject(newProj);
     setCreateModalOpen(false);
   };
 
-  // Generate Breadcrumbs based on current route
   const getBreadcrumbs = () => {
     const path = location.pathname;
     const items = [{ name: 'IntellMeet', path: '/dashboard' }];
@@ -134,8 +129,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
     <SidebarProvider defaultOpen={true}>
       <AppSidebar />
 
-      <SidebarInset>
-        {/* Top App Header with Trigger, Vertical Separator, Breadcrumbs & Notifications Bell */}
+      <SidebarInset className="min-w-0 max-w-full overflow-hidden">
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-card/85 dark:bg-card/75 backdrop-blur-xl px-4 transition-[width,height] ease-linear">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1 size-8 rounded-md text-foreground/70 hover:text-emerald-600 dark:hover:text-emerald-400 bg-transparent hover:bg-transparent border-none shadow-none transition-colors" />
@@ -161,7 +155,6 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
             </Breadcrumb>
           </div>
 
-          {/* Right Header Controls: Notification Bell with Badge */}
           <div className="relative flex items-center gap-2" ref={notificationRef}>
             <div className="relative">
               <button
@@ -171,21 +164,20 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
               >
                 <Bell size={18} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[9px] font-bold text-white shadow-none">
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground shadow-none">
                     {unreadCount}
                   </span>
                 )}
               </button>
 
-              {/* Notification Popover Dropdown */}
               {notificationsOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50 rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-0 space-y-0 overflow-hidden animate-in fade-in-0 zoom-in-95">
+                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50 rounded-xs border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-0 space-y-0 overflow-hidden animate-in fade-in-0 zoom-in-95">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
                     <div className="flex items-center gap-2">
-                      <Bell size={15} className="text-emerald-500" />
+                      <Bell size={15} className="text-primary" />
                       <span className="text-xs font-bold text-foreground">Notifications</span>
                       {unreadCount > 0 && (
-                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary border border-primary/30">
                           {unreadCount} new
                         </span>
                       )}
@@ -193,7 +185,7 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                     {unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllRead}
-                        className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
+                        className="text-[11px] font-medium text-primary hover:underline cursor-pointer flex items-center gap-1"
                       >
                         <CheckCheck size={13} />
                         Mark all read
@@ -205,10 +197,10 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                     {notificationsList.map((item) => (
                       <div
                         key={item.id}
-                        className={`p-3.5 flex gap-3 transition-colors hover:bg-muted/50 ${item.unread ? 'bg-emerald-500/[0.03]' : ''
+                        className={`p-3.5 flex gap-3 transition-colors hover:bg-muted/50 ${item.unread ? 'bg-primary/[0.04]' : ''
                           }`}
                       >
-                        <div className="flex shrink-0 items-center justify-center text-emerald-600 dark:text-emerald-400 pt-0.5">
+                        <div className="flex shrink-0 items-center justify-center text-primary pt-0.5">
                           {item.type === 'meeting' ? <Video size={16} /> : item.type === 'ai' ? <Sparkles size={16} /> : <Bell size={16} />}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -233,13 +225,11 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
           </div>
         </header>
 
-        {/* Main View Area */}
-        <main className="relative flex-1 flex flex-col w-full bg-background text-foreground min-h-0">
-          <div className="relative z-10 flex-1 flex flex-col w-full min-h-0">{children}</div>
+        <main className="relative flex-1 flex flex-col w-full min-w-0 max-w-full overflow-x-hidden bg-background text-foreground min-h-0">
+          <div className="relative flex-1 flex flex-col w-full min-w-0 max-w-full min-h-0">{children}</div>
         </main>
       </SidebarInset>
 
-      {/* Create Project Modal */}
       <CreateProjectModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}

@@ -1,9 +1,9 @@
 export const formatCountdown = (scheduledMs: number, now: number): string => {
   const totalMins = Math.max(1, Math.ceil((scheduledMs - now) / (60 * 1000)));
 
-  const MINS_IN_YEAR = 525600; // 365 * 1440
-  const MINS_IN_MONTH = 43200; // 30 * 1440
-  const MINS_IN_DAY = 1440; // 24 * 60
+  const MINS_IN_YEAR = 525600;
+  const MINS_IN_MONTH = 43200;
+  const MINS_IN_DAY = 1440;
 
   if (totalMins >= MINS_IN_YEAR) {
     const years = Math.floor(totalMins / MINS_IN_YEAR);

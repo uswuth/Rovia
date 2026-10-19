@@ -10,29 +10,31 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { Pagination } from '@/components/ui/Pagination';
 import { getMeetingStatusTone } from '@/lib/status-tone';
 import { useQuery } from '@/hooks/useApi';
 import { queryKeys } from '@/api/queryClient';
 import { getMeetings } from '@/api/meeting/meeting.api';
+import { useDebounce } from '@/hooks/useDebounce';
 import type { Meeting, MeetingStatus } from '@/api/meeting/meeting.types';
 import { formatCountdown } from '@/lib/format-countdown';
+import { shareOrCopy } from '@/lib/share';
+import { formatDuration } from '@/lib/format-date';
+import { formatDurationHuman } from '@/utils/duration';
 
-/**
- * `IN_PROGRESS` is a client-derived display state for a meeting inside its
- * scheduled window that the server has not yet marked LIVE.
- */
+/** `IN_PROGRESS` is client-derived: inside the scheduled window before the server marks it LIVE. */
 type MeetingDisplayStatus = MeetingStatus | 'IN_PROGRESS';
 
 export const Meetings: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { projects, selectedProject } = useProject();
   const { formatDateTimeStr } = useTimeFormat();
 
   const [searchInput, setSearchInput] = useState('');
-  const [activeSearch, setActiveSearch] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 300);
   const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
 
   const handleCopyLink = (joinCode: string, meetingId: string) => {
@@ -42,20 +44,16 @@ export const Meetings: React.FC = () => {
     setTimeout(() => setCopiedMeetingId(null), 2000);
   };
 
-  const handleShareLink = async (joinCode: string, meetingTitle: string) => {
+  const handleShareLink = async (joinCode: string, meetingTitle: string, meetingId?: string) => {
     const joinUrl = `${window.location.origin}/meetings/join/${joinCode}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: meetingTitle,
-          text: `Join meeting "${meetingTitle}" on IntellMeet`,
-          url: joinUrl,
-        });
-      } catch {
-        await navigator.clipboard.writeText(joinUrl);
-      }
-    } else {
-      await navigator.clipboard.writeText(joinUrl);
+    const res = await shareOrCopy({
+      title: meetingTitle || 'IntellMeet Meeting',
+      text: `Join meeting "${meetingTitle}" on IntellMeet`,
+      url: joinUrl,
+    });
+    if ((res === 'copied' || res === 'shared') && meetingId) {
+      setCopiedMeetingId(meetingId);
+      setTimeout(() => setCopiedMeetingId(null), 2000);
     }
   };
 
@@ -65,35 +63,54 @@ export const Meetings: React.FC = () => {
   const activeProject = projects.find((p) => getProjectId(p) === filterProjectId);
   const activeProjectName = activeProject ? getProjectName(activeProject) : (selectedProject ? getProjectName(selectedProject) : '');
 
+  const projectFilterOptions = useMemo<SearchableSelectOption[]>(() => {
+    return [
+      { value: '', label: 'All Projects' },
+      ...projects.map((p) => {
+        const pId = getProjectId(p);
+        const pName = getProjectName(p) || 'Unnamed Project';
+        return {
+          value: pId,
+          label: pName,
+        };
+      }),
+    ];
+  }, [projects]);
+
   const { data: meetings, loading } = useQuery<Meeting[]>(
     queryKeys.meetings.list(filterProjectId || undefined),
     () => getMeetings(filterProjectId ? { projectId: filterProjectId } : undefined),
     { enabled: isAuthenticated, list: true }
   );
 
-  // Join-window status depends on the current time
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
 
-  // Always sort meetings by last created first (newest creation date or ObjectId timestamp at top)
   const sortedMeetings = useMemo(() => {
     const rawMeetings = meetings ?? [];
     return [...rawMeetings].sort((a, b) => {
-      const timeA = new Date(a.createdAt || a.meetingScheduledAt || 0).getTime();
-      const timeB = new Date(b.createdAt || b.meetingScheduledAt || 0).getTime();
-      if (timeB !== timeA) {
-        return timeB - timeA;
+      if (currentTab === 'upcoming') {
+        const isLiveA = a.meetingStatus === 'LIVE';
+        const isLiveB = b.meetingStatus === 'LIVE';
+        if (isLiveA !== isLiveB) return isLiveA ? -1 : 1;
+
+        const timeA = new Date(a.meetingScheduledAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.meetingScheduledAt || b.createdAt || 0).getTime();
+        if (timeA !== timeB) return timeA - timeB;
+      } else {
+        const timeA = new Date(a.meetingScheduledAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.meetingScheduledAt || b.createdAt || 0).getTime();
+        if (timeB !== timeA) return timeB - timeA;
       }
       return (b.meetingId || '').localeCompare(a.meetingId || '');
     });
-  }, [meetings]);
+  }, [meetings, currentTab]);
 
-  // Filter meetings based on active search query and tab selection
   const displayedMeetings = useMemo(() => {
-    const q = activeSearch.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     return sortedMeetings.filter((m) => {
       if (q) {
         const titleMatch = (m.meetingTitle || '').toLowerCase().includes(q);
@@ -102,12 +119,11 @@ export const Meetings: React.FC = () => {
         if (!titleMatch && !descMatch && !codeMatch) return false;
       }
 
-      const scheduledDate = new Date(m.meetingScheduledAt);
-      const scheduledMs = scheduledDate.getTime();
+      const scheduledMs = new Date(m.meetingScheduledAt).getTime();
       const durationMinutes = m.meetingDurationMinutes || 30;
       const endMs = !isNaN(scheduledMs) ? scheduledMs + durationMinutes * 60 * 1000 : Infinity;
-
-      const isEnded = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED' || (!isNaN(scheduledMs) && now > endMs);
+      const isPastDuration = !isNaN(scheduledMs) && now > endMs;
+      const isEnded = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED' || (m.meetingStatus !== 'LIVE' && isPastDuration);
 
       if (currentTab === 'upcoming') {
         return !isEnded;
@@ -117,7 +133,7 @@ export const Meetings: React.FC = () => {
       }
       return true;
     });
-  }, [sortedMeetings, activeSearch, currentTab, now]);
+  }, [sortedMeetings, debouncedSearch, currentTab, now]);
 
   const [meetingPage, setMeetingPage] = React.useState(1);
   const [meetingPageSize, setMeetingPageSize] = React.useState(5);
@@ -158,13 +174,46 @@ export const Meetings: React.FC = () => {
   const activeProjectStatus = (activeProject?.projectStatus || activeProject?.status || '').toLowerCase();
   const isSelectedProjectReadOnly = activeProjectStatus === 'completed' || activeProjectStatus === 'archived';
 
+  const isGlobalAdmin = Boolean(
+    user?.isSuperAdmin || user?.userRole === 'SuperAdmin' || user?.userRole === 'Admin'
+  );
+
+  const isHostOfSelectedProject = Boolean(
+    user?.userId &&
+    activeProject &&
+    (activeProject.hosts || []).some((h: unknown) => {
+      if (typeof h === 'string') return h === user.userId;
+      if (typeof h === 'object' && h !== null) {
+        const obj = h as Record<string, unknown>;
+        return (obj.userId || obj._id || obj.id) === user.userId;
+      }
+      return false;
+    })
+  );
+
+  const isHostOfAnyProject = Boolean(
+    user?.userId &&
+    projects?.length &&
+    projects.some((p) =>
+      (p.hosts || []).some((h: unknown) => {
+        if (typeof h === 'string') return h === user.userId;
+        if (typeof h === 'object' && h !== null) {
+          const obj = h as Record<string, unknown>;
+          return (obj.userId || obj._id || obj.id) === user.userId;
+        }
+        return false;
+      })
+    )
+  );
+
+  const canCreateMeeting = isGlobalAdmin || (filterProjectId ? isHostOfSelectedProject : isHostOfAnyProject);
+
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
-      {/* Header Row: Heading & Action Buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <Video size={24} className="text-emerald-500 dark:text-emerald-400" />
+            <Video size={24} className="text-primary" />
             <span>{headerInfo.title}</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
@@ -175,10 +224,16 @@ export const Meetings: React.FC = () => {
         <div className="flex items-center gap-2 shrink-0">
           <Button
             size="sm"
-            disabled={isSelectedProjectReadOnly}
-            onClick={() => !isSelectedProjectReadOnly && navigate(filterProjectId ? `/meetings/new?projectId=${filterProjectId}` : '/meetings/new')}
+            disabled={isSelectedProjectReadOnly || !canCreateMeeting}
+            onClick={() => !isSelectedProjectReadOnly && canCreateMeeting && navigate(filterProjectId ? `/meetings/new?projectId=${filterProjectId}` : '/meetings/new')}
             className="gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={isSelectedProjectReadOnly ? `Selected project is ${activeProjectStatus}. Re-activate status to Active to schedule meetings.` : 'Schedule Meeting'}
+            title={
+              !canCreateMeeting
+                ? 'Only project/team hosts, Admins, or SuperAdmins can schedule meetings'
+                : isSelectedProjectReadOnly
+                ? `Selected project is ${activeProjectStatus}. Re-activate status to Active to schedule meetings.`
+                : 'Schedule Meeting'
+            }
           >
             <Plus size={15} />
             <span>Schedule Meeting</span>
@@ -186,9 +241,7 @@ export const Meetings: React.FC = () => {
         </div>
       </div>
 
-      {/* Search & Project Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
-        {/* Search Box with Search Button */}
         <div className="flex items-center gap-2 flex-1 max-w-md">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -197,12 +250,11 @@ export const Meetings: React.FC = () => {
               value={searchInput}
               onChange={(e) => {
                 setSearchInput(e.target.value);
-                if (!e.target.value) setActiveSearch('');
+                setMeetingPage(1);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  setActiveSearch(searchInput);
                   setMeetingPage(1);
                 }
               }}
@@ -214,7 +266,6 @@ export const Meetings: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setSearchInput('');
-                  setActiveSearch('');
                   setMeetingPage(1);
                 }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-0.5 rounded-xs"
@@ -227,7 +278,6 @@ export const Meetings: React.FC = () => {
             size="sm"
             variant="secondary"
             onClick={() => {
-              setActiveSearch(searchInput);
               setMeetingPage(1);
             }}
             className="h-9 px-3 gap-1.5 text-xs cursor-pointer shrink-0 border border-border"
@@ -237,43 +287,35 @@ export const Meetings: React.FC = () => {
           </Button>
         </div>
 
-        {/* Project Selector Filter */}
         {projects.length > 0 && (
-          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-            <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto min-w-[220px]">
+            <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium shrink-0">
               <FolderGit2 size={13} />
               Project:
             </span>
-            <select
-              value={filterProjectId}
-              onChange={(e) => {
-                const newParams = new URLSearchParams(searchParams);
-                if (e.target.value) {
-                  newParams.set('projectId', e.target.value);
-                } else {
-                  newParams.delete('projectId');
-                }
-                setSearchParams(newParams);
-                setMeetingPage(1);
-              }}
-              className="h-9 rounded-md border border-border bg-background px-2.5 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-            >
-              <option value="">All Projects</option>
-              {projects.map((p) => {
-                const pId = getProjectId(p);
-                const pName = getProjectName(p);
-                return (
-                  <option key={pId} value={pId}>
-                    {pName}
-                  </option>
-                );
-              })}
-            </select>
+            <div className="w-48">
+              <SearchableSelect
+                value={filterProjectId}
+                onChange={(val) => {
+                  const newParams = new URLSearchParams(searchParams);
+                  if (val) {
+                    newParams.set('projectId', val);
+                  } else {
+                    newParams.delete('projectId');
+                  }
+                  setSearchParams(newParams);
+                  setMeetingPage(1);
+                }}
+                options={projectFilterOptions}
+                placeholder="All Projects"
+                searchPlaceholder="Search projects..."
+                className="w-full text-xs"
+              />
+            </div>
           </div>
         )}
       </div>
 
-      {/* Content Area */}
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -295,8 +337,8 @@ export const Meetings: React.FC = () => {
               ? `There are no ${currentTab} meetings under project '${activeProjectName}'. Click below to schedule a meeting.`
               : `There are no ${currentTab} meetings in your workspace yet. Click below to schedule a meeting.`
           }
-          actionLabel="Schedule Meeting"
-          onAction={() => navigate(filterProjectId ? `/meetings/new?projectId=${filterProjectId}` : '/meetings/new')}
+          actionLabel={canCreateMeeting ? 'Schedule Meeting' : undefined}
+          onAction={canCreateMeeting ? () => navigate(filterProjectId ? `/meetings/new?projectId=${filterProjectId}` : '/meetings/new') : undefined}
           accentColor="emerald"
         />
       ) : (
@@ -316,14 +358,16 @@ export const Meetings: React.FC = () => {
 
               const isPastDuration = !isNaN(scheduledMs) && now > endMs;
               const isTooEarly = !isNaN(scheduledMs) && now < earlyJoinMs;
-              const isEndedOrCancelled = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED' || isPastDuration;
+              const isEndedOrCancelled = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED' || (m.meetingStatus !== 'LIVE' && isPastDuration);
 
-              const canJoin = !isEndedOrCancelled && !isTooEarly;
+              const canJoin = !isEndedOrCancelled && (!isTooEarly || m.meetingStatus === 'LIVE');
 
               let statusLabel: MeetingDisplayStatus = m.meetingStatus;
-              if (isPastDuration && m.meetingStatus !== 'CANCELLED') {
-                statusLabel = 'ENDED';
-              } else if (!isEndedOrCancelled && now >= earlyJoinMs) {
+              if (m.meetingStatus === 'LIVE') {
+                statusLabel = 'IN_PROGRESS';
+              } else if (isEndedOrCancelled) {
+                statusLabel = m.meetingStatus === 'CANCELLED' ? 'CANCELLED' : 'ENDED';
+              } else if (now >= earlyJoinMs && now <= endMs) {
                 statusLabel = 'IN_PROGRESS';
               } else if (isTooEarly) {
                 statusLabel = 'SCHEDULED';
@@ -355,7 +399,7 @@ export const Meetings: React.FC = () => {
                       <Badge tone="neutral">{m.meetingJoinMode === 'INVITE_ONLY' ? 'Invite Only' : 'Open Link'}</Badge>
                       {(pCode || pName) && (
                         <Badge tone="neutral" className="gap-1 font-mono text-[10px]">
-                          <FolderGit2 size={10} className="text-emerald-500" />
+                          <FolderGit2 size={10} className="text-primary" />
                           <span>{pCode || pName}</span>
                         </Badge>
                       )}
@@ -366,20 +410,37 @@ export const Meetings: React.FC = () => {
                       <p className="text-xs text-muted-foreground line-clamp-1">{m.meetingDescription}</p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1">
-                      <span className="flex items-center gap-1">
-                        <Calendar size={13} className="text-muted-foreground" />
-                        {dateStr}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock size={13} className="text-muted-foreground" />
-                        {durationMinutes} mins
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users size={13} className="text-muted-foreground" />
-                        {participantCount} Participant{participantCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
+                    {(() => {
+                      let actualDurationStr: string | null = null;
+                      if (m.startedAt && m.endedAt) {
+                        const startMs = new Date(m.startedAt).getTime();
+                        const endMs = new Date(m.endedAt).getTime();
+                        if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
+                          const elapsedMins = Math.round((endMs - startMs) / (60 * 1000));
+                          actualDurationStr = formatDuration(elapsedMins);
+                        }
+                      }
+                      return (
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={13} className="text-muted-foreground" />
+                            {dateStr}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock size={13} className="text-muted-foreground" />
+                            {actualDurationStr ? (
+                              <span>{actualDurationStr} <span className="opacity-75">/ scheduled {formatDurationHuman(durationMinutes)}</span></span>
+                            ) : (
+                              <span>{formatDurationHuman(durationMinutes)}</span>
+                            )}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users size={13} className="text-muted-foreground" />
+                            {participantCount} Participant{participantCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {!isEndedOrCancelled && (
@@ -393,7 +454,7 @@ export const Meetings: React.FC = () => {
                       >
                         {copiedMeetingId === m.meetingId ? (
                           <>
-                            <Check size={13} className="text-emerald-500" />
+                            <Check size={13} className="text-primary" />
                             <span>Copied</span>
                           </>
                         ) : (

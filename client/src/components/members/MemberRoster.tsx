@@ -9,15 +9,16 @@ import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { getMemberId, isTopAdminRole, getRoleCategory } from '@/components/members/member-utils';
 import { useScrollFade } from '@/hooks/useScrollFade';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export interface MemberRosterProps {
   /** The full pool of organization members available to select from */
   members: Member[];
   /** Map of member ID -> role ('Host' | 'Member') */
   value: Record<string, 'Host' | 'Member'>;
-  /** Callback when roster assignments change */
+  
   onChange: (value: Record<string, 'Host' | 'Member'>) => void;
-  /** Panel title */
+  
   title?: string;
   /** Singular entity noun for dialogs/tooltips (e.g. "project", "meeting") */
   entityName?: string;
@@ -25,7 +26,7 @@ export interface MemberRosterProps {
   lockSuperAdmin?: boolean;
   /** Optional class name on outer container */
   className?: string;
-  /** Optional min-height for scroll area */
+  
   minHeight?: string;
   /** Name of the project or meeting to mention in confirmation dialogs */
   projectName?: string;
@@ -68,6 +69,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
 
   const scrollRef = useScrollFade<HTMLDivElement>();
   const [memberSearch, setMemberSearch] = useState('');
+  const debouncedSearch = useDebounce(memberSearch, 300);
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
   const [removeAnchorRect, setRemoveAnchorRect] = useState<DOMRect | null>(null);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
     if (updated) {
       onChange(copy);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members, lockSuperAdmin]);
 
   const topAdminIds = new Set(
@@ -139,12 +141,15 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
     ([mId, role]) => role === 'Host' && !topAdminIds.has(mId)
   ).length;
 
-  const filteredMembers = members.filter((m) => {
-    const name = m.userName || '';
-    const email = canSeeEmail ? (m.userEmail || '') : '';
-    const query = memberSearch.toLowerCase();
-    return name.toLowerCase().includes(query) || (canSeeEmail && email.toLowerCase().includes(query));
-  });
+  const filteredMembers = React.useMemo(() => {
+    if (!debouncedSearch.trim()) return members;
+    const query = debouncedSearch.toLowerCase();
+    return members.filter((m) => {
+      const name = m.userName || '';
+      const email = canSeeEmail ? (m.userEmail || '') : '';
+      return name.toLowerCase().includes(query) || (canSeeEmail && email.toLowerCase().includes(query));
+    });
+  }, [members, debouncedSearch, canSeeEmail]);
 
   const entityTitle = entityName.charAt(0).toUpperCase() + entityName.slice(1);
 
@@ -209,7 +214,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
       {/* Header with counter */}
       <div className="flex items-center justify-between pb-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
-          <Users size={18} className="text-emerald-500" />
+          <Users size={18} className="text-primary" />
           <h2 className="text-sm font-bold text-foreground">{title}</h2>
         </div>
         <Badge tone={selectedCount > 0 ? 'success' : 'neutral'}>
@@ -244,9 +249,9 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                 style={
                   scrollOffset > 0
                     ? ({
-                        '--scroll-offset': `-${scrollOffset + 10}px`,
-                        '--ticker-duration': `${Math.max(6, Math.min(15, (scrollOffset / 25) + 4))}s`,
-                      } as React.CSSProperties)
+                      '--scroll-offset': `-${scrollOffset + 10}px`,
+                      '--ticker-duration': `${Math.max(6, Math.min(15, (scrollOffset / 25) + 4))}s`,
+                    } as React.CSSProperties)
                     : undefined
                 }
               >
@@ -310,15 +315,15 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                         className={cn(
                           'flex items-center justify-between p-2.5 rounded-lg border transition-all',
                           isSuperAdmin
-                            ? 'border-emerald-500/50 bg-emerald-500/10'
+                            ? 'border-primary/50 bg-primary/10'
                             : isSelected
-                            ? 'border-emerald-500/50 bg-emerald-500/10 shadow-xs'
-                            : 'border-border/60 bg-background/50 hover:border-border',
+                              ? 'border-primary/50 bg-primary/10 shadow-xs'
+                              : 'border-border/60 bg-background/50 hover:border-border',
                         )}
                       >
                         {/* Member Avatar & Details */}
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0 border border-emerald-500/30">
+                          <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0 border border-primary/30">
                             {displayName.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
@@ -346,7 +351,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                             /* Read-only view for regular Members */
                             <div className="flex items-center gap-1.5">
                               {isSuperAdmin ? (
-                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30">
+                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-primary/15 text-primary border border-primary/30">
                                   SuperAdmin
                                 </span>
                               ) : isAdmin ? (
@@ -371,7 +376,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                             </div>
                           ) : (lockSuperAdmin && isSuperAdmin) ? (
                             <>
-                              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30">
+                              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-primary/15 text-primary border border-primary/30">
                                 SuperAdmin
                               </span>
                               <Tooltip className="w-auto shrink-0 inline-flex">
@@ -381,7 +386,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                                       type="button"
                                       disabled
                                       tabIndex={-1}
-                                      className="w-7 h-7 rounded-full flex items-center justify-center bg-emerald-500 text-white cursor-default pointer-events-none"
+                                      className="w-7 h-7 rounded-full flex items-center justify-center bg-primary text-primary-foreground cursor-default pointer-events-none"
                                     >
                                       <Check size={14} />
                                     </button>
@@ -415,54 +420,54 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                             /* Interactive controls for TopAdmin and Hosts on regular members */
                             <>
                               {isSelected && (
-                                  <div className="flex items-center gap-1 bg-background/80 rounded-md p-0.5 border border-border">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (!canAssignRole(memberId)) return;
-                                        applyMemberRole(memberId, 'Member');
-                                      }}
-                                      className={cn(
-                                        'px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer',
-                                        currentRole === 'Member'
-                                          ? 'bg-emerald-500 text-white'
-                                          : 'text-muted-foreground hover:text-foreground',
-                                      )}
-                                    >
-                                      Member
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (!canAssignRole(memberId)) return;
-                                        if (value[memberId] !== 'Host' && memberHostCount >= maxHosts) {
-                                          showWarning(
-                                            `Only ${maxHosts} member hosts are allowed per ${entityName} (Admins are exempt).`
-                                          );
-                                          return;
-                                        }
-                                        applyMemberRole(memberId, 'Host');
-                                      }}
-                                      className={cn(
-                                        'px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer',
-                                        currentRole === 'Host'
-                                          ? 'bg-emerald-500 text-white'
-                                          : !topAdminIds.has(memberId) && memberHostCount >= maxHosts
+                                <div className="flex items-center gap-1 bg-background/80 rounded-md p-0.5 border border-border">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!canAssignRole(memberId)) return;
+                                      applyMemberRole(memberId, 'Member');
+                                    }}
+                                    className={cn(
+                                      'px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer',
+                                      currentRole === 'Member'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'text-muted-foreground hover:text-foreground',
+                                    )}
+                                  >
+                                    Member
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!canAssignRole(memberId)) return;
+                                      if (value[memberId] !== 'Host' && memberHostCount >= maxHosts) {
+                                        showWarning(
+                                          `Only ${maxHosts} member hosts are allowed per ${entityName} (Admins are exempt).`
+                                        );
+                                        return;
+                                      }
+                                      applyMemberRole(memberId, 'Host');
+                                    }}
+                                    className={cn(
+                                      'px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer',
+                                      currentRole === 'Host'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : !topAdminIds.has(memberId) && memberHostCount >= maxHosts
                                           ? 'text-muted-foreground/60 hover:text-amber-500'
                                           : 'text-muted-foreground hover:text-foreground',
-                                      )}
-                                      title={
-                                        currentRole !== 'Host' && !topAdminIds.has(memberId) && memberHostCount >= maxHosts
-                                          ? `Only ${maxHosts} member hosts allowed for a ${entityName}`
-                                          : undefined
-                                      }
-                                    >
-                                      Host
-                                    </button>
-                                  </div>
-                                )}
+                                    )}
+                                    title={
+                                      currentRole !== 'Host' && !topAdminIds.has(memberId) && memberHostCount >= maxHosts
+                                        ? `Only ${maxHosts} member hosts allowed for a ${entityName}`
+                                        : undefined
+                                    }
+                                  >
+                                    Host
+                                  </button>
+                                </div>
+                              )}
 
                               {isSelected ? (
                                 <Tooltip className="w-auto shrink-0 inline-flex">
@@ -488,7 +493,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => toggleMemberSelection(memberId)}
-                                      className="w-7 h-7 rounded-full flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                                      className="w-7 h-7 rounded-full flex items-center justify-center bg-secondary text-muted-foreground hover:text-primary hover:bg-primary/20 transition-colors cursor-pointer"
                                     >
                                       <UserPlus size={14} />
                                     </button>

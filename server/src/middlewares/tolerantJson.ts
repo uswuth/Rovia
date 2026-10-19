@@ -6,14 +6,7 @@ export interface TolerantJsonOptions {
   type?: string;
 }
 
-/**
- * Dev-only JSON body parser that strips `//` and block comments (and trailing
- * commas) before parsing. Never mounted when NODE_ENV=production, so production
- * keeps the strict `express.json()` behaviour.
- *
- * An empty or missing body yields `req.body = {}` so downstream validation can
- * report every missing required field instead of failing to parse.
- */
+/** Dev-only JSON body parser that strips `//` and block comments (and trailing commas) before parsing. Never mounted when NODE_ENV=production, so production keeps the strict `express.json()` behaviour. An empty or missing body yields `req.body = {}` so downstream validation can report every missing required field instead of failing to parse. */
 export const tolerantJsonParser = (options: TolerantJsonOptions = {}) => {
   const limitBytes = options.limit ? parseLimit(options.limit) : 1024 * 1024;
   const contentType = options.type ?? 'application/json';

@@ -15,8 +15,7 @@ import {
 
 const router: Router = Router();
 
-// Every recording route requires authentication. The organization is then
-// resolved from the verified JWT, never from the request.
+// The organization always comes from the verified JWT, never from the request.
 router.use(authenticateUser);
 
 /**

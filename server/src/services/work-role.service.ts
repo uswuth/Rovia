@@ -1,5 +1,6 @@
 import { WorkRole } from '../models/work-role.model.js';
 import { ApiError } from '../utils/apiError.js';
+import { generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
 
 export const createWorkRoleService = async (input: {
   roleName: string;
@@ -15,7 +16,12 @@ export const createWorkRoleService = async (input: {
     throw ApiError.badRequest('Organization ID is required');
   }
 
-  const roleCode = `WR-${Math.floor(1000 + Math.random() * 9000)}`;
+  const roleCode = await generateSequentialCode(
+    ENTITY_PREFIXES.ROLE,
+    WorkRole,
+    'role_code',
+    { organization_id: organizationId }
+  );
   const workRole = await WorkRole.create({
     role_name: roleName.trim(),
     role_code: roleCode,

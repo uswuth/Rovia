@@ -17,8 +17,7 @@ import {
 export const registerUser = async (req: Request, res: Response): Promise<Response> => {
   const { user, accessToken, refreshToken } = await registerUserService(req.body);
 
-  // Same cookie contract as login: the refresh token lives only in the
-  // httpOnly cookie, never in the response body.
+  // Same cookie contract as login: the refresh token only ever lives in the httpOnly cookie.
   res.cookie('refreshToken', refreshToken, refreshTokenCookieOptions);
 
   return ApiResponse.success(
@@ -43,7 +42,7 @@ export const loginUser = async (req: Request, res: Response): Promise<Response> 
 };
 
 export const refreshAccessToken = async (req: Request, res: Response): Promise<Response> => {
-  const incomingRefreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+  const incomingRefreshToken = req.cookies?.refreshToken;
 
   const { accessToken, newRefreshToken } = await refreshAccessTokenService(incomingRefreshToken);
 

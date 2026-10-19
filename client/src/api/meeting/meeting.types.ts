@@ -1,9 +1,6 @@
 /** Mirrors the server `toJSON` shape. Optional where the server may omit it. */
 
-/** Raw participant as the server actually sends it: `userId` is camelCase
- *  but role/status/permission flags arrive in `snake_case` (see the Network
- *  tab on GET /meetings/:id). Both spellings are accepted so the room never
- *  drops a profile it cannot parse. */
+/** Raw participant as the server actually sends it: `userId` is camelCase but role/status/permission flags arrive in `snake_case` (see the Network tab on GET /meetings/:id). Both spellings are accepted so the room never drops a profile it cannot parse. */
 export interface MeetingParticipantRaw {
   userId?: string;
   user_id?: string;
@@ -44,9 +41,7 @@ export interface MeetingParticipant {
   leftAt?: string | null;
 }
 
-/** Accepts either spelling the server may send and returns the camelCase form
- *  the room renders. Safely unwraps populated Mongoose objects so userId is
- *  always a valid string ID. */
+/** Accepts either spelling the server may send and returns the camelCase form the room renders. Safely unwraps populated Mongoose objects so userId is always a valid string ID. */
 export const normalizeParticipant = (raw: MeetingParticipantRaw): MeetingParticipant => {
   const pick = <T,>(camel: T | undefined, snake: T | undefined, fallback: T): T =>
     camel ?? snake ?? fallback;
@@ -100,7 +95,7 @@ export interface Meeting {
   meetingParticipantLimit: number;
   meetingJoinCode: string;
   organizationId: string;
-  projectId: string;
+  projectId?: string;
   teamId?: string;
   createdBy: string;
   createdAt?: string;
@@ -126,7 +121,7 @@ export interface MeetingPreview {
 }
 
 export interface CreateMeetingDTO {
-  projectId: string;
+  projectId?: string;
   teamId?: string;
   meetingTitle: string;
   meetingDescription?: string;
@@ -136,6 +131,7 @@ export interface CreateMeetingDTO {
   meetingJoinMode?: MeetingJoinMode;
   meetingParticipantLimit?: number;
   participantIds?: string[];
+  participantRoles?: Record<string, 'HOST' | 'MEMBER'>;
 }
 
 export interface ParticipantPermissions {

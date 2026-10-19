@@ -1,54 +1,79 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CheckSquare,
   Plus,
-  Edit2,
-  Trash2,
   RefreshCw,
   LayoutGrid,
   List,
+  GripVertical,
   FolderGit2,
-  CheckCircle2, Users,
-  Circle,
-  CircleDashed,
-  AlertCircle,
-  Loader2
+  Users,
 } from 'lucide-react';
 import { getTasksApi, updateTaskApi, deleteTaskApi, type TaskStatusType } from '@/api/tasks/tasks.api';
 import { getTeamsApi } from '@/api/teams/teams.api';
 import { useAuth } from '@/context/AuthContext';
 import { useProject } from '@/context/ProjectContext';
+import { useOrganization } from '@/context/OrganizationContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DataTable, type Column } from '@/components/ui/data-table';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
+import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { extractApiItems } from '@/utils/apiResponse';
 import { cn } from '@/lib/utils';
+import { RosterDetailModal } from '@/components/members/RosterDetailModal';
+import { GroupedAvatars } from '@/components/members/GroupedAvatars';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { useDebounce } from '@/hooks/useDebounce';
+import type { Member, MemberRole, MemberStatus } from '@/types/member.types';
+import { formatDateOnly } from '@/lib/format-date';
+import { getTaskColumns, KANBAN_COLUMNS } from './Tasks.TanCol';
 
-type BadgeTone = import('@/components/ui/badge-variants').BadgeTone;
+const mapTaskMembers = (
+  assignedArr: unknown[],
+  orgMembers?: Member[],
+  currentUser?: { userId?: string; userName?: string; userEmail?: string; userRole?: string; avatarUrl?: string } | null
+): Member[] => {
+  return assignedArr.map((m) => {
+    if (typeof m === 'string') {
+      const orgMatch = orgMembers?.find((om) => om.userId === m || om.userName === m);
+      return {
+        userId: m,
+        userName: orgMatch?.userName || m,
+        userEmail: orgMatch?.userEmail || '',
+        userRole: (orgMatch?.userRole || 'Member') as MemberRole,
+        userStatus: (orgMatch?.userStatus || 'ACTIVE') as MemberStatus,
+        avatarUrl: orgMatch?.avatarUrl,
+        createdAt: orgMatch?.createdAt || '',
+      };
+    }
+    const mem = m as Member;
+    const uid = mem.userId;
+    const orgMatch = orgMembers?.find((om) => om.userId === uid);
+    const isCurrent = Boolean(currentUser && currentUser.userId === uid);
 
-const KANBAN_COLUMNS: {
-  id: TaskStatusType;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone: BadgeTone;
-  iconColor: string;
-}[] = [
-    { id: 'backlog', label: 'Backlog', icon: CircleDashed, tone: 'accent', iconColor: 'text-purple-500 dark:text-purple-400' },
-    { id: 'to_do', label: 'Todo', icon: Circle, tone: 'info', iconColor: 'text-zinc-400' },
-    { id: 'in_progress', label: 'In Progress', icon: Loader2, tone: 'warning', iconColor: 'text-amber-500 dark:text-amber-400' },
-    { id: 'bug', label: 'Bug / Issue', icon: AlertCircle, tone: 'danger', iconColor: 'text-rose-500 dark:text-rose-400' },
-    { id: 'completed', label: 'Done', icon: CheckCircle2, tone: 'success', iconColor: 'text-emerald-500 dark:text-emerald-400' },
-  ];
+    return {
+      userId: uid,
+      userName: orgMatch?.userName || (isCurrent && currentUser ? currentUser.userName : '') || mem.userName,
+      userEmail: orgMatch?.userEmail || (isCurrent && currentUser ? currentUser.userEmail : '') || mem.userEmail,
+      userRole: (orgMatch?.userRole || (isCurrent && currentUser ? currentUser.userRole : '') || mem.userRole || 'Member') as MemberRole,
+      userStatus: orgMatch?.userStatus || mem.userStatus || 'ACTIVE',
+      userCode: orgMatch?.userCode || mem.userCode,
+      avatarUrl: orgMatch?.avatarUrl || (isCurrent && currentUser ? currentUser.avatarUrl : '') || mem.avatarUrl,
+      jobTitle: orgMatch?.jobTitle || mem.jobTitle,
+      createdAt: orgMatch?.createdAt || mem.createdAt,
+    };
+  });
+};
 
 export const Tasks: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { members: orgMembers } = useOrganization();
   const { projects: contextProjects } = useProject();
   const hasFetchedRef = useRef(false);
 
@@ -61,12 +86,19 @@ export const Tasks: React.FC = () => {
   const [teams, setTeams] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [rosterModal, setRosterModal] = useState<{
+    open: boolean;
+    title: string;
+    members: Member[];
+  } | null>(null);
+
   const projects = useMemo(() => {
     return (contextProjects || []) as unknown as Record<string, unknown>[];
   }, [contextProjects]);
 
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('kanban');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [projectFilter, setProjectFilter] = useState('ALL');
   const [teamFilter, setTeamFilter] = useState('ALL');
 
@@ -102,21 +134,20 @@ export const Tasks: React.FC = () => {
     void loadData();
   }, []);
 
-  const handleDelete = async (taskId: string) => {
+  const handleDelete = useCallback(async (taskId: string) => {
     if (!confirm('Are you sure you want to delete this Task?')) return;
-    const previousTasks = [...tasks];
-    setTasks((prev) => prev.filter((t) => (t.taskId || t._id || t.id) !== taskId));
+    setTasks((prev) => prev.filter((t) => ((t.taskId || t._id) as string) !== taskId));
     try {
       await deleteTaskApi(taskId);
     } catch (err: unknown) {
-      setTasks(previousTasks);
       const errorObj = err as { response?: { data?: { message?: string } } };
       alert(errorObj?.response?.data?.message || 'Failed to delete task.');
+      void loadData();
     }
-  };
+  }, []);
 
   const handleStatusChange = async (taskId: string, newStatus: TaskStatusType) => {
-    const currentTask = tasks.find((t) => (t.taskId || t._id || t.id) === taskId);
+    const currentTask = tasks.find((t) => ((t.taskId || t._id) as string) === taskId);
     if (!currentTask || (currentTask.taskStatus as TaskStatusType) === newStatus) {
       return;
     }
@@ -126,7 +157,7 @@ export const Tasks: React.FC = () => {
     // 1. Optimistically update local tasks state immediately (0ms UI re-render, zero extra fetches)
     setTasks((prevTasks) =>
       prevTasks.map((t) => {
-        const idStr = (t.taskId || t._id || t.id) as string;
+        const idStr = (t.taskId || t._id) as string;
         if (idStr === taskId) {
           return { ...t, taskStatus: newStatus };
         }
@@ -138,10 +169,9 @@ export const Tasks: React.FC = () => {
     try {
       await updateTaskApi(taskId, { taskStatus: newStatus });
     } catch (err: unknown) {
-      // Revert optimistic update on error
-      setTasks((prevTasks) =>
+            setTasks((prevTasks) =>
         prevTasks.map((t) => {
-          const idStr = (t.taskId || t._id || t.id) as string;
+          const idStr = (t.taskId || t._id) as string;
           if (idStr === taskId) {
             return { ...t, taskStatus: previousStatus };
           }
@@ -154,159 +184,82 @@ export const Tasks: React.FC = () => {
   };
 
   const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
-      const titleStr = (t.taskTitle as string) || '';
-      const descStr = (t.taskDescription as string) || '';
-      const matchesSearch =
-        titleStr.toLowerCase().includes(search.toLowerCase()) ||
-        descStr.toLowerCase().includes(search.toLowerCase());
+    const query = debouncedSearch.trim().toLowerCase();
+    return tasks
+      .filter((t) => {
+        const titleStr = (t.taskTitle as string) || '';
+        const descStr = (t.taskDescription as string) || '';
+        const matchesSearch =
+          !query ||
+          titleStr.toLowerCase().includes(query) ||
+          descStr.toLowerCase().includes(query);
 
-      const projObj = typeof t.projectId === 'object' && t.projectId !== null ? (t.projectId as Record<string, unknown>) : null;
-      const projId = projObj ? ((projObj._id || projObj.projectId) as string) : (t.projectId as string);
-      const matchesProj = projectFilter === 'ALL' || projId === projectFilter;
-
-      const teamObj = typeof t.teamId === 'object' && t.teamId !== null ? (t.teamId as Record<string, unknown>) : null;
-      const tmId = teamObj ? ((teamObj._id || teamObj.teamId) as string) : (t.teamId as string);
-      const matchesTeam = teamFilter === 'ALL' || tmId === teamFilter;
-
-      return matchesSearch && matchesProj && matchesTeam;
-    });
-  }, [tasks, search, projectFilter, teamFilter]);
-
-  const columns: Column<Record<string, unknown>>[] = [
-    {
-      id: 'task',
-      header: 'Task Title & Description',
-      cell: (t) => {
-        const title = (t.taskTitle as string) || '';
-        const desc = (t.taskDescription as string) || '';
-        return (
-          <div>
-            <span className="font-semibold text-foreground text-sm leading-snug block">
-              {title}
-            </span>
-            {desc ? (
-              <span className="text-xs text-muted-foreground line-clamp-1 block">{desc}</span>
-            ) : (
-              <span className="text-xs italic text-muted-foreground/50">No description</span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      id: 'status',
-      header: 'Status',
-      width: '130px',
-      cell: (t) => {
-        const taskStatusStr = (t.taskStatus as TaskStatusType) || 'to_do';
-        const colMeta = KANBAN_COLUMNS.find((c) => c.id === taskStatusStr) || KANBAN_COLUMNS[0];
-        const Icon = colMeta.icon;
-
-        return (
-          <Badge tone={colMeta.tone} className="gap-1.5 text-xs font-semibold shadow-2xs">
-            <Icon className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
-            <span>{colMeta.label}</span>
-          </Badge>
-        );
-      },
-    },
-    {
-      id: 'projectTeam',
-      header: 'Project / Team',
-      width: '180px',
-      cell: (t) => {
         const projObj = typeof t.projectId === 'object' && t.projectId !== null ? (t.projectId as Record<string, unknown>) : null;
-        const teamObj = typeof t.teamId === 'object' && t.teamId !== null ? (t.teamId as Record<string, unknown>) : null;
-        const projName = projObj ? ((projObj.projectName || projObj.name) as string) : null;
-        const teamName = teamObj ? (teamObj.teamName as string) : null;
+        const projId = projObj ? ((projObj.projectId || projObj._id) as string) : (t.projectId as string);
+        const matchesProj = projectFilter === 'ALL' || projId === projectFilter;
 
-        return (
-          <div className="space-y-0.5 text-xs">
-            {projName && (
-              <div className="flex items-center gap-1 text-foreground font-medium">
-                <FolderGit2 size={12} className="text-emerald-500" />
-                <span>{projName}</span>
-              </div>
-            )}
-            {teamName && (
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Users size={12} />
-                <span>{teamName}</span>
-              </div>
-            )}
-            {!projName && !teamName && (
-              <span className="text-muted-foreground/50 italic">Workspace Task</span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      id: 'assignees',
-      header: 'Assignees',
-      width: '110px',
-      cell: (t) => {
-        const assignedArr = (t.assignedMembers as unknown[]) || [];
-        return (
-          <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
-            <Users size={13} className="text-muted-foreground" />
-            <span>{assignedArr.length}</span>
-          </div>
-        );
-      },
-    },
-    {
-      id: 'createdAt',
-      header: 'Created At',
-      width: '110px',
-      cell: (t) => {
-        const date = t.createdAt ? new Date(t.createdAt as string).toLocaleDateString() : 'N/A';
-        return <span className="text-xs text-muted-foreground font-mono">{date}</span>;
-      },
-    },
-    ...(canManage
-      ? [
-        {
-          id: 'actions',
-          header: 'Actions',
-          align: 'right' as const,
-          width: '80px',
-          cell: (t: Record<string, unknown>) => {
-            const taskIdStr = (t.taskId || t._id) as string;
-            return (
-              <div className="flex justify-end gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate(`/tasks/${taskIdStr}/edit`)}
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-                  title="Edit Task"
-                >
-                  <Edit2 size={14} />
-                </Button>
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(taskIdStr)}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
-                    title="Delete Task"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                )}
-              </div>
-            );
-          },
+        const teamObj = typeof t.teamId === 'object' && t.teamId !== null ? (t.teamId as Record<string, unknown>) : null;
+        const tmId = teamObj ? ((teamObj.teamId || teamObj._id) as string) : (t.teamId as string);
+        const matchesTeam = teamFilter === 'ALL' || tmId === teamFilter;
+
+        return matchesSearch && matchesProj && matchesTeam;
+      })
+      .sort((a, b) => {
+        const timeA = new Date((a.createdAt || a.created_at || 0) as string).getTime() || 0;
+        const timeB = new Date((b.createdAt || b.created_at || 0) as string).getTime() || 0;
+        return timeB - timeA;
+      });
+  }, [tasks, debouncedSearch, projectFilter, teamFilter]);
+
+  const projectFilterOptions = useMemo<SearchableSelectOption[]>(() => {
+    return [
+      { value: 'ALL', label: 'All Projects' },
+      ...projects.map((p) => {
+        const pId = (p.projectId || p._id || p.id) as string;
+        const pName = ((p.projectName || p.name || p.title) as string) || 'Unnamed Project';
+        return {
+          value: pId,
+          label: pName,
+        };
+      }),
+    ];
+  }, [projects]);
+
+  const teamFilterOptions = useMemo<SearchableSelectOption[]>(() => {
+    return [
+      { value: 'ALL', label: 'All Teams' },
+      ...teams.map((tm) => {
+        const tmId = (tm.teamId || tm._id) as string;
+        const tmName = ((tm.teamName || tm.name) as string) || 'Unnamed Team';
+        return {
+          value: tmId,
+          label: tmName,
+        };
+      }),
+    ];
+  }, [teams]);
+
+  const columns = useMemo(
+    () =>
+      getTaskColumns({
+        navigate,
+        isAdmin,
+        canManage,
+        onDelete: handleDelete,
+        onOpenAssigneesModal: (taskTitle, members) => {
+          setRosterModal({
+            open: true,
+            title: `Task Assignees: ${taskTitle}`,
+            members,
+          });
         },
-      ]
-      : []),
-  ];
+      }),
+    [navigate, isAdmin, canManage, handleDelete, setRosterModal]
+  );
 
   if (loading) {
     return (
-      <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
+      <div className="w-full max-w-full min-w-0 bg-background text-foreground p-6 lg:p-8 space-y-6">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-96 w-full rounded-xl" />
       </div>
@@ -314,12 +267,12 @@ export const Tasks: React.FC = () => {
   }
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-background text-foreground p-6 lg:p-8 space-y-6 min-h-0">
+    <div className="w-full max-w-full min-w-0 flex-1 flex flex-col bg-background text-foreground p-6 lg:p-8 space-y-6 min-h-0">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <CheckSquare className="text-emerald-500 dark:text-emerald-400" size={24} />
+            <CheckSquare className="text-primary" size={24} />
             <span>Tasks & Board</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
@@ -390,69 +343,33 @@ export const Tasks: React.FC = () => {
             className="w-full sm:w-64 h-9 text-xs"
           />
 
-          <Select
-            value={projectFilter}
-            onValueChange={(val) => {
-              if (val) {
-                setProjectFilter(String(val));
+          <div className="w-full sm:w-48">
+            <SearchableSelect
+              value={projectFilter}
+              onChange={(val) => {
+                setProjectFilter(val || 'ALL');
                 setCurrentPage(1);
-              }
-            }}
-          >
-            <SelectTrigger className="w-44 h-9 text-xs">
-              <SelectValue placeholder="All Projects">
-                {(val: unknown) => {
-                  if (val === 'ALL' || !val) return 'All Projects';
-                  const match = projects.find((p) => (p.projectId || p._id || p.id) === val);
-                  return match ? ((match.projectName || match.name) as string) : String(val);
-                }}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Projects</SelectItem>
-              {projects.map((p) => {
-                const pId = (p.projectId || p._id || p.id) as string;
-                const pName = (p.projectName || p.name) as string;
-                return (
-                  <SelectItem key={pId} value={pId}>
-                    {pName}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+              }}
+              options={projectFilterOptions}
+              placeholder="All Projects"
+              searchPlaceholder="Search projects..."
+              className="w-full text-xs"
+            />
+          </div>
 
-          <Select
-            value={teamFilter}
-            onValueChange={(val) => {
-              if (val) {
-                setTeamFilter(String(val));
+          <div className="w-full sm:w-48">
+            <SearchableSelect
+              value={teamFilter}
+              onChange={(val) => {
+                setTeamFilter(val || 'ALL');
                 setCurrentPage(1);
-              }
-            }}
-          >
-            <SelectTrigger className="w-44 h-9 text-xs">
-              <SelectValue placeholder="All Teams">
-                {(val: unknown) => {
-                  if (val === 'ALL' || !val) return 'All Teams';
-                  const match = teams.find((tm) => (tm.teamId || tm._id) === val);
-                  return match ? (match.teamName as string) : String(val);
-                }}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Teams</SelectItem>
-              {teams.map((tm) => {
-                const tmId = (tm.teamId || tm._id) as string;
-                const tmName = tm.teamName as string;
-                return (
-                  <SelectItem key={tmId} value={tmId}>
-                    {tmName}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+              }}
+              options={teamFilterOptions}
+              placeholder="All Teams"
+              searchPlaceholder="Search teams..."
+              className="w-full text-xs"
+            />
+          </div>
         </div>
       </div>
 
@@ -475,7 +392,6 @@ export const Tasks: React.FC = () => {
           {KANBAN_COLUMNS.map((col) => {
             const Icon = col.icon;
             const columnTasks = filteredTasks.filter((t) => (t.taskStatus as string) === col.id);
-            const isDragOver = dragOverColumnId === col.id;
 
             return (
               <div
@@ -499,14 +415,9 @@ export const Tasks: React.FC = () => {
                   setDraggedTaskId(null);
                   setDragOverColumnId(null);
                 }}
-                className={cn(
-                  'p-1 flex flex-col flex-1 min-h-[500px] lg:min-h-0 space-y-3 transition-all duration-150',
-                  isDragOver
-                    ? 'border border-emerald-500/80 bg-emerald-500/5 ring-2 ring-emerald-500/20 rounded-lg shadow-md'
-                    : ''
-                )}
+                className="flex flex-col flex-1 min-h-[500px] lg:min-h-0 space-y-3"
               >
-                <div className="flex items-center justify-between pb-3 border-b border-border/60">
+                <div className="flex items-center justify-between pb-2.5 border-b border-border/60">
                   <div className="flex items-center gap-2">
                     <Icon className={cn('w-4 h-4', col.iconColor)} />
                     <span className="text-xs font-bold text-foreground tracking-tight">{col.label}</span>
@@ -527,19 +438,46 @@ export const Tasks: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
+                <div className="flex-1 space-y-2.5 overflow-y-auto pr-0.5">
                   {columnTasks.length === 0 ? (
-                    <div className="h-32 border border-dashed border-border/50 rounded-md flex items-center justify-center text-xs text-muted-foreground/50 italic">
+                    <div className="h-28 border border-dashed border-border/50 rounded-sm flex items-center justify-center text-xs text-muted-foreground/50 italic">
                       No tasks
                     </div>
                   ) : (
-                    columnTasks.map((task, idx) => {
+                    columnTasks.map((task) => {
                       const taskIdStr = (task.taskId || task._id) as string;
-                      const taskCodeStr = (task.taskCode || `TSK-${(idx + 1).toString().padStart(2, '0')}`) as string;
+                      const taskCodeStr = ((task.taskCode || task.task_code || taskIdStr) as string) || '';
                       const taskTitleStr = (task.taskTitle as string) || '';
                       const taskDescStr = (task.taskDescription as string) || '';
                       const assignedArr = (task.assignedMembers as unknown[]) || [];
+                      const mappedMembers = mapTaskMembers(assignedArr, orgMembers, user);
                       const isBeingDragged = draggedTaskId === taskIdStr;
+
+                      const projObj = typeof task.projectId === 'object' && task.projectId !== null ? (task.projectId as Record<string, unknown>) : null;
+                      const teamObj = typeof task.teamId === 'object' && task.teamId !== null ? (task.teamId as Record<string, unknown>) : null;
+                      const projName = projObj ? ((projObj.projectName || projObj.name) as string) : (typeof task.projectId === 'string' ? task.projectId : null);
+                      const teamName = teamObj ? (teamObj.teamName as string) : null;
+
+                      const cObj = typeof task.createdBy === 'object' && task.createdBy !== null ? (task.createdBy as Member) : null;
+                      const creatorId = cObj ? (cObj.userId || '') : (typeof task.createdBy === 'string' ? task.createdBy : '');
+                      const liveCreator =
+                        orgMembers?.find((m) => (creatorId && m.userId === creatorId) || (m.userEmail && cObj && m.userEmail === cObj.userEmail)) ||
+                        (user && ((creatorId && user.userId === creatorId) || (cObj && user.userEmail === cObj.userEmail))
+                          ? {
+                            userId: user.userId,
+                            userName: user.userName,
+                            userEmail: user.userEmail,
+                            userRole: user.userRole,
+                            avatarUrl: user.avatarUrl,
+                          }
+                          : null);
+
+                      const creatorName =
+                        liveCreator?.userName || (cObj ? (cObj.userName || cObj.userEmail) : (typeof task.createdBy === 'string' ? task.createdBy : null));
+                      const creatorRole = liveCreator?.userRole || cObj?.userRole || 'Member';
+                      const creatorAvatar = liveCreator?.avatarUrl || cObj?.avatarUrl;
+                      const createdAtStr = formatDateOnly(task.createdAt);
+                      const updatedAtStr = formatDateOnly(task.updatedAt);
 
                       return (
                         <div
@@ -554,71 +492,139 @@ export const Tasks: React.FC = () => {
                             setDragOverColumnId(null);
                           }}
                           className={cn(
-                            'rounded-md border border-border/80 bg-card p-3 hover:border-emerald-500/50 transition-all duration-150 space-y-2 group shadow-2xs select-none',
+                            'rounded-sm border border-border/80 bg-card p-3 hover:border-border transition-all duration-150 space-y-2 group shadow-2xs select-none min-w-0 max-w-full relative hover:z-20',
                             canManage ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
-                            isBeingDragged ? 'opacity-30 scale-95 border-emerald-500/60 ring-2 ring-emerald-500/30' : ''
+                            isBeingDragged ? 'opacity-25 border-dashed shadow-none' : ''
                           )}
                         >
-                          {/* Top row: Task Code / ID & Action icons */}
-                          <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground font-mono">
-                            <span className="font-semibold text-foreground/80 tracking-wider">
-                              {taskCodeStr}
-                            </span>
-                            {canManage && (
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => navigate(`/tasks/${taskIdStr}/edit`)}
-                                  className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
-                                  title="Edit Task"
-                                >
-                                  <Edit2 size={11} />
-                                </Button>
-                                {isAdmin && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDelete(taskIdStr)}
-                                    className="h-5 w-5 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
-                                    title="Delete Task"
-                                  >
-                                    <Trash2 size={11} />
-                                  </Button>
-                                )}
-                              </div>
-                            )}
+                          {/* Top row: Drag Handle + Clickable Task Title & Top-Right Assigner Avatar */}
+                          <div className="flex items-center justify-between gap-1.5 text-xs min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              {canManage && (
+                                <GripVertical
+                                  size={13}
+                                  className="text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 cursor-grab active:cursor-grabbing transition-colors"
+                                />
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/tasks/${taskCodeStr}`);
+                                }}
+                                className="font-semibold text-xs text-foreground hover:text-primary hover:underline leading-snug truncate text-left cursor-pointer flex-1"
+                                title={`View task: ${taskTitleStr}`}
+                              >
+                                {taskTitleStr}
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {/* Assigner / Creator avatar alone with rich info tooltip */}
+                              {creatorName && (
+                                <Tooltip className="w-auto">
+                                  <TooltipTrigger asChild>
+                                    <div className="cursor-pointer">
+                                      <Avatar className="size-5 text-[9px] shrink-0 ring-1 ring-border/70 shadow-2xs">
+                                        {creatorAvatar && <AvatarImage src={creatorAvatar} alt={creatorName} />}
+                                        <AvatarFallback name={creatorName} className="text-[9px] font-bold">
+                                          {creatorName.charAt(0).toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" align="start" className="p-2.5 space-y-1.5 text-left min-w-[160px] bg-popover text-popover-foreground border border-border shadow-md rounded-md z-50">
+                                    <div className="flex items-center gap-2">
+                                      <Avatar className="size-6 text-[10px]">
+                                        {creatorAvatar && <AvatarImage src={creatorAvatar} alt={creatorName} />}
+                                        <AvatarFallback name={creatorName} className="font-bold">
+                                          {creatorName.charAt(0).toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-semibold text-xs text-foreground truncate">{creatorName}</p>
+                                        <p className="text-[10px] text-muted-foreground">{creatorRole}</p>
+                                      </div>
+                                    </div>
+                                    <div className="border-t border-border/50 pt-1.5 text-[10px] space-y-0.5 text-muted-foreground">
+                                      {createdAtStr && (
+                                        <p className="flex items-center justify-between gap-2">
+                                          <span>Created:</span>
+                                          <span className="font-mono text-foreground/80">{createdAtStr}</span>
+                                        </p>
+                                      )}
+                                      {updatedAtStr && updatedAtStr !== createdAtStr && (
+                                        <p className="flex items-center justify-between gap-2">
+                                          <span>Updated:</span>
+                                          <span className="font-mono text-foreground/80">{updatedAtStr}</span>
+                                        </p>
+                                      )}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
                           </div>
 
-                          {/* Task Title */}
-                          <h4 className="font-semibold text-xs text-foreground leading-snug">
-                            {taskTitleStr}
-                          </h4>
-
-                          {Boolean(taskDescStr) && (
-                            <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                              {taskDescStr}
-                            </p>
+                          {/* Middle: Description with "...more" link to view page (2.5 lines + inline more) or No description fallback */}
+                          {taskDescStr ? (
+                            <div className="text-[11px] text-muted-foreground leading-relaxed break-words [overflow-wrap:anywhere] break-all min-w-0 max-w-full overflow-hidden">
+                              {taskDescStr.length <= 110 ? (
+                                <span className="break-words [overflow-wrap:anywhere] break-all line-clamp-3 block">
+                                  {taskDescStr}
+                                </span>
+                              ) : (
+                                <div className="break-words [overflow-wrap:anywhere] break-all leading-normal">
+                                  <span>{taskDescStr.slice(0, 100)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/tasks/${taskCodeStr}`);
+                                    }}
+                                    className="inline-flex items-center text-[10px] font-bold text-primary hover:underline cursor-pointer ml-1 whitespace-nowrap"
+                                  >
+                                    ...more
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground/50 italic">No description</p>
                           )}
 
-                          {/* Card Footer: Project Badge & Assignees Count */}
-                          <div className="flex items-center justify-between pt-2 border-t border-border/40 text-[10px]">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {Boolean(task.projectId) && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary text-secondary-foreground text-[10px] font-medium border border-border/50">
-                                  <FolderGit2 size={10} className="text-emerald-500" />
-                                  <span className="truncate max-w-[90px]">
-                                    {typeof task.projectId === 'object' && task.projectId !== null
-                                      ? ((task.projectId as Record<string, unknown>).projectName as string)
-                                      : 'Project'}
-                                  </span>
+                          {/* Card Footer: Project / Team Badges in same single row & Assignees Avatar Group */}
+                          <div className="flex items-center justify-between pt-2 border-t border-border/40 text-[10px] gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                              {projName && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-secondary text-secondary-foreground text-[10px] font-medium border border-border/50 truncate shrink-0 max-w-[85px]" title={projName}>
+                                  <FolderGit2 size={10} className="text-primary shrink-0" />
+                                  <span className="truncate">{projName}</span>
+                                </span>
+                              )}
+                              {teamName && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-medium border border-blue-500/20 truncate shrink-0 max-w-[80px]" title={teamName}>
+                                  <Users size={10} className="shrink-0" />
+                                  <span className="truncate">{teamName}</span>
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium bg-secondary/50 px-1.5 py-0.5 rounded-md border border-border/40">
-                              <Users size={11} />
-                              <span>{assignedArr.length}</span>
+                            <div className="shrink-0">
+                              <GroupedAvatars
+                                members={mappedMembers}
+                                maxDisplay={3}
+                                size="xs"
+                                onClick={() => {
+                                  if (mappedMembers.length > 0) {
+                                    setRosterModal({
+                                      open: true,
+                                      title: `Task Assignees: ${taskTitleStr}`,
+                                      members: mappedMembers,
+                                    });
+                                  }
+                                }}
+                              />
                             </div>
                           </div>
                         </div>
@@ -640,6 +646,17 @@ export const Tasks: React.FC = () => {
           pageSize={pageSize}
           totalCount={filteredTasks.length}
           onPageChange={setCurrentPage}
+        />
+      )}
+
+      {/* Task Assignees Modal */}
+      {rosterModal && (
+        <RosterDetailModal
+          open={rosterModal.open}
+          onClose={() => setRosterModal(null)}
+          title={rosterModal.title}
+          members={rosterModal.members}
+          canManage={false}
         />
       )}
     </div>

@@ -7,10 +7,7 @@ export type MeetingJoinMode = 'INVITE_ONLY';
 export type MeetingParticipantRole = 'HOST' | 'MODERATOR' | 'MEMBER';
 export type MeetingParticipantStatus = 'INVITED' | 'JOINED' | 'LEFT';
 
-/**
- * Per-participant capabilities. A host can restrict an individual member
- * without affecting everyone else in the meeting.
- */
+/** Per-participant capabilities. A host can restrict an individual member without affecting everyone else in the meeting. */
 @modelOptions({ schemaOptions: { _id: false } })
 export class MeetingParticipantClass {
   @prop({ type: () => String, required: true, index: true })
@@ -53,7 +50,7 @@ export class MeetingParticipantClass {
 
 /** Default ceiling. An organization may lower it per meeting, never raise it. */
 export const MEETING_DEFAULT_PARTICIPANT_LIMIT = 50;
-export const MEETING_MAX_DURATION_MINUTES = 480;
+export const MEETING_MAX_DURATION_MINUTES = 1440;
 
 @modelOptions({
   schemaOptions: {
@@ -101,14 +98,14 @@ export class MeetingClass {
     this.organization_id = val;
   }
 
-  /** The roster a meeting may draw from. Members must belong to this project. */
-  @prop({ ref: () => 'ProjectClass', required: true, index: true, alias: 'projectId' })
-  public project_id!: Ref<'ProjectClass'>;
+  /** The roster a meeting may draw from. Optional for general/team meetings. */
+  @prop({ ref: () => 'ProjectClass', index: true, alias: 'projectId' })
+  public project_id?: Ref<'ProjectClass'>;
 
-  public get projectId(): Ref<'ProjectClass'> {
+  public get projectId(): Ref<'ProjectClass'> | undefined {
     return this.project_id;
   }
-  public set projectId(val: Ref<'ProjectClass'>) {
+  public set projectId(val: Ref<'ProjectClass'> | undefined) {
     this.project_id = val;
   }
 
@@ -122,7 +119,7 @@ export class MeetingClass {
     this.team_id = val;
   }
 
-  @prop({ type: () => String, enum: ['project', 'team', 'custom'], default: 'project' })
+  @prop({ type: () => String, enum: ['project', 'team', 'custom', 'organization', 'general'], default: 'project' })
   public scope?: string;
 
   @prop({ type: () => String, enum: ['SCHEDULED', 'INSTANT'], default: 'SCHEDULED', alias: 'meetingType' })
@@ -200,7 +197,7 @@ export class MeetingClass {
     this.meeting_scheduled_at = val;
   }
 
-  @prop({ type: () => Number, default: 30, alias: 'meetingDurationMinutes' })
+  @prop({ type: () => Number, default: 360, alias: 'meetingDurationMinutes' })
   public meeting_duration_minutes!: number;
 
   public get meetingDurationMinutes(): number {

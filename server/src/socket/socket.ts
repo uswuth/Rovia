@@ -2,16 +2,18 @@ import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
-import { corsOptions } from '../config/cors.js';
+import { socketCorsOptions } from '../config/cors.js';
 import { env } from '../config/env.js';
-import { Meeting } from '../models/meeting.model.js';
+import { Meeting, MeetingParticipantClass } from '../models/meeting.model.js';
+import { Project } from '../models/project.model.js';
+import { Team } from '../models/team.model.js';
 import {
   ServerToClientEvents,
   ClientToServerEvents,
   InterServerEvents,
-  SocketData
+  SocketData,
+  RaisedHand
 } from '../types/index.js';
-import { assertMeetingCanChat } from '../services/meeting.service.js';
 import { randomUUID } from 'node:crypto';
 
 type TypedSocketServer = SocketIOServer<
@@ -32,6 +34,7 @@ type TypedSocket = Socket<
 const MAX_CHAT_MESSAGE_CHARS = 2000;
 
 let io: TypedSocketServer | null = null;
+const meetingRaisedHands = new Map<string, RaisedHand[]>();
 
 export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
   io = new SocketIOServer<
@@ -40,14 +43,10 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
     InterServerEvents,
     SocketData
   >(httpServer, {
-    cors: corsOptions
+    cors: socketCorsOptions
   });
 
-  /**
-   * Verifies the handshake token and returns the caller's identity. The same
-   * JWT the REST API uses, so a socket client is exactly as trusted as a request.
-   * Rejects any connection without a valid JWT token.
-   */
+  /** Verifies the handshake token; a socket client is trusted exactly as much as a REST request. */
   const resolveIdentity = (
     token?: string
   ): { userId: string; organizationId: string; isSuperAdmin?: boolean } | null => {
@@ -81,11 +80,10 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
     socket.data.organizationId = identity.organizationId;
     socket.data.isSuperAdmin = identity.isSuperAdmin ?? false;
 
-    // Every socket joins a per-user room so signalling addressed to a userId
-    // (`io.to(user:<id>)`) always has a live target room to land in.
+    // Join a per-user room so `io.to(user:<id>)` signalling always has a live target.
     void socket.join(`user:${identity.userId}`);
 
-    socket.on('meeting:join', async (meetingId: string, ack?) => {
+    socket.on('meeting:join', async (meetingId: string, ack?: (result: { ok: boolean; peers?: string[]; error?: string }) => void) => {
       const userId = socket.data.userId ?? '';
       try {
         let meeting;
@@ -102,7 +100,6 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
 
         const realMeetingId = meeting._id.toString();
 
-        // Check Organization Access: meeting organization must match user's organization (unless SuperAdmin)
         const isOrgMember =
           socket.data.isSuperAdmin ||
           (socket.data.organizationId && meeting.organization_id.toString() === socket.data.organizationId);
@@ -112,17 +109,60 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
           return;
         }
 
-        // Check Project Team Roster Access: user must be on roster, creator, or superadmin
-        const isOnRoster = meeting.meeting_participants.some((p) => String(p.userId) === userId);
-        const isHostOrCreator = meeting.created_by.toString() === userId || socket.data.isSuperAdmin;
+        let hasAccess = Boolean(socket.data.isSuperAdmin || meeting.created_by.toString() === userId);
 
-        if (!isOnRoster && !isHostOrCreator) {
-          ack?.({ ok: false, error: 'Access denied: You are not assigned to this project team meeting' });
+        if (!hasAccess && meeting.meeting_participants.some((p) => String(p.userId) === userId)) {
+          hasAccess = true;
+        }
+
+        if (!hasAccess && meeting.team_id) {
+          const team = await Team.findById(meeting.team_id).lean();
+          if (team) {
+            const teamMembers = [...(team.team_hosts || []), ...(team.team_members || [])].map((id) => String(id));
+            if (teamMembers.includes(userId)) hasAccess = true;
+          }
+        }
+
+        if (!hasAccess && meeting.project_id) {
+          const project = await Project.findById(meeting.project_id).lean();
+          if (project) {
+            const projMembers = [
+              String(project.created_by || ''),
+              ...(project.project_hosts || []).map((id) => String(id)),
+              ...(project.project_members || []).map((id) => String(id)),
+            ];
+            if (projMembers.includes(userId)) hasAccess = true;
+          }
+        }
+
+        if (!hasAccess && !meeting.project_id && !meeting.team_id) {
+          // General / Org scope meeting: open to any member of the organization
+          hasAccess = isOrgMember;
+        }
+
+        if (!hasAccess) {
+          ack?.({ ok: false, error: 'Access denied: You do not have permission to join this meeting' });
           return;
         }
 
         await socket.join(`meeting:${realMeetingId}`);
         socket.data.meetingId = realMeetingId;
+        (socket.data as Record<string, unknown>).meetingCode = meeting.meeting_join_code;
+
+        let participantRecord = meeting.meeting_participants.find((p) => String(p.userId) === userId);
+        if (!participantRecord) {
+          participantRecord = new MeetingParticipantClass();
+          participantRecord.userId = userId;
+          participantRecord.participant_role = 'MEMBER';
+          participantRecord.participant_status = 'JOINED';
+          participantRecord.joined_at = new Date();
+          meeting.meeting_participants.push(participantRecord);
+        } else {
+          participantRecord.participant_status = 'JOINED';
+          participantRecord.joined_at = new Date();
+          participantRecord.left_at = null;
+        }
+        await meeting.save();
 
         const room = io?.sockets.adapter.rooms.get(`meeting:${realMeetingId}`);
         const live = new Set<string>();
@@ -136,27 +176,86 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
 
         ack?.({ ok: true, peers: Array.from(live) });
         socket.to(`meeting:${realMeetingId}`).emit('meeting:peer-joined', { userId });
+        const currentHands = meetingRaisedHands.get(realMeetingId) || [];
+        socket.emit('meeting:hands-updated', { hands: currentHands });
       } catch (error) {
         logger.error(`meeting:join failed: ${(error as Error).message}`);
         ack?.({ ok: false, error: (error as Error).message });
       }
     });
 
-    socket.on('meeting:leave', (meetingId: string) => {
+    socket.on('meeting:leave', async (meetingId: string) => {
       const targetId = socket.data.meetingId || meetingId;
+      const leavingUserId = socket.data.userId;
       void socket.leave(`meeting:${targetId}`);
       delete socket.data.meetingId;
-      socket.to(`meeting:${targetId}`).emit('meeting:peer-left', { userId: socket.data.userId ?? '' });
+      delete (socket.data as Record<string, unknown>).meetingCode;
+      socket.to(`meeting:${targetId}`).emit('meeting:peer-left', { userId: leavingUserId ?? '' });
+
+      if (targetId && leavingUserId) {
+        const hands = meetingRaisedHands.get(targetId);
+        if (hands && hands.some((h) => h.userId === leavingUserId)) {
+          const updated = hands.filter((h) => h.userId !== leavingUserId);
+          meetingRaisedHands.set(targetId, updated);
+          io?.to(`meeting:${targetId}`).emit('meeting:hands-updated', { hands: updated });
+        }
+      }
+
+      try {
+        const meeting = targetId.match(/^[0-9a-fA-F]{24}$/)
+          ? await Meeting.findById(targetId)
+          : await Meeting.findOne({ meeting_join_code: targetId });
+        if (meeting) {
+          const participantRecord = meeting.meeting_participants.find((p) => String(p.userId) === socket.data.userId);
+          if (participantRecord && participantRecord.participant_status !== 'LEFT') {
+            participantRecord.participant_status = 'LEFT';
+            participantRecord.left_at = new Date();
+            await meeting.save();
+          }
+        }
+      } catch {
+        // Non-critical
+      }
     });
 
-    // SDP and ICE are relayed untouched. The server never inspects media.
-    // Only a sender that actually joined this meeting may relay, and the target
-    // is the receiver's per-user room — never an arbitrary room name.
-    const relay = (event: 'webrtc:offer' | 'webrtc:answer' | 'webrtc:ice', field: string) => {
+    socket.on('meeting:end', async (meetingId: string) => {
+      const targetId = socket.data.meetingId || meetingId;
+      if (!targetId) return;
+
+      const userId = socket.data.userId;
+      if (!userId) return;
+
+      try {
+        const meeting = targetId.match(/^[0-9a-fA-F]{24}$/)
+          ? await Meeting.findById(targetId)
+          : await Meeting.findOne({ meeting_join_code: targetId });
+
+        if (!meeting) return;
+
+        const isCreator = meeting.created_by.toString() === userId;
+        const participant = meeting.meeting_participants.find((p) => String(p.userId) === userId);
+        const isHost = participant?.participant_role === 'HOST';
+        const isSuperAdmin = socket.data.isSuperAdmin;
+
+        if (!isCreator && !isHost && !isSuperAdmin) {
+          logger.warn(`Unauthorized meeting:end attempt by user ${userId} on meeting ${targetId}`);
+          return;
+        }
+
+        meetingRaisedHands.delete(targetId);
+        io?.to(`meeting:${targetId}`).emit('meeting:ended', { meetingId: targetId });
+      } catch (err) {
+        logger.error(`Error ending meeting via socket: ${(err as Error).message}`);
+      }
+    });
+
+    // SDP/ICE are relayed untouched; only a joined member may relay, and only to the target's user room.
+    const relay = (event: 'webrtc:offer' | 'webrtc:answer' | 'webrtc:ice', field: 'webrtc:offer' | 'webrtc:answer' | 'webrtc:ice') => {
       socket.on(event, (payload: { meetingId: string; to: string; [key: string]: unknown }) => {
         if (!payload?.meetingId || !payload?.to) return;
-        if (payload.meetingId !== socket.data.meetingId) return;
-        io?.to(`user:${payload.to}`).emit(field as keyof ServerToClientEvents, {
+        const meetingCode = (socket.data as Record<string, unknown>).meetingCode;
+        if (payload.meetingId !== socket.data.meetingId && payload.meetingId !== meetingCode) return;
+        io?.to(`user:${payload.to}`).emit(field, {
           from: socket.data.userId ?? '',
           ...payload,
         } as never);
@@ -175,11 +274,56 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       });
     });
 
-    /**
-     * In-meeting chat. Roster membership and can_use_chat are re-checked
-     * against the database on every message with the same guard the REST Q&A
-     * routes use, so a host disabling chat takes effect immediately.
-     */
+    socket.on('meeting:hand-raise', (payload: { meetingId: string; raised: boolean; userName?: string }) => {
+      const targetId = socket.data.meetingId || payload?.meetingId;
+      const userId = socket.data.userId;
+      if (!targetId || !userId) return;
+
+      let hands = meetingRaisedHands.get(targetId) || [];
+      if (payload.raised) {
+        if (!hands.some((h) => h.userId === userId)) {
+          hands = [...hands, { userId, userName: payload.userName, raisedAt: Date.now() }];
+        }
+      } else {
+        hands = hands.filter((h) => h.userId !== userId);
+      }
+      meetingRaisedHands.set(targetId, hands);
+      io?.to(`meeting:${targetId}`).emit('meeting:hands-updated', { hands });
+    });
+
+    socket.on('meeting:hand-lower', async (payload: { meetingId: string; userId?: string }) => {
+      const targetId = socket.data.meetingId || payload?.meetingId;
+      const callerId = socket.data.userId;
+      if (!targetId || !callerId) return;
+
+      const targetUserId = payload.userId || callerId;
+
+      if (targetUserId !== callerId) {
+        const meeting = targetId.match(/^[0-9a-fA-F]{24}$/)
+          ? await Meeting.findById(targetId)
+          : await Meeting.findOne({ meeting_join_code: targetId });
+
+        if (meeting) {
+          const isCreator = meeting.created_by.toString() === callerId;
+          const participant = meeting.meeting_participants.find((p) => String(p.userId) === callerId);
+          const isHost = participant?.participant_role === 'HOST';
+          if (!isCreator && !isHost && !socket.data.isSuperAdmin) {
+            return;
+          }
+        }
+      }
+
+      let hands = meetingRaisedHands.get(targetId) || [];
+      if (targetUserId === 'all') {
+        hands = [];
+      } else if (targetUserId) {
+        hands = hands.filter((h) => h.userId !== targetUserId);
+      }
+      meetingRaisedHands.set(targetId, hands);
+      io?.to(`meeting:${targetId}`).emit('meeting:hands-updated', { hands });
+    });
+
+    /** Chat: can_use_chat is re-checked against the DB per message, so a host disable takes effect at once. */
     socket.on(
       'meeting:message',
       async (
@@ -188,7 +332,12 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       ) => {
         try {
           const joinedMeetingId = socket.data.meetingId ?? '';
-          if (!payload?.meetingId || !joinedMeetingId || payload.meetingId !== joinedMeetingId) {
+          const meetingCode = (socket.data as Record<string, unknown>).meetingCode as string | undefined;
+          if (!payload?.meetingId || !joinedMeetingId) {
+            ack?.({ ok: false, error: 'You are not in this meeting' });
+            return;
+          }
+          if (payload.meetingId !== joinedMeetingId && payload.meetingId !== meetingCode) {
             ack?.({ ok: false, error: 'You are not in this meeting' });
             return;
           }
@@ -202,20 +351,24 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
             return;
           }
 
-          const meeting = await Meeting.findOne({
-            _id: joinedMeetingId,
-            organization_id: socket.data.organizationId
-          });
+          const meeting = await Meeting.findById(joinedMeetingId);
           if (!meeting) {
             ack?.({ ok: false, error: 'Meeting not found' });
             return;
           }
-          assertMeetingCanChat(meeting, socket.data.userId ?? '');
+
+          const userId = socket.data.userId ?? '';
+          const isCreator = meeting.created_by.toString() === userId;
+          const participant = meeting.meeting_participants.find((p) => String(p.userId) === userId);
+          if (participant && participant.can_use_chat === false && !isCreator) {
+            ack?.({ ok: false, error: 'Chat is disabled for you in this meeting' });
+            return;
+          }
 
           io?.to(`meeting:${joinedMeetingId}`).emit('meeting:message', {
             messageId: randomUUID(),
-            meetingId: joinedMeetingId,
-            from: socket.data.userId ?? '',
+            meetingId: payload.meetingId,
+            from: userId,
             text,
             at: new Date().toISOString()
           });
@@ -226,12 +379,28 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       }
     );
 
+    socket.on('meeting:typing', (payload: { meetingId: string; isTyping: boolean; userName?: string }) => {
+      const targetId = socket.data.meetingId || payload?.meetingId;
+      if (!targetId) return;
+      socket.to(`meeting:${targetId}`).emit('meeting:typing', {
+        userId: socket.data.userId ?? '',
+        userName: payload.userName || '',
+        isTyping: Boolean(payload.isTyping)
+      });
+    });
+
     socket.on('disconnect', (reason: string) => {
       logger.info(`Socket client disconnected: ${socket.id} (reason: ${reason})`);
       const meetingId = socket.data.meetingId;
       const userId = socket.data.userId;
       if (meetingId && userId) {
         socket.to(`meeting:${meetingId}`).emit('meeting:peer-left', { userId });
+        const hands = meetingRaisedHands.get(meetingId);
+        if (hands && hands.some((h) => h.userId === userId)) {
+          const updated = hands.filter((h) => h.userId !== userId);
+          meetingRaisedHands.set(meetingId, updated);
+          io?.to(`meeting:${meetingId}`).emit('meeting:hands-updated', { hands: updated });
+        }
       }
     });
   });

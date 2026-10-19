@@ -15,7 +15,6 @@ import {
 
 const router: Router = Router();
 
-// All project routes require authentication
 router.use(authenticateUser);
 
 /**

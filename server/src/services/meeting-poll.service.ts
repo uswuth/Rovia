@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { MeetingPoll, MeetingPollDocument, MeetingPollOptionClass } from '../models/meeting-poll.model.js';
 import { ApiError } from '../utils/apiError.js';
-import { assertObjectId } from '../utils/objectId.js';
+import { assertObjectId, toObjectIdString } from '../utils/objectId.js';
 import { requireOrganizationId } from '../utils/scope.js';
 import { findPaginated } from '../utils/paginatedFind.js';
 import { findScopedMeeting, assertMeetingParticipant } from './meeting.service.js';
@@ -22,16 +22,31 @@ export const createPollService = async (
   userId: string,
   pollQuestion: string,
   optionTexts: string[],
-  multipleChoice: boolean
+  multipleChoice: boolean = false,
+  userRole?: string
 ): Promise<MeetingPollDocument> => {
   requireOrganizationId(organizationId, 'create a poll');
   assertObjectId(meetingId, 'meetingId');
 
   const meeting = await findScopedMeeting(meetingId, organizationId);
   const participant = assertMeetingParticipant(meeting, userId);
-  const isManager = participant.participant_role === 'HOST' || participant.participant_role === 'MODERATOR';
+  const isCreator = toObjectIdString(meeting.created_by) === userId;
+  const isSuperOrAdmin = Boolean(
+    userRole && ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes(userRole.toUpperCase())
+  );
+  const pRole = (participant.participant_role || '').toUpperCase();
+  const isManager = isCreator || isSuperOrAdmin || pRole === 'HOST' || pRole === 'MODERATOR';
   if (!isManager) {
     throw ApiError.forbidden('Only a meeting host or moderator can create a poll');
+  }
+
+  const existingOpenPoll = await MeetingPoll.findOne({
+    meeting_id: meetingId,
+    organization_id: organizationId,
+    poll_status: 'OPEN',
+  });
+  if (existingOpenPoll) {
+    throw ApiError.badRequest('An active poll is already running in this meeting. Close it before creating a new one.');
   }
 
   const question = (pollQuestion || '').trim();
@@ -124,7 +139,8 @@ export const closePollService = async (
   meetingId: string,
   pollId: string,
   organizationId: string,
-  userId: string
+  userId: string,
+  userRole?: string
 ): Promise<MeetingPollDocument> => {
   requireOrganizationId(organizationId, 'close a poll');
   assertObjectId(meetingId, 'meetingId');
@@ -132,7 +148,12 @@ export const closePollService = async (
 
   const meeting = await findScopedMeeting(meetingId, organizationId);
   const participant = assertMeetingParticipant(meeting, userId);
-  const isManager = participant.participant_role === 'HOST' || participant.participant_role === 'MODERATOR';
+  const isCreator = toObjectIdString(meeting.created_by) === userId;
+  const isSuperOrAdmin = Boolean(
+    userRole && ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes(userRole.toUpperCase())
+  );
+  const pRole = (participant.participant_role || '').toUpperCase();
+  const isManager = isCreator || isSuperOrAdmin || pRole === 'HOST' || pRole === 'MODERATOR';
   if (!isManager) {
     throw ApiError.forbidden('Only a meeting host or moderator can close a poll');
   }

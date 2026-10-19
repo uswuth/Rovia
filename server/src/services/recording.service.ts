@@ -10,7 +10,6 @@ import { findPaginated } from '../utils/paginatedFind.js';
 import { USER_SELECT } from '../utils/projections.js';
 import {
   MAX_PENDING_RECORDINGS_PER_ORG,
-  MAX_RECORDING_DURATION_MS,
   MAX_RECORDING_SIZE_BYTES,
   UPLOAD_URL_TTL_SECONDS,
   DOWNLOAD_URL_TTL_SECONDS,
@@ -26,10 +25,7 @@ const RECORDING_POPULATE = [
   { path: 'created_by', select: USER_SELECT }
 ];
 
-/**
- * Every recording lookup is tenant-scoped: an id alone never grants access.
- * Recording.findById(id) must never appear in this file.
- */
+/** Every recording lookup is tenant-scoped: an id alone never grants access. Recording.findById(id) must never appear in this file. */
 const findScopedRecording = async (recordingId: string, organizationId: string): Promise<RecordingDocument> => {
   const recording = await Recording.findOne({ _id: recordingId, organization_id: organizationId });
   if (!recording) {
@@ -89,12 +85,23 @@ export const createRecordingService = async (
     meeting_id: input.meetingId ?? null,
     recording_expires_at: recordingExpiresAt()
   });
-  // Key is built from OUR organization id and OUR id, never from the request.
+  // Keys are built from OUR organization id and OUR id, never from the request.
+  // Each speaker gets its own object so tracks can be transcribed independently.
   recording.storage_key = buildRecordingStorageKey(
     organizationId,
     recordingId.toString(),
-    declaredType
+    declaredType,
+    0
   );
+  recording.recording_speakers = (input.speakers ?? []).map((speaker, speakerIndex) => ({
+    speakerId: speaker.speakerId,
+    speakerName: (speaker.speakerName ?? '').trim(),
+    speakerIndex,
+    storageKey: buildRecordingStorageKey(organizationId, recordingId.toString(), declaredType, speakerIndex),
+    mimeType: declaredType,
+    sizeBytes: 0,
+    uploaded: false
+  }));
   await recording.save();
 
   return recording;
@@ -102,7 +109,8 @@ export const createRecordingService = async (
 
 export const getRecordingUploadUrlService = async (
   recordingId: string,
-  organizationId: string
+  organizationId: string,
+  speakerIndex = 0
 ): Promise<{ uploadUrl: string; expiresIn: number; maxSizeBytes: number }> => {
   requireOrganizationId(organizationId, 'upload a recording');
   assertObjectId(recordingId, 'recordingId');
@@ -112,8 +120,15 @@ export const getRecordingUploadUrlService = async (
     throw ApiError.badRequest(`Recording is not awaiting upload (status: ${recording.recording_status})`);
   }
 
+  // The speaker's own server-derived key, never one from the request. A bad
+  // index must fail here rather than silently signing speaker 0's object twice.
+  const speaker = recording.recording_speakers[speakerIndex];
+  if (!speaker) {
+    throw ApiError.badRequest(`No speaker at index ${speakerIndex} on this recording`);
+  }
+
   // Re-signing the server-derived key is safe and lets a failed upload retry.
-  const uploadUrl = await createUploadUrl(recording.storage_key, recording.recording_mime_type, UPLOAD_URL_TTL_SECONDS);
+  const uploadUrl = await createUploadUrl(speaker.storageKey, speaker.mimeType, UPLOAD_URL_TTL_SECONDS);
 
   return { uploadUrl, expiresIn: UPLOAD_URL_TTL_SECONDS, maxSizeBytes: MAX_RECORDING_SIZE_BYTES };
 };
@@ -132,36 +147,61 @@ export const completeRecordingService = async (
     throw ApiError.badRequest(`Recording is not awaiting upload (status: ${recording.recording_status})`);
   }
 
-  // HeadObject is authoritative for both type and size. Nothing the client
-  // claimed about its own upload is trusted.
-  const metadata = await headObject(recording.storage_key);
-  if (!metadata.exists) {
-    throw ApiError.badRequest('Uploaded object was not found in storage');
-  }
-  if (!metadata.contentType || !isAllowedRecordingMimeType(metadata.contentType)) {
-    await deleteObject(recording.storage_key).catch(() => undefined);
-    recording.recording_status = 'FAILED';
-    await recording.save();
-    throw ApiError.badRequest('Uploaded object has an unsupported content type');
-  }
-  const sizeBytes = metadata.contentLength ?? 0;
-  if (sizeBytes <= 0) {
-    await deleteObject(recording.storage_key).catch(() => undefined);
-    recording.recording_status = 'FAILED';
-    await recording.save();
-    throw ApiError.badRequest('Uploaded object is empty');
-  }
-  if (sizeBytes > MAX_RECORDING_SIZE_BYTES) {
-    // Policy limit enforced against the real object, then removed.
-    await deleteObject(recording.storage_key).catch(() => undefined);
-    recording.recording_status = 'FAILED';
-    await recording.save();
-    throw ApiError.badRequest('Uploaded object exceeds the maximum recording size');
+  if (recording.recording_speakers.length === 0) {
+    throw ApiError.badRequest('Recording has no speaker tracks to complete');
   }
 
-  recording.recording_mime_type = metadata.contentType;
-  recording.recording_size_bytes = sizeBytes;
-  recording.recording_duration_ms = Math.max(0, Math.min(durationMs, MAX_RECORDING_DURATION_MS));
+  let totalBytes = 0;
+  const failed = await Promise.all(
+    recording.recording_speakers.map(async (speaker) => {
+      // HeadObject is authoritative for both type and size. Nothing the client
+      // claimed about its own upload is trusted.
+      const metadata = await headObject(speaker.storageKey);
+      if (!metadata.exists) {
+        await deleteObject(speaker.storageKey).catch(() => undefined);
+        return `No audio was uploaded for ${speaker.speakerName || 'a participant'}`;
+      }
+      if (!metadata.contentType || !isAllowedRecordingMimeType(metadata.contentType)) {
+        await deleteObject(speaker.storageKey).catch(() => undefined);
+        return `The audio for ${speaker.speakerName || 'a participant'} has an unsupported format`;
+      }
+      const sizeBytes = metadata.contentLength ?? 0;
+      if (sizeBytes <= 0) {
+        await deleteObject(speaker.storageKey).catch(() => undefined);
+        return `The audio for ${speaker.speakerName || 'a participant'} is empty`;
+      }
+      if (sizeBytes > MAX_RECORDING_SIZE_BYTES) {
+        // Policy limit enforced against the real object, then removed.
+        await deleteObject(speaker.storageKey).catch(() => undefined);
+        return `The audio for ${speaker.speakerName || 'a participant'} is too large`;
+      }
+      speaker.mimeType = metadata.contentType;
+      speaker.sizeBytes = sizeBytes;
+      speaker.uploaded = true;
+      totalBytes += sizeBytes;
+      return null;
+    })
+  );
+
+  const problem = failed.find((message) => message !== null);
+  if (problem) {
+    // One bad track fails the recording rather than silently producing a
+    // transcript that is missing a participant.
+    await Promise.all(
+      recording.recording_speakers
+        .filter((speaker) => speaker.uploaded)
+        .map((speaker) => deleteObject(speaker.storageKey).catch(() => undefined))
+    );
+    recording.recording_status = 'FAILED';
+    await recording.save();
+    throw ApiError.badRequest(problem);
+  }
+
+  recording.recording_mime_type = recording.recording_speakers[0].mimeType;
+  recording.recording_size_bytes = totalBytes;
+  // Recorded as measured by the browser. There is no ceiling: a long meeting is
+  // legitimate input, and the value is only ever reported back, never enforced.
+  recording.recording_duration_ms = Math.max(0, durationMs);
   recording.recording_status = 'READY';
   recording.recording_expires_at = recordingExpiresAt();
   await recording.save();

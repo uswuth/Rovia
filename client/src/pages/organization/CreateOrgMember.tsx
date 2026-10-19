@@ -23,7 +23,6 @@ import {
   getAllUsersAdminApi,
 } from '@/api/organization/organization.api';
 import { getWorkRolesApi } from '@/api/work-roles/work-roles.api';
-import { getJobTitles } from '@/api/job-title/job-title.api';
 import { parseApiError } from '@/utils/apiError';
 import { extractApiItems } from '@/utils/apiResponse';
 
@@ -31,7 +30,7 @@ const memberFormSchema = z.object({
   userName: z.string().trim().min(2, 'Member name must be at least 2 characters'),
   userEmail: z.string().trim().email('Valid email address is required'),
   password: z.string().optional(),
-  userRole: z.enum(['Admin', 'Member']),
+  userRole: z.enum(['SuperAdmin', 'Admin', 'Member']),
   userStatus: z.enum(['ACTIVE', 'SUSPENDED', 'DEACTIVATED']),
   jobTitle: z.string().trim().optional(),
 });
@@ -68,11 +67,11 @@ export const CreateOrgMember: React.FC = () => {
   const isAdmin = Boolean(isSuperAdmin || user?.userRole === 'Admin');
 
   const [jobTitleOptions, setJobTitleOptions] = useState<string[]>([]);
+  const [isTargetSuperAdmin, setIsTargetSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState('');
 
-  // Derive organization ID
   const organizationId = typeof user?.organizationId === 'object'
     ? ((user.organizationId as unknown as Record<string, unknown>)?._id as string) || ((user.organizationId as unknown as Record<string, unknown>)?.organizationId as string) || ''
     : user?.organizationId || '';
@@ -93,20 +92,14 @@ export const CreateOrgMember: React.FC = () => {
     let isMounted = true;
     const loadJobTitles = async () => {
       try {
-        const [wrRes, jtRes] = await Promise.allSettled([getWorkRolesApi(), getJobTitles()]);
+        const wrRes = await Promise.allSettled([getWorkRolesApi()]);
         if (!isMounted) return;
 
         const titlesSet = new Set<string>();
 
-        if (wrRes.status === 'fulfilled') {
-          extractApiItems<Record<string, string>>(wrRes.value).forEach((r) => {
+        if (wrRes[0].status === 'fulfilled') {
+          extractApiItems<Record<string, string>>(wrRes[0].value).forEach((r) => {
             if (r.roleName) titlesSet.add(r.roleName);
-          });
-        }
-
-        if (jtRes.status === 'fulfilled') {
-          extractApiItems<Record<string, string>>(jtRes.value).forEach((j) => {
-            if (j.title) titlesSet.add(j.title);
           });
         }
 
@@ -129,11 +122,13 @@ export const CreateOrgMember: React.FC = () => {
           const found = usersList.find((u) => u.userId === id || u._id === id);
 
           if (found) {
+            const isTargetSA = found.userRole === 'SuperAdmin' || Boolean(found.isSuperAdmin);
+            setIsTargetSuperAdmin(isTargetSA);
             reset({
               userName: found.userName || '',
               userEmail: found.userEmail || '',
               password: '',
-              userRole: found.userRole === 'Admin' ? 'Admin' : 'Member',
+              userRole: isTargetSA ? 'SuperAdmin' : found.userRole === 'Admin' ? 'Admin' : 'Member',
               userStatus: (found.userStatus as 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED') || 'ACTIVE',
               jobTitle: found.jobTitle || '',
             });
@@ -203,11 +198,10 @@ export const CreateOrgMember: React.FC = () => {
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
       <div className="max-w-3xl mx-auto space-y-6">
-        {/* Header Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
-              <UserPlus size={24} className="text-emerald-500" />
+              <UserPlus size={24} className="text-primary" />
               <span>{isEditMode ? 'Edit Member' : 'Add Member'}</span>
             </h1>
           </div>
@@ -228,8 +222,20 @@ export const CreateOrgMember: React.FC = () => {
             <Input id="user-name" {...register('userName')} />
           </FormField>
 
-          <FormField label="Email Address" htmlFor="user-email" required error={errors.userEmail?.message}>
-            <Input id="user-email" type="email" {...register('userEmail')} />
+          <FormField
+            label="Email Address"
+            htmlFor="user-email"
+            required
+            error={errors.userEmail?.message}
+            hint={isEditMode ? 'Email address is locked and cannot be changed.' : undefined}
+          >
+            <Input
+              id="user-email"
+              type="email"
+              disabled={isEditMode}
+              className={isEditMode ? 'opacity-70 cursor-not-allowed bg-muted/30 font-mono text-xs' : ''}
+              {...register('userEmail')}
+            />
           </FormField>
 
           {!isEditMode && (
@@ -251,67 +257,85 @@ export const CreateOrgMember: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Role" htmlFor="user-role" required error={errors.userRole?.message}>
-              <Controller
-                control={control}
-                name="userRole"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={(val) => {
-                      if (val) field.onChange(val);
-                    }}
-                  >
-                    <SelectTrigger id="user-role" className="w-full">
-                      <SelectValue placeholder="Select Role">
-                        {(val: unknown) => {
-                          if (!val) return 'Select Role';
-                          const opt = ROLE_OPTIONS.find((r) => r.value === val);
-                          return opt ? opt.label : String(val);
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROLE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
+              {isTargetSuperAdmin ? (
+                <div className="flex items-center gap-2 h-10 px-3 border border-border/80 bg-muted/30 rounded-md select-none">
+                  <span className="font-semibold text-xs text-foreground">SuperAdmin</span>
+                  <span className="text-[10px] text-primary font-medium bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-sm">
+                    Org Owner (Locked)
+                  </span>
+                </div>
+              ) : (
+                <Controller
+                  control={control}
+                  name="userRole"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(val) => {
+                        if (val) field.onChange(val);
+                      }}
+                    >
+                      <SelectTrigger id="user-role" className="w-full">
+                        <SelectValue placeholder="Select Role">
+                          {(val: unknown) => {
+                            if (!val) return 'Select Role';
+                            const opt = ROLE_OPTIONS.find((r) => r.value === val);
+                            return opt ? opt.label : String(val);
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              )}
             </FormField>
 
             <FormField label="Status" htmlFor="user-status" required error={errors.userStatus?.message}>
-              <Controller
-                control={control}
-                name="userStatus"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={(val) => {
-                      if (val) field.onChange(val);
-                    }}
-                  >
-                    <SelectTrigger id="user-status" className="w-full">
-                      <SelectValue placeholder="Select Status">
-                        {(val: unknown) => {
-                          if (!val) return 'Select Status';
-                          const opt = STATUS_OPTIONS.find((s) => s.value === val);
-                          return opt ? opt.label : String(val);
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
+              {isTargetSuperAdmin ? (
+                <div className="flex items-center gap-2 h-10 px-3 border border-border/80 bg-muted/30 rounded-md select-none">
+                  <span className="font-semibold text-xs text-foreground">Active</span>
+                  <span className="text-[10px] text-primary font-medium bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-sm">
+                    Locked
+                  </span>
+                </div>
+              ) : (
+                <Controller
+                  control={control}
+                  name="userStatus"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(val) => {
+                        if (val) field.onChange(val);
+                      }}
+                    >
+                      <SelectTrigger id="user-status" className="w-full">
+                        <SelectValue placeholder="Select Status">
+                          {(val: unknown) => {
+                            if (!val) return 'Select Status';
+                            const opt = STATUS_OPTIONS.find((s) => s.value === val);
+                            return opt ? opt.label : String(val);
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              )}
             </FormField>
           </div>
 

@@ -7,6 +7,8 @@ export interface EnvConfig {
   JWT_ACCESS_EXPIRY: string;
   JWT_REFRESH_SECRET: string;
   JWT_REFRESH_EXPIRY: string;
+  ROOT_SHARED_SECRET: string;
+  SERVER_ADMIN_INITIAL_PASSWORD?: string;
   AWS_ENDPOINT_URL?: string;
   AWS_PUBLIC_ENDPOINT_URL?: string;
   AWS_REGION?: string;
@@ -15,10 +17,13 @@ export interface EnvConfig {
   AWS_S3_BUCKET?: string;
   CLIENT_URL?: string;
   FFMPEG_PATH?: string;
-  WHISPER_BASE_URL?: string;
-  WHISPER_MODEL?: string;
-  WHISPER_TIMEOUT_MS?: number;
-  OLLAMA_BASE_URL?: string;
-  OLLAMA_MODEL?: string;
-  OLLAMA_TIMEOUT_MS?: number;
+  GROQ_API_KEY?: string;
+  GROQ_BASE_URL?: string;
+  GROQ_TRANSCRIBE_MODEL?: string;
+  GROQ_TIMEOUT_MS?: number;
+  OPENROUTER_API_KEY?: string;
+  OPENROUTER_BASE_URL?: string;
+  OPENROUTER_SUMMARY_MODEL?: string;
+  OPENROUTER_FALLBACK_MODELS?: string[];
+  OPENROUTER_TIMEOUT_MS?: number;
 }

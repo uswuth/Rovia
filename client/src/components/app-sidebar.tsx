@@ -21,8 +21,9 @@ export function AppSidebar({
 }: React.ComponentProps<typeof Sidebar>) {
   const { user, logout } = useAuth()
   const { state } = useSidebar()
-  const isSuperAdmin = user?.userRole === 'SuperAdmin' || user?.isSuperAdmin
-  const isAdmin = isSuperAdmin || user?.userRole === 'Admin'
+  const userRoleUpper = (user?.userRole || '').toUpperCase();
+  const isSuperAdmin = userRoleUpper === 'SUPERADMIN' || userRoleUpper === 'SUPER_ADMIN' || Boolean(user?.isSuperAdmin);
+  const isAdmin = isSuperAdmin || userRoleUpper === 'ADMIN';
 
   const navMain = [
     {
@@ -124,7 +125,7 @@ export function AppSidebar({
           </div>
           {state === "expanded" && (
             <span className="font-bold text-[15px] tracking-tight text-foreground truncate leading-none flex items-center">
-              Intell<span className="text-emerald-600 dark:text-emerald-400 font-extrabold ml-0.5">Meet</span>
+              Intell<span className="text-primary font-extrabold ml-0.5">Meet</span>
             </span>
           )}
         </Link>

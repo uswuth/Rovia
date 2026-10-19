@@ -9,7 +9,7 @@ interface PopoverContextType {
 
 const PopoverContext = React.createContext<PopoverContextType>({
   open: false,
-  setOpen: () => {},
+  setOpen: () => { },
 })
 
 export function Popover({
@@ -59,10 +59,33 @@ export function PopoverTrigger({
 
   if (render) {
     return React.cloneElement(render, {
-      onClick: (e: React.MouseEvent<HTMLElement>) => {
+      ...props,
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation()
-        render.props?.onClick?.(e)
+        props.onClick?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onClick?.(e)
         toggleOpen()
+      },
+      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+        props.onMouseEnter?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onMouseEnter?.(e)
+      },
+      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+        props.onMouseLeave?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onMouseLeave?.(e)
+      },
+      onFocus: (e: React.FocusEvent<HTMLButtonElement>) => {
+        props.onFocus?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onFocus?.(e)
+      },
+      onBlur: (e: React.FocusEvent<HTMLButtonElement>) => {
+        props.onBlur?.(e)
+        const renderProps = render.props as React.DOMAttributes<HTMLButtonElement> | undefined
+        renderProps?.onBlur?.(e)
       },
       "aria-expanded": open,
       className: cn(render.props?.className, className),
@@ -89,17 +112,20 @@ export function PopoverContent({
   align = "start",
   side = "bottom",
   sideOffset = 4,
+  closeOnClickOutside = true,
   ...props
 }: React.ComponentProps<"div"> & {
   align?: "start" | "center" | "end"
   side?: "top" | "bottom" | "left" | "right"
   sideOffset?: number
+  closeOnClickOutside?: boolean
 }) {
   const { open, setOpen } = React.useContext(PopoverContext)
   const contentRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (!closeOnClickOutside) return
       if (contentRef.current && !contentRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
@@ -116,7 +142,7 @@ export function PopoverContent({
         document.removeEventListener("keydown", handleKeyDown)
       }
     }
-  }, [open, setOpen])
+  }, [open, setOpen, closeOnClickOutside])
 
   if (!open) return null
 
@@ -141,11 +167,11 @@ export function PopoverContent({
         side === "top"
           ? { marginBottom: `${sideOffset}px` }
           : side === "bottom"
-          ? { marginTop: `${sideOffset}px` }
-          : undefined
+            ? { marginTop: `${sideOffset}px` }
+            : undefined
       }
       className={cn(
-        "absolute z-50 rounded-lg border border-border bg-card p-3 text-card-foreground shadow-xl outline-none animate-in fade-in-0 zoom-in-95",
+        "absolute z-50 rounded-xs border border-border bg-card p-3 text-card-foreground shadow-xl outline-none animate-in fade-in-0 zoom-in-95",
         sideClasses[side] || sideClasses.bottom,
         alignClasses[align],
         className

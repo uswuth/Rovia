@@ -83,7 +83,7 @@ export function NavUser({
               <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {theme === "dark" ? (
-                    <MoonIcon size={14} className="text-emerald-400" />
+                    <MoonIcon size={14} className="text-primary" />
                   ) : (
                     <SunIcon size={14} className="text-amber-400" />
                   )}

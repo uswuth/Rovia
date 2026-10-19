@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-// Sanitize helpers
 const sanitizedString = (min: number, label: string) =>
   z.string().trim().min(min, `${label} must be at least ${min} characters`);
 
@@ -23,8 +22,12 @@ export const signupSchema = z
       .toLowerCase(),
     password: z
       .string()
-      .min(6, 'Password must be at least 6 characters')
-      .max(72, 'Password is too long'),
+      .min(8, 'Password must be at least 8 characters')
+      .max(72, 'Password is too long')
+      .regex(
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+        'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
+      ),
     isCreatingOrg: z.boolean(),
     organizationName: z.string().trim().optional(),
     organizationLocation: z.string().trim().optional(),

@@ -5,17 +5,23 @@ import { env } from '../config/env.js';
 import { IHealthData, IReadinessData } from '../types/index.js';
 
 export const getHealth = (_req: Request, res: Response): Response => {
+  const isProd = env.NODE_ENV === 'production';
+
   const healthData: IHealthData = {
     service: 'IntellMeet Backend API',
     status: 'healthy',
-    environment: env.NODE_ENV,
-    uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     database: getDBStatus(),
-    memory: {
-      rssMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
-      heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
-    }
+    ...(isProd
+      ? {}
+      : {
+          environment: env.NODE_ENV,
+          uptimeSeconds: Math.floor(process.uptime()),
+          memory: {
+            rssMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+            heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+          }
+        })
   };
 
   return ApiResponse.success<IHealthData>(res, 'IntellMeet Server is healthy', healthData, 200);

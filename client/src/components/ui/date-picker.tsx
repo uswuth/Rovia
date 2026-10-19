@@ -11,10 +11,10 @@ import {
 } from "@/components/ui/popover"
 
 export interface DateTimePickerProps {
-  value?: string // ISO string format: YYYY-MM-DDTHH:mm
-  onChange?: (value: string) => void
-  disabled?: boolean
-  id?: string
+  value?: string;
+  onChange?: (value: string) => void;
+  disabled?: boolean;
+  id?: string;
 }
 
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"))
@@ -68,8 +68,8 @@ const TimeScrollColumn: React.FC<TimeScrollColumnProps> = ({
               className={cn(
                 "w-full h-8 flex items-center justify-center rounded-md text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
                 isSelected
-                  ? "bg-emerald-500 text-white font-bold shadow-xs scale-102"
-                  : "text-foreground hover:bg-secondary hover:text-emerald-500"
+                  ? "bg-primary text-primary-foreground font-bold shadow-xs scale-102"
+                  : "text-foreground hover:bg-secondary hover:text-primary"
               )}
             >
               {item}
@@ -81,10 +81,7 @@ const TimeScrollColumn: React.FC<TimeScrollColumnProps> = ({
   )
 }
 
-/**
- * Shadcn UI Date & Dynamic Time Picker component.
- * Provides interactive Popover Calendar for Date & dynamic Hours/Minutes/AM-PM picker for Time.
- */
+/** Shadcn UI Date & Dynamic Time Picker component. Provides interactive Popover Calendar for Date & dynamic Hours/Minutes/AM-PM picker for Time. */
 export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerProps>(
   ({ value, onChange, disabled, id }, ref) => {
     const [dateOpen, setDateOpen] = React.useState(false)
@@ -216,7 +213,7 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
               <div className="space-y-3">
                 {/* Header readout */}
                 <div className="text-center py-1 bg-secondary/50 rounded-md border border-border">
-                  <span className="text-sm font-bold text-emerald-500 tracking-wider">
+                  <span className="text-sm font-bold text-primary tracking-wider">
                     {formattedTimeDisplay}
                   </span>
                 </div>
@@ -248,7 +245,7 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
                         onClick={() => updateTime(selectedHour, selectedMinute, "AM")}
                         className={cn(
                           "w-full py-2 text-center rounded-md text-xs font-semibold transition-colors border border-border hover:bg-secondary cursor-pointer",
-                          selectedPeriod === "AM" && "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600 shadow-xs"
+                          selectedPeriod === "AM" && "bg-primary text-primary-foreground border-primary hover:opacity-90 shadow-xs"
                         )}
                       >
                         AM
@@ -258,7 +255,7 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
                         onClick={() => updateTime(selectedHour, selectedMinute, "PM")}
                         className={cn(
                           "w-full py-2 text-center rounded-md text-xs font-semibold transition-colors border border-border hover:bg-secondary cursor-pointer",
-                          selectedPeriod === "PM" && "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600 shadow-xs"
+                          selectedPeriod === "PM" && "bg-primary text-primary-foreground border-primary hover:opacity-90 shadow-xs"
                         )}
                       >
                         PM

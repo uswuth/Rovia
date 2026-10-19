@@ -6,9 +6,6 @@ export { ENTITY_PREFIXES, type EntityPrefix };
 // Non-ambiguous character pool (excludes 0, O, 1, I, L to prevent user confusion)
 const CHAR_POOL = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
-/**
- * Generates a cryptographically secure, hard-shuffled random string of specified length.
- */
 export const generateHardShuffledCode = (length = 6): string => {
   const randomBytes = crypto.randomBytes(length * 2);
   let result = '';
@@ -21,18 +18,11 @@ export const generateHardShuffledCode = (length = 6): string => {
   return result;
 };
 
-/**
- * Format helper to clean and normalize prefixes (uppercase alphanumeric only)
- */
 export const cleanPrefix = (prefix: string, maxLen = 6, fallback = 'INTEL'): string => {
   const cleaned = (prefix || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, maxLen);
   return cleaned.length > 0 ? cleaned : fallback;
 };
 
-/**
- * Formats a prefix and number into a padded sequential code string.
- * Example: formatSequentialCode('PRJT', 0) -> 'PRJT001'
- */
 export const formatSequentialCode = (prefix: EntityPrefix, count: number): string => {
   const normalizedPrefix = cleanPrefix(prefix, 6, 'CODE');
   const nextNum = (count + 1).toString().padStart(3, '0');
@@ -44,12 +34,6 @@ export interface CodeGeneratorModel {
   findOne(query: Record<string, unknown>): { lean(): Promise<unknown> } | Promise<unknown>;
 }
 
-/**
- * Dynamic Universal Code Generator with Collision Detection.
- * Reads prefixes from ENTITY_PREFIXES registry or any feature slug string.
- * Throws a clear error if the prefix is missing or invalid.
- * Automatically checks the database for duplicates to guarantee 100% collision-free codes.
- */
 export const generateSequentialCode = async (
   prefix: EntityPrefix,
   model: CodeGeneratorModel,
@@ -83,20 +67,12 @@ export const generateSequentialCode = async (
   return code;
 };
 
-/**
- * 1. Organization Invite Code Generator
- * Format: [ORG_PREFIX]-[HARD_SHUFFLED_CODE] (e.g., ACME-K9X3P7)
- */
 export const generateOrgInviteCode = (orgSlugOrName: string): string => {
   const prefix = cleanPrefix(orgSlugOrName, 4, ENTITY_PREFIXES.ORGANIZATION);
   const shuffle = generateHardShuffledCode(6);
   return `${prefix}-${shuffle}`;
 };
 
-/**
- * 2. Project Code Generator
- * Uses sequential PRJT001 format
- */
 export const generateProjectCode = async (
   model: CodeGeneratorModel,
   organizationId?: string
@@ -105,10 +81,6 @@ export const generateProjectCode = async (
   return generateSequentialCode(ENTITY_PREFIXES.PROJECT, model, 'project_code', filter);
 };
 
-/**
- * 3. Meeting / Session Code Generator
- * Uses sequential MEET001 format
- */
 export const generateSessionCode = async (
   model: CodeGeneratorModel,
   organizationId?: string

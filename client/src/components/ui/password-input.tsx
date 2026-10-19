@@ -28,7 +28,7 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputPro
               variant="ghost"
               size="sm"
               onClick={onGeneratePassword}
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-emerald-500 cursor-pointer"
+              className="h-7 w-7 p-0 border-0 bg-transparent text-muted-foreground hover:text-primary cursor-pointer"
               title="Generate Random Password"
             >
               <Sparkles size={14} />
@@ -39,7 +39,7 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputPro
             variant="ghost"
             size="sm"
             onClick={() => setShowPassword((prev) => !prev)}
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+            className="h-7 w-7 p-0 border-0 bg-transparent text-muted-foreground hover:text-foreground cursor-pointer"
             title={showPassword ? 'Hide password' : 'Show password'}
           >
             {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}

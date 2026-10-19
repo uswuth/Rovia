@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Users } from 'lucide-react';
@@ -21,6 +21,7 @@ import { parseApiError } from '@/utils/apiError';
 import { useProjects } from '@/hooks/useProjects';
 import { useTeams } from '@/hooks/useTeams';
 import { getProjectId } from '@/types/project.types';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { MemberRoster } from '@/components/members/MemberRoster';
 import type { Member } from '@/types/member.types';
 
@@ -58,14 +59,52 @@ export const CreateTeam: React.FC = () => {
     [rawProjects]
   );
 
-  const [, setExistingTeam] = useState<Record<string, unknown> | null>(null);
-  const [assignedRoles, setAssignedRoles] = useState<Record<string, 'Host' | 'Member'>>({});
+  const projectOptions = useMemo<SearchableSelectOption[]>(() => {
+    return projects.map((p) => {
+      const pId = (p.projectId || p._id || p.id) as string;
+      const pName = ((p.projectName || p.name || p.title) as string) || 'Unnamed Project';
+      return {
+        value: pId,
+        label: pName,
+      };
+    });
+  }, [projects]);
+
+  const existingTeam = useMemo(() => {
+    if (!id || !rawTeams) return null;
+    return rawTeams.find((t: Record<string, unknown>) => ((t.teamId || t._id) as string) === id) || null;
+  }, [id, rawTeams]);
+
+  const defaultRoles = useMemo<Record<string, 'Host' | 'Member'>>(() => {
+    const roleMap: Record<string, 'Host' | 'Member'> = {};
+    if (existingTeam) {
+      const hostsArr = (existingTeam.hosts as unknown[]) || [];
+      const membersArr = (existingTeam.members as unknown[]) || [];
+      hostsArr.forEach((h) => {
+        const hId = typeof h === 'object' && h !== null ? ((h as Record<string, unknown>).userId as string) : (h as string);
+        if (hId) roleMap[hId] = 'Host';
+      });
+      membersArr.forEach((m) => {
+        const mId = typeof m === 'object' && m !== null ? ((m as Record<string, unknown>).userId as string) : (m as string);
+        if (mId && !roleMap[mId]) roleMap[mId] = 'Member';
+      });
+    }
+    return roleMap;
+  }, [existingTeam]);
+
+  const [seededRoles, setSeededRoles] = useState(defaultRoles);
+  const [assignedRoles, setAssignedRoles] = useState(defaultRoles);
+  if (seededRoles !== defaultRoles) {
+    setSeededRoles(defaultRoles);
+    setAssignedRoles(defaultRoles);
+  }
+
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [serverError, setServerError] = useState<string>('');
 
   const loading = projectsLoading || teamsLoading;
 
-  const { register, handleSubmit, reset, watch, control, formState: { errors } } = useForm<TeamFormValues>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<TeamFormValues>({
     resolver: zodResolver(teamFormSchema),
     defaultValues: {
       teamName: '',
@@ -75,45 +114,24 @@ export const CreateTeam: React.FC = () => {
     },
   });
 
-  const selectedProjectId = watch('projectId');
+  const selectedProjectId = useWatch({ control, name: 'projectId' });
 
   useEffect(() => {
     if (loading) return;
 
-    if (id) {
-      const found = rawTeams.find(
-        (t: Record<string, unknown>) => (t.teamId || t._id) === id
-      );
-      if (found) {
-        setExistingTeam(found);
-        const pObj =
-          typeof found.projectId === 'object' && found.projectId !== null
-            ? (found.projectId as unknown as Record<string, unknown>)
-            : null;
-        const pId = pObj ? ((pObj._id || pObj.projectId) as string) : (found.projectId as string);
+    if (id && existingTeam) {
+      const pObj =
+        typeof existingTeam.projectId === 'object' && existingTeam.projectId !== null
+          ? (existingTeam.projectId as Record<string, unknown>)
+          : null;
+      const pId = pObj ? ((pObj.projectId || pObj._id) as string) : (existingTeam.projectId as string);
 
-        reset({
-          teamName: (found.teamName as string) || '',
-          projectId: pId || '',
-          description: (found.description as string) || '',
-          teamStatus: (found.teamStatus as 'active' | 'completed' | 'archived') || 'active',
-        });
-
-        const rolesMap: Record<string, 'Host' | 'Member'> = {};
-        const hostsArr = (found.hosts as unknown[]) || [];
-        const membersArr = (found.members as unknown[]) || [];
-
-        hostsArr.forEach((h) => {
-          const hId = typeof h === 'object' && h !== null ? (((h as unknown as Record<string, unknown>)._id || (h as unknown as Record<string, unknown>).userId) as string) : (h as string);
-          if (hId) rolesMap[hId] = 'Host';
-        });
-        membersArr.forEach((m) => {
-          const mId = typeof m === 'object' && m !== null ? (((m as unknown as Record<string, unknown>)._id || (m as unknown as Record<string, unknown>).userId) as string) : (m as string);
-          if (mId && !rolesMap[mId]) rolesMap[mId] = 'Member';
-        });
-
-        setAssignedRoles(rolesMap);
-      }
+      reset({
+        teamName: (existingTeam.teamName as string) || '',
+        projectId: pId || '',
+        description: (existingTeam.description as string) || '',
+        teamStatus: (existingTeam.teamStatus as 'active' | 'completed' | 'archived') || 'active',
+      });
     } else if (rawProjects.length > 0) {
       const defaultPId = getProjectId(rawProjects[0]);
       reset({
@@ -123,7 +141,7 @@ export const CreateTeam: React.FC = () => {
         teamStatus: 'active',
       });
     }
-  }, [id, loading, rawProjects, rawTeams, reset]);
+  }, [id, loading, rawProjects, existingTeam, reset]);
 
   // Compute member pool from selected parent project
   const projectMemberPool = useMemo<Member[]>(() => {
@@ -215,7 +233,7 @@ export const CreateTeam: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
           <div className="space-y-1">
             <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground">
-              <Users size={24} className="text-emerald-500" />
+              <Users size={24} className="text-primary" />
               <span>{isEditMode ? 'Edit Team' : 'Create New Team'}</span>
             </h1>
             <p className="text-xs text-muted-foreground">
@@ -249,42 +267,17 @@ export const CreateTeam: React.FC = () => {
                   control={control}
                   name="projectId"
                   render={({ field }) => (
-                    <Select
+                    <SearchableSelect
+                      id="parent-project"
                       value={field.value}
-                      onValueChange={(val) => {
-                        if (val) {
-                          field.onChange(val);
-                          setAssignedRoles({});
-                        }
+                      options={projectOptions}
+                      placeholder="Select Parent Project"
+                      searchPlaceholder="Search projects..."
+                      onChange={(val) => {
+                        field.onChange(val);
+                        setAssignedRoles({});
                       }}
-                    >
-                      <SelectTrigger id="parent-project" className="w-full sm:w-72">
-                        <SelectValue placeholder="Select Parent Project">
-                          {(val: unknown) => {
-                            if (!val) return 'Select Parent Project';
-                            const match = projects.find((p) => (p.projectId || p._id || p.id) === val);
-                            return match ? ((match.projectName || match.name || match.title) as string) : String(val);
-                          }}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {projects.length === 0 ? (
-                          <SelectItem value="" disabled>
-                            No projects available
-                          </SelectItem>
-                        ) : (
-                          projects.map((p) => {
-                            const pId = (p.projectId || p._id || p.id) as string;
-                            const pName = (p.projectName || p.name || p.title) as string || 'Unnamed Project';
-                            return (
-                              <SelectItem key={pId} value={pId}>
-                                {pName}
-                              </SelectItem>
-                            );
-                          })
-                        )}
-                      </SelectContent>
-                    </Select>
+                    />
                   )}
                 />
               </FormField>

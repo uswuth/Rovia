@@ -5,6 +5,7 @@ import { Ref } from '@typegoose/typegoose';
 import { findPaginated } from '../utils/paginatedFind.js';
 import { requireOrganizationId } from '../utils/scope.js';
 import { ORGANIZATION_OWNER_POPULATE, USER_LIST_SELECT } from '../utils/projections.js';
+import { generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
 
 export const getMyOrganizationService = async (orgId: string) => {
   requireOrganizationId(orgId, 'view this organization');
@@ -25,6 +26,18 @@ export const getOrganizationMembersService = async (
   query: Record<string, unknown> = {}
 ) => {
   requireOrganizationId(orgId, 'view organization members');
+
+  // Ensure the primary organization owner is always synchronized as SuperAdmin
+  const org = await Organization.findById(orgId).select('organization_owner_id');
+  if (org?.organization_owner_id) {
+    await User.updateOne(
+      {
+        _id: org.organization_owner_id,
+        $or: [{ user_role: { $ne: 'SuperAdmin' } }, { is_super_admin: { $ne: true } }]
+      },
+      { $set: { user_role: 'SuperAdmin', is_super_admin: true } }
+    );
+  }
 
   const filter: Record<string, unknown> = { organization_id: orgId, is_deleted: { $ne: true } };
   if (typeof query.userCode === 'string' && query.userCode.trim()) {
@@ -48,12 +61,13 @@ export const getOrganizationMemberByIdService = async (
   requireOrganizationId(orgId, 'view organization member profile');
 
   const isObjectId = /^[0-9a-fA-F]{24}$/.test(memberId);
-  const filter: Record<string, unknown> = { organization_id: orgId, is_deleted: { $ne: true } };
-  if (isObjectId) {
-    filter._id = memberId;
-  } else {
-    filter.user_code = memberId;
-  }
+  const filter: Record<string, unknown> = {
+    organization_id: orgId,
+    is_deleted: { $ne: true },
+    $or: isObjectId
+      ? [{ _id: memberId }, { user_code: memberId }, { user_code: memberId.toUpperCase() }]
+      : [{ user_code: memberId }, { user_code: memberId.toUpperCase() }]
+  };
 
   const isSelfOrAdmin = Boolean(
     requester?.isSuperAdmin ||
@@ -156,9 +170,10 @@ export const provisionUserService = async (input: {
   }
 
   const defaultPassword = password && password.length >= 6 ? password : 'User@123456';
-  const roleToAssign = (userRole as 'SuperAdmin' | 'Admin' | 'Member') || 'Member';
+  // Privilege Escalation Guard: Only 'Admin' or 'Member' can ever be provisioned
+  const roleToAssign = userRole === 'Admin' ? 'Admin' : 'Member';
   const statusToAssign = (userStatus as 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED') || 'ACTIVE';
-  const userCode = `USR-${Math.floor(1000 + Math.random() * 9000)}`;
+  const userCode = await generateSequentialCode(ENTITY_PREFIXES.USER, User, 'user_code');
 
   const newUser = await User.create({
     user_name: userName.trim(),
@@ -167,7 +182,7 @@ export const provisionUserService = async (input: {
     organization_id: org._id,
     user_role: roleToAssign,
     user_status: statusToAssign,
-    is_super_admin: roleToAssign === 'SuperAdmin',
+    is_super_admin: false,
     job_title: jobTitle?.trim() || 'Team Member',
     user_code: userCode
   });
@@ -206,23 +221,29 @@ export const updateUserService = async (
     user.user_name = input.userName.trim();
   }
 
-  if (input.userEmail !== undefined && input.userEmail.trim() !== '') {
-    const cleanEmail = input.userEmail.trim().toLowerCase();
-    const existing = await User.findOne({ user_email: cleanEmail, _id: { $ne: user._id } });
-    if (existing) {
-      throw ApiError.conflict('Another user with this email address already exists');
+  const org = await Organization.findById(user.organization_id);
+  const isOrgOwner = Boolean(
+    org &&
+    org.organization_owner_id &&
+    org.organization_owner_id.toString() === user._id.toString()
+  );
+
+  if (isOrgOwner) {
+    // Org owner is permanently SuperAdmin and ACTIVE
+    user.user_role = 'SuperAdmin';
+    user.is_super_admin = true;
+    user.user_status = 'ACTIVE';
+  } else {
+    if (input.userRole !== undefined) {
+      // Privilege Escalation Guard: Non-owners can only ever be assigned Admin or Member
+      const validRole = input.userRole === 'Admin' ? 'Admin' : 'Member';
+      user.user_role = validRole;
+      user.is_super_admin = false;
     }
-    user.user_email = cleanEmail;
-  }
 
-  if (input.userRole !== undefined) {
-    const validRole = input.userRole as 'SuperAdmin' | 'Admin' | 'Member';
-    user.user_role = validRole;
-    user.is_super_admin = validRole === 'SuperAdmin';
-  }
-
-  if (input.userStatus !== undefined) {
-    user.user_status = input.userStatus as 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
+    if (input.userStatus !== undefined) {
+      user.user_status = input.userStatus as 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
+    }
   }
 
   if (input.jobTitle !== undefined) {

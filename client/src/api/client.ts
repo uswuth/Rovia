@@ -22,13 +22,18 @@ export const getAccessToken = () => {
 };
 
 const client = axios.create({
-  baseURL: (import.meta.env.VITE_API_BASE_URL as string) || '/api/v1',
+  baseURL: '/api/v1',
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
 
 client.interceptors.request.use((config) => {
-  const token = getAccessToken();
+  const isServerAdmin =
+    config.url?.includes('/server-admin') ||
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/server-admin'));
+  const serverAdminToken =
+    typeof window !== 'undefined' ? localStorage.getItem('server_admin_token') : null;
+  const token = isServerAdmin && serverAdminToken ? serverAdminToken : getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -50,7 +55,8 @@ client.interceptors.response.use(
     const isAuthEndpoint =
       original?.url?.includes('/auth/refresh-token') ||
       original?.url?.includes('/auth/login') ||
-      original?.url?.includes('/auth/signup');
+      original?.url?.includes('/auth/signup') ||
+      original?.url?.includes('/server-admin/');
 
     if (error.response?.status === 401 && original && !original._retry && !isAuthEndpoint) {
       original._retry = true;

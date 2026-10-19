@@ -7,6 +7,7 @@ export interface MeetingPollOption {
   optionId: string;
   optionText: string;
   voteCount: number;
+  voterIds?: string[];
 }
 
 export interface MeetingPoll {
@@ -28,7 +29,7 @@ export const getMeetingPolls = (meetingId: string, status?: string) =>
 
 export const createPoll = (
   meetingId: string,
-  payload: { pollQuestion: string; options: string[]; multipleChoice: boolean }
+  payload: { pollQuestion: string; options: string[]; multipleChoice?: boolean }
 ) => client.post<{ data: MeetingPoll }>(`/meetings/${meetingId}/polls`, payload);
 
 export const votePoll = (meetingId: string, pollId: string, optionIds: string[]) =>

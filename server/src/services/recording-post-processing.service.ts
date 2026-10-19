@@ -4,10 +4,19 @@ import { Recording } from '../models/recording.model.js';
 import { logger } from '../utils/logger.js';
 import { requireOrganizationId } from '../utils/scope.js';
 import { assertObjectId } from '../utils/objectId.js';
-import { AudioExtractor, Summarizer, Transcriber } from '../types/index.js';
+import { AudioExtractor, Summarizer, Transcriber, TranscriptionSegment } from '../types/index.js';
+
+/** One participant's contribution to a meeting, as stored on the transcript. */
+interface TranscriptSpeaker {
+  speakerId: string;
+  speakerName: string;
+  speakerText: string;
+  speakerDurationMs: number;
+  spoke: boolean;
+}
 import { FfmpegAudioExtractor } from './ai/ffmpeg-audio-extractor.js';
-import { LocalWhisperTranscriber } from './ai/local-whisper-transcriber.js';
-import { OllamaSummarizer } from './ai/ollama-summarizer.js';
+import { GroqTranscriber } from './ai/groq-transcriber.js';
+import { OpenRouterSummarizer } from './ai/openrouter-summarizer.js';
 import {
   startTranscriptService,
   completeTranscriptService,
@@ -19,23 +28,12 @@ import {
   failSummaryService
 } from './summary.service.js';
 
-/**
- * Orchestrates the local AI pipeline. It contains no FFmpeg, Whisper or Ollama
- * logic: those live behind the three injected interfaces, so the Recording
- * domain can be tested with fakes and any provider can be swapped later.
- *
- * Failure policy: a failed stage marks its OWN record FAILED. The recording
- * stays READY, and a later stage failure never invalidates an earlier success,
- * so summarisation can be retried without retranscribing.
- *
- * Today this runs inline from complete(). Replacing that call with an enqueue
- * is the only change needed to move to a worker.
- */
+/** Orchestrates the AI pipeline. It contains no FFmpeg, transcription or summarisation logic: those live behind the three injected interfaces, so the Recording domain can be tested with fakes and any provider can be swapped. Transcription runs on Groq (whisper-large-v3) and summarisation on the OpenRouter free tier. Both are hosted, so no model weights are downloaded to this host and no AI container is required. Failure policy: a failed stage marks its OWN record FAILED. The recording stays READY, and a later stage failure never invalidates an earlier success, so summarisation can be retried without retranscribing. Today this runs inline from complete(). Replacing that call with an enqueue is the only change needed to move to a worker. */
 export class RecordingPostProcessingService {
   constructor(
     private readonly audioExtractor: AudioExtractor = new FfmpegAudioExtractor(),
-    private readonly transcriber: Transcriber = new LocalWhisperTranscriber(),
-    private readonly summarizer: Summarizer = new OllamaSummarizer()
+    private readonly transcriber: Transcriber = new GroqTranscriber(),
+    private readonly summarizer: Summarizer = new OpenRouterSummarizer()
   ) {}
 
   async runPostProcessing(recordingId: string, organizationId: string, userId: string): Promise<void> {
@@ -54,40 +52,147 @@ export class RecordingPostProcessingService {
     await this.summarize(transcript.transcriptId, recordingId, organizationId, userId);
   }
 
+  /**
+   * Transcribes every speaker track independently, then stores one transcript
+   * holding each person's words separately.
+   *
+   * Tracks are never mixed: simultaneous speech is what garbles a transcript,
+   * so each participant's audio is sent to the model on its own.
+   *
+   * A track that fails does not sink the whole recording. A participant who
+   * never spoke, or whose track was unreadable, is recorded as silent and the
+   * rest of the meeting still produces a summary.
+   */
   private async transcribe(
-    recording: { _id: unknown; storage_key: string; recording_mime_type: string },
+    recording: {
+      _id: unknown;
+      recording_mime_type: string;
+      recording_speakers: Array<{
+        speakerId: string;
+        speakerName: string;
+        speakerIndex: number;
+        storageKey: string;
+        mimeType: string;
+      }>;
+    },
     organizationId: string
   ) {
     const recordingId = String((recording as { _id: { toString(): string } })._id);
     const transcript = await startTranscriptService(recordingId, organizationId);
-    let audioFilePath: string | null = null;
+    const speakers = recording.recording_speakers ?? [];
 
-    try {
-      const extracted = await this.audioExtractor.extract({
-        storageKey: recording.storage_key,
-        recordingMimeType: recording.recording_mime_type,
-        recordingId
-      });
-      audioFilePath = extracted.filePath;
-
-      const result = await this.transcriber.transcribe({ filePath: extracted.filePath });
-      if (!result.text) {
-        throw new Error('Transcription produced no text');
-      }
-      const ready = await completeTranscriptService(transcript.transcriptId, organizationId, result);
-      logger.info(`Transcript READY for recording ${recordingId} (${result.text.length} chars)`);
-      return ready;
-    } catch (error) {
-      logger.error(`Transcription failed for recording ${recordingId}: ${(error as Error).message}`);
+    if (speakers.length === 0) {
+      logger.warn(`Recording ${recordingId} has no speaker tracks; nothing to transcribe`);
       await failTranscriptService(transcript.transcriptId, organizationId).catch(() => undefined);
       return null;
-    } finally {
-      // Temporary audio is removed whether or not transcription succeeded. The
-      // original recording in object storage is untouched.
-      if (audioFilePath) {
-        await fs.rm(path.dirname(audioFilePath), { recursive: true, force: true }).catch(() => undefined);
+    }
+
+    const results: TranscriptSpeaker[] = [];
+    let combinedText = '';
+    let totalDurationMs = 0;
+    let anySucceeded = false;
+
+    for (const speaker of speakers) {
+      const label = speaker.speakerName || `speaker ${speaker.speakerIndex}`;
+      let workDir: string | null = null;
+      try {
+        const extracted = await this.audioExtractor.extract({
+          storageKey: speaker.storageKey,
+          recordingMimeType: speaker.mimeType,
+          recordingId,
+          label
+        });
+        workDir = extracted.filePaths.length > 0 ? path.dirname(extracted.filePaths[0]) : null;
+
+        // The extractor always emits FLAC chunks, so that is the type to declare.
+      const result = await this.transcribeChunks(extracted.filePaths, recordingId, label, 'audio/flac');
+        totalDurationMs += result.durationMs ?? 0;
+        results.push({
+          speakerId: speaker.speakerId,
+          speakerName: speaker.speakerName || speaker.speakerId,
+          speakerText: result.text,
+          speakerDurationMs: result.durationMs ?? 0,
+          spoke: result.text.length > 0
+        });
+        if (result.text) {
+          anySucceeded = true;
+          // The flat text is kept for search and the copy-to-clipboard button.
+          combinedText += combinedText ? `\n\n${speaker.speakerName || 'Speaker'}: ${result.text}` : result.text;
+        }
+        logger.info(`Transcribed ${label} for recording ${recordingId} (${result.text.length} chars)`);
+      } catch (error) {
+        // One unreadable track must not discard everyone's speech.
+        logger.error(`Transcription failed for ${label} on recording ${recordingId}: ${(error as Error).message}`);
+        results.push({
+          speakerId: speaker.speakerId,
+          speakerName: speaker.speakerName || speaker.speakerId,
+          speakerText: '',
+          speakerDurationMs: 0,
+          spoke: false
+        });
+      } finally {
+        // Temporary audio is removed whether or not transcription succeeded. The
+        // stored track in object storage is untouched.
+        if (workDir) {
+          await fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+        }
       }
     }
+
+    if (!anySucceeded) {
+      logger.error(`Every speaker track failed for recording ${recordingId}`);
+      await failTranscriptService(transcript.transcriptId, organizationId).catch(() => undefined);
+      return null;
+    }
+
+    const ready = await completeTranscriptService(transcript.transcriptId, organizationId, {
+      text: combinedText.trim(),
+      language: null,
+      durationMs: totalDurationMs || null,
+      segments: [],
+      speakers: results
+    });
+    logger.info(
+      `Transcript READY for recording ${recordingId}: ${results.length} speaker(s), ${combinedText.length} chars`
+    );
+    return ready;
+  }
+
+  /**
+   * Transcribes each chunk in order and joins the results into one speaker's text.
+   *
+   * Segments are kept in the flattened order the chunks arrive, with each
+   * chunk's own timings preserved, so the stored transcript still reads
+   * chronologically even though the timestamps restart per request.
+   */
+  private async transcribeChunks(
+    filePaths: string[],
+    recordingId: string,
+    label: string,
+    mimeType: string
+  ): Promise<{ text: string; language: string | null; durationMs: number | null; segments: TranscriptionSegment[] }> {
+    const texts: string[] = [];
+    const segments: TranscriptionSegment[] = [];
+    let language: string | null = null;
+    let durationMs = 0;
+
+    for (const [index, filePath] of filePaths.entries()) {
+      const chunk = await this.transcriber.transcribe({ filePath, mimeType });
+      if (chunk.text) {
+        texts.push(chunk.text);
+      }
+      segments.push(...chunk.segments);
+      if (!language && chunk.language) {
+        language = chunk.language;
+      }
+      durationMs += chunk.durationMs ?? 0;
+      logger.info(
+        `Transcribed ${label} chunk ${index + 1}/${filePaths.length} for recording ${recordingId} ` +
+          `(${chunk.text.length} chars)`
+      );
+    }
+
+    return { text: texts.join(' '), language, durationMs: durationMs || null, segments };
   }
 
   private async summarize(
@@ -111,6 +216,8 @@ export class RecordingPostProcessingService {
         throw new Error('Transcript disappeared before summarisation');
       }
 
+      // The flat text already carries "Name: ..." per turn, so the model can see who
+      // committed to what and attribute action items without inventing owners.
       const result = await this.summarizer.summarize({ transcript: transcript.transcript_text });
       await completeSummaryService(summary.summaryId, organizationId, result);
       logger.info(`Summary READY for recording ${recordingId}`);

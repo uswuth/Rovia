@@ -2,9 +2,11 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Video, VideoOff, Mic, MicOff, Clock, Calendar,
-  ArrowRight, AlertCircle, ShieldCheck, RefreshCw, Share2, FolderGit2, Settings2
+  ArrowRight, AlertCircle, ShieldCheck, RefreshCw, Share2, FolderGit2, Settings2,
+  PhoneOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { buildAudioConstraints } from '@/lib/audio-capture';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -17,10 +19,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useTimeFormat } from '@/context/TimeFormatContext';
 import { useProject } from '@/context/ProjectContext';
 import { getProjectName, getProjectId } from '@/types/project.types';
-import { previewMeetingByJoinCode } from '@/api/meeting/meeting.api';
+import { previewMeetingByJoinCode, joinMeeting } from '@/api/meeting/meeting.api';
 import type { MeetingPreview } from '@/api/meeting/meeting.types';
 import { parseApiError } from '@/utils/apiError';
-import { formatCountdown } from '@/lib/format-countdown';
+import { shareOrCopy } from '@/lib/share';
+import { formatDurationHuman } from '@/utils/duration';
 
 const getCleanDeviceLabel = (
   device: MediaDeviceInfo | undefined,
@@ -44,12 +47,6 @@ export const MeetingLobby: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Time state for countdown
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 10_000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Media states
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -78,24 +75,14 @@ export const MeetingLobby: React.FC = () => {
   // Native share or copy link
   const handleShare = async () => {
     const shareUrl = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: preview?.meetingTitle || 'IntellMeet Meeting',
-          text: `Join IntellMeet video meeting: ${preview?.meetingTitle || ''}`,
-          url: shareUrl,
-        });
-        return;
-      } catch {
-        // User cancelled or share failed, fallback to copy
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(shareUrl);
+    const res = await shareOrCopy({
+      title: preview?.meetingTitle || 'IntellMeet Meeting',
+      text: `Join IntellMeet video meeting: ${preview?.meetingTitle || ''}`,
+      url: shareUrl,
+    });
+    if (res === 'shared' || res === 'copied') {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
     }
   };
 
@@ -167,12 +154,10 @@ export const MeetingLobby: React.FC = () => {
         stream.getTracks().forEach((t) => t.stop());
       }
 
-      const audioConstraint: boolean | MediaTrackConstraints = micId
-        ? { deviceId: { exact: micId } }
-        : true;
+      const audioConstraint = buildAudioConstraints(micId);
       const videoConstraint: boolean | MediaTrackConstraints = camId
-        ? { deviceId: { exact: camId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        : { width: { ideal: 1280 }, height: { ideal: 720 } };
+        ? { deviceId: { exact: camId }, width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 30, max: 30 } }
+        : { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 30, max: 30 } };
 
       const userMedia = await navigator.mediaDevices.getUserMedia({
         video: videoConstraint,
@@ -289,11 +274,16 @@ export const MeetingLobby: React.FC = () => {
       stream.getTracks().forEach((t) => t.stop());
     }
 
+    joinMeeting(preview.meetingId).catch(() => { });
+
     navigate(`/meetings/${preview.meetingId}/room`, {
       state: {
         fromLobby: true,
         initialCamera: cameraEnabled,
         initialMic: micEnabled,
+        selectedMic,
+        selectedCamera,
+        selectedSpeaker,
         preview,
       },
     });
@@ -342,23 +332,13 @@ export const MeetingLobby: React.FC = () => {
     audioOutputs.findIndex((d) => d.deviceId === selectedSpeaker)
   );
 
-  // Meeting opening / countdown status
-  const scheduledDate = preview ? new Date(preview.meetingScheduledAt) : new Date();
-  const scheduledMs = scheduledDate.getTime();
-  const earlyJoinMs = !isNaN(scheduledMs) ? scheduledMs - 5 * 60 * 1000 : 0;
-  const durationMinutes = preview?.meetingDurationMinutes || 30;
-  const endMs = !isNaN(scheduledMs) ? scheduledMs + durationMinutes * 60 * 1000 : Infinity;
-
-  const isPastDuration = !isNaN(scheduledMs) && now > endMs;
-  const isTooEarly = !isNaN(scheduledMs) && now < earlyJoinMs;
-  const isEndedOrCancelled = preview?.meetingStatus === 'ENDED' || preview?.meetingStatus === 'CANCELLED' || isPastDuration;
-  const canJoin = Boolean(preview) && !isEndedOrCancelled && !isTooEarly;
+  // Meeting status: Google Meet model (Link stays valid and joinable until host ends it)
+  const isEndedOrCancelled = preview?.meetingStatus === 'ENDED' || preview?.meetingStatus === 'CANCELLED';
+  const canJoin = Boolean(preview) && !isEndedOrCancelled;
 
   let buttonText = 'Join Meeting';
   if (isEndedOrCancelled) {
     buttonText = 'Meeting Ended';
-  } else if (isTooEarly) {
-    buttonText = `Opens in ${formatCountdown(scheduledMs, now)}`;
   }
 
   const isUserAssignedToMeeting = useMemo(() => {
@@ -376,7 +356,7 @@ export const MeetingLobby: React.FC = () => {
   }, [preview, user]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-emerald-500/20">
+    <div className="flex min-h-dvh flex-col bg-background text-foreground selection:bg-emerald-500/20">
       {/* Header bar */}
       <header className="flex h-14 items-center justify-between border-b border-border/80 px-6 bg-background">
         <div className="flex items-center gap-3">
@@ -415,7 +395,7 @@ export const MeetingLobby: React.FC = () => {
       <main className="flex flex-1 items-center justify-center p-6 sm:p-10">
         {loading ? (
           <div className="flex flex-col items-center gap-3 text-center">
-            <div className="size-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+            <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <p className="text-xs text-muted-foreground">Connecting to meeting lobby...</p>
           </div>
         ) : error || !preview ? (
@@ -491,11 +471,10 @@ export const MeetingLobby: React.FC = () => {
                   <button
                     type="button"
                     onClick={toggleMic}
-                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${
-                      micEnabled
+                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${micEnabled
                         ? 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
                         : 'bg-red-600 text-white hover:bg-red-700 shadow-red-600/30'
-                    }`}
+                      }`}
                     title={micEnabled ? 'Mute Mic' : 'Unmute Mic'}
                   >
                     {micEnabled ? <Mic size={18} /> : <MicOff size={18} />}
@@ -504,11 +483,10 @@ export const MeetingLobby: React.FC = () => {
                   <button
                     type="button"
                     onClick={toggleCamera}
-                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${
-                      cameraEnabled
+                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${cameraEnabled
                         ? 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
                         : 'bg-red-600 text-white hover:bg-red-700 shadow-red-600/30'
-                    }`}
+                      }`}
                     title={cameraEnabled ? 'Turn Camera Off' : 'Turn Camera On'}
                   >
                     {cameraEnabled ? <Video size={18} /> : <VideoOff size={18} />}
@@ -517,11 +495,10 @@ export const MeetingLobby: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowDeviceSettings(!showDeviceSettings)}
-                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${
-                      showDeviceSettings
+                    className={`flex size-11 items-center justify-center rounded-full transition-all shadow-md cursor-pointer ${showDeviceSettings
                         ? 'bg-emerald-600 text-white shadow-emerald-600/30'
                         : 'bg-slate-900/80 text-white hover:bg-slate-800 backdrop-blur-md border border-white/10'
-                    }`}
+                      }`}
                     title="Device Preferences"
                   >
                     <Settings2 size={18} />
@@ -538,7 +515,7 @@ export const MeetingLobby: React.FC = () => {
                   <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2.5 py-1 backdrop-blur-xs">
                     <span className="text-[10px] text-slate-300 font-medium">Mic</span>
                     <div className="h-1.5 w-10 overflow-hidden rounded-full bg-slate-700">
-                      <div className="h-full bg-emerald-400 transition-all duration-75" style={{ width: `${audioLevel}%` }} />
+                      <div className="h-full bg-primary transition-all duration-75" style={{ width: `${audioLevel}%` }} />
                     </div>
                   </div>
                 )}
@@ -548,7 +525,7 @@ export const MeetingLobby: React.FC = () => {
               {showDeviceSettings && (
                 <div className="border-t border-b border-border/80 py-4 my-1 space-y-3 text-xs">
                   <div className="font-bold text-foreground flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                    <Settings2 size={13} className="text-emerald-500" />
+                    <Settings2 size={13} className="text-primary" />
                     <span>Audio & Video Devices</span>
                   </div>
 
@@ -642,7 +619,7 @@ export const MeetingLobby: React.FC = () => {
               )}
 
               <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
-                <ShieldCheck size={14} className="text-emerald-500 shrink-0" />
+                <ShieldCheck size={14} className="text-primary shrink-0" />
                 <span>Devices previewed locally before entering.</span>
               </div>
             </div>
@@ -651,7 +628,7 @@ export const MeetingLobby: React.FC = () => {
             <div className="flex flex-col gap-5 lg:col-span-5 py-1">
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-xs font-mono font-bold text-primary">
                     Meeting Session
                   </span>
 
@@ -681,7 +658,7 @@ export const MeetingLobby: React.FC = () => {
               <div className="space-y-2 text-xs border-t border-b border-border/80 py-3 text-muted-foreground">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 font-medium">
-                    <Calendar size={14} className="text-emerald-500" />
+                    <Calendar size={14} className="text-primary" />
                     Scheduled At:
                   </span>
                   <span className="font-semibold text-foreground">
@@ -691,11 +668,11 @@ export const MeetingLobby: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 font-medium">
-                    <Clock size={14} className="text-emerald-500" />
+                    <Clock size={14} className="text-primary" />
                     Duration:
                   </span>
                   <span className="font-semibold text-foreground">
-                    {preview.meetingDurationMinutes} minutes
+                    {formatDurationHuman(preview.meetingDurationMinutes)}
                   </span>
                 </div>
               </div>
@@ -714,11 +691,11 @@ export const MeetingLobby: React.FC = () => {
                   onClick={handleJoin}
                   className="w-full h-11 text-sm font-semibold justify-center gap-2 rounded-md shadow-xs disabled:opacity-50"
                 >
-                  {isTooEarly ? (
-                    <Clock size={16} />
-                  ) : !isEndedOrCancelled ? (
+                  {!isEndedOrCancelled ? (
                     <Video size={16} />
-                  ) : null}
+                  ) : (
+                    <PhoneOff size={16} />
+                  )}
                   <span>{buttonText}</span>
                   {canJoin && <ArrowRight size={16} />}
                 </Button>

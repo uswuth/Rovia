@@ -54,7 +54,7 @@ export const Login = () => {
   };
 
   const inputCls =
-    'h-10.5 rounded-md border-border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground shadow-none transition-all hover:border-emerald-500/50 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:shadow-[0_0_20px_rgba(16,185,129,0.3)]';
+    'h-10.5 rounded-md border-border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground shadow-none transition-all hover:border-primary/50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_20px_color-mix(in_srgb,var(--custom-accent,#10b981)_30%,transparent)]';
   const labelCls = 'text-[11px] font-medium text-muted-foreground';
 
   return (
@@ -62,7 +62,7 @@ export const Login = () => {
       component="main"
       className="bg-dots-pattern"
       sx={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         width: '100%',
         bgcolor: 'var(--background)',
         color: 'var(--foreground)',
@@ -70,36 +70,36 @@ export const Login = () => {
         position: 'relative',
       }}
     >
-      {/* Ambient Green Color Bloom Overlay */}
+      {}
       <Box
         sx={{
           position: 'absolute',
-          top: '-10%',
-          right: '25%',
-          width: '500px',
-          height: '500px',
+          top: '20%',
+          right: '15%',
+          width: '600px',
+          height: '600px',
           borderRadius: '50%',
           pointerEvents: 'none',
-          background: 'radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0) 70%)',
-          filter: 'blur(40px)',
+          background: 'radial-gradient(circle, color-mix(in srgb, var(--custom-accent, #10b981) 18%, transparent) 0%, transparent 65%)',
+          filter: 'blur(60px)',
           zIndex: 1,
         }}
       />
 
-      <Grid container sx={{ minHeight: '100vh', width: '100%', position: 'relative', zIndex: 2 }}>
+      <Grid container sx={{ minHeight: '100dvh', width: '100%', position: 'relative', zIndex: 2 }}>
         {/* ── Left Hero Column (Inset with all 4 corners rounded) ── */}
         <Grid
           size={{ xs: 12, lg: 6 }}
           sx={{
             display: { xs: 'none', lg: 'flex' },
             p: 1,
-            height: { lg: '100vh' },
+            height: { lg: '100dvh' },
             position: { lg: 'sticky' },
             top: 0,
             boxSizing: 'border-box',
           }}
         >
-          {/* Inner Rounded Green Card */}
+          {}
           <Box
             sx={{
               width: '100%',
@@ -111,40 +111,103 @@ export const Login = () => {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              background: 'linear-gradient(145deg, #031c13 0%, #063725 45%, #095237 100%)',
+              background:
+                'linear-gradient(160deg, color-mix(in srgb, var(--custom-accent, #10b981) 95%, #ffffff) 0%, color-mix(in srgb, var(--custom-accent, #10b981) 85%, #f59e0b) 35%, color-mix(in srgb, var(--custom-accent, #10b981) 90%, #d97706) 70%, color-mix(in srgb, var(--custom-accent, #10b981) 75%, #000000) 100%)',
               border: 'none',
-              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+              boxShadow:
+                '0 10px 30px -5px color-mix(in srgb, var(--custom-accent, #10b981) 30%, rgba(0,0,0,0.1)), 15px 0 45px -10px color-mix(in srgb, var(--custom-accent, #10b981) 40%, rgba(0,0,0,0.25))',
             }}
           >
+            {}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '-15%',
+                right: '-15%',
+                width: '80%',
+                height: '70%',
+                pointerEvents: 'none',
+                borderRadius: '50%',
+                background:
+                  'radial-gradient(circle, color-mix(in srgb, var(--custom-accent, #10b981) 40%, #ffedd5) 0%, color-mix(in srgb, var(--custom-accent, #10b981) 75%, #f59e0b) 45%, transparent 75%)',
+                filter: 'blur(35px)',
+                opacity: 0.9,
+              }}
+            />
+
+            {/* Deep mesh shadow in bottom corner */}
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: '-20%',
+                left: '-15%',
+                width: '85%',
+                height: '75%',
+                pointerEvents: 'none',
+                borderRadius: '50%',
+                background:
+                  'radial-gradient(circle, color-mix(in srgb, var(--custom-accent, #10b981) 70%, #000000) 0%, transparent 70%)',
+                filter: 'blur(50px)',
+                opacity: 0.65,
+              }}
+            />
+
+            {}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '30%',
+                left: '20%',
+                width: '75%',
+                height: '60%',
+                pointerEvents: 'none',
+                borderRadius: '50%',
+                background:
+                  'radial-gradient(ellipse at center, color-mix(in srgb, var(--custom-accent, #10b981) 85%, #fde047) 0%, transparent 60%)',
+                filter: 'blur(45px)',
+                opacity: 0.4,
+              }}
+            />
+
+            {}
             <Box
               sx={{
                 position: 'absolute',
                 inset: 0,
                 pointerEvents: 'none',
-                opacity: 0.5,
-                background: 'radial-gradient(circle at 65% 40%, rgba(16, 185, 129, 0.45) 0%, transparent 65%)',
+                opacity: 0.22,
+                backgroundImage:
+                  'radial-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px), radial-gradient(rgba(0, 0, 0, 0.3) 1px, transparent 1px)',
+                backgroundSize: '4px 4px, 6px 6px',
+                backgroundPosition: '0 0, 2px 2px',
+                mixBlendMode: 'overlay',
               }}
             />
 
-            {/* Top Brand Mark */}
+            {}
             <Box sx={{ position: 'relative', zIndex: 10 }}>
               <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-                <IntellMeetLogo size={26} />
+                <IntellMeetLogo
+                  size={28}
+                  color="#ffffff"
+                  style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+                />
                 <Typography
                   sx={{
                     color: '#ffffff',
-                    fontWeight: 700,
-                    fontSize: '1.05rem',
+                    fontWeight: 800,
+                    fontSize: '1.15rem',
                     letterSpacing: '-0.025em',
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    textShadow: '0 2px 10px rgba(0,0,0,0.3)',
                   }}
                 >
-                  Intell<span style={{ color: '#34d399' }}>Meet</span>
+                  Intell<span style={{ opacity: 0.92 }}>Meet</span>
                 </Typography>
               </Stack>
             </Box>
 
-            {/* Bottom Hero & Steps */}
+            {}
             <Stack spacing={4} sx={{ position: 'relative', zIndex: 10, width: '100%' }}>
               <Stack
                 direction={{ xs: 'column', xl: 'row' }}
@@ -169,7 +232,7 @@ export const Login = () => {
                 <Typography
                   sx={{
                     fontSize: '0.875rem',
-                    color: 'rgba(167, 243, 208, 0.75)',
+                    color: 'rgba(255, 255, 255, 0.85)',
                     maxWidth: 240,
                     lineHeight: 1.5,
                     pb: { xl: 0.5 },
@@ -192,11 +255,17 @@ export const Login = () => {
                         height: '100%',
                         borderRadius: '12px',
                         transition: 'all 0.2s ease',
-                        border: step.active ? '1px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.1)',
-                        bgcolor: step.active ? '#ffffff' : 'rgba(255, 255, 255, 0.07)',
-                        color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.8)',
-                        backdropFilter: step.active ? 'none' : 'blur(4px)',
-                        boxShadow: step.active ? '0 10px 25px -5px rgba(0, 0, 0, 0.4)' : 'none',
+                        border: step.active
+                          ? '1px solid rgba(255, 255, 255, 0.9)'
+                          : '1px solid rgba(255, 255, 255, 0.25)',
+                        bgcolor: step.active
+                          ? 'rgba(255, 255, 255, 0.95)'
+                          : 'rgba(0, 0, 0, 0.18)',
+                        color: step.active ? '#09090b' : '#ffffff',
+                        backdropFilter: 'blur(12px)',
+                        boxShadow: step.active
+                          ? '0 12px 30px -5px rgba(0, 0, 0, 0.35)'
+                          : '0 4px 15px rgba(0, 0, 0, 0.1)',
                       }}
                     >
                       <Box
@@ -210,7 +279,7 @@ export const Login = () => {
                           fontSize: '0.75rem',
                           fontWeight: 700,
                           mb: 1.25,
-                          bgcolor: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.2)',
+                          bgcolor: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.25)',
                           color: '#ffffff',
                         }}
                       >
@@ -222,7 +291,7 @@ export const Login = () => {
                           fontWeight: 600,
                           lineHeight: 1.35,
                           whiteSpace: 'pre-line',
-                          color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.85)',
+                          color: step.active ? '#09090b' : 'rgba(255, 255, 255, 0.95)',
                         }}
                       >
                         {step.label}
@@ -239,8 +308,8 @@ export const Login = () => {
         <Grid
           size={{ xs: 12, lg: 6 }}
           sx={{
-            minHeight: '100vh',
-            height: { lg: '100vh' },
+            minHeight: '100dvh',
+            height: { lg: '100dvh' },
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
@@ -278,7 +347,7 @@ export const Login = () => {
                       fontFamily: "'Plus Jakarta Sans', sans-serif",
                     }}
                   >
-                    Intell<span className="text-emerald-600 dark:text-emerald-400">Meet</span>
+                    Intell<span className="text-primary">Meet</span>
                   </Typography>
                 </Stack>
               </Box>
@@ -376,7 +445,7 @@ export const Login = () => {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-10.5 mt-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold text-sm rounded-md transition-all duration-200 shadow-md cursor-pointer"
+                    className="w-full h-10.5 mt-2 bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground font-bold text-sm rounded-md transition-all duration-200 shadow-md cursor-pointer"
                   >
                     {isSubmitting ? (
                       <>

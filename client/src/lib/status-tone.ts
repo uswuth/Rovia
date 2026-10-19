@@ -1,9 +1,6 @@
 import type { BadgeTone } from '@/components/ui/badge-variants';
 
-/**
- * Maps a domain status string to a badge tone. Keeps status→color mapping in
- * one place so a page never re-declares a switch statement for it.
- */
+/** Single source of truth for domain status → badge tone, so no page re-declares the mapping. */
 const projectStatusTones: Record<string, BadgeTone> = {
   active: 'success',
   planning: 'warning',
@@ -35,11 +32,10 @@ export const getTaskStatusTone = (status: string): BadgeTone =>
 
 const meetingStatusTones: Record<string, BadgeTone> = {
   live: 'success',
-  // Client-side display state for a meeting inside its scheduled window but not
-  // yet marked LIVE by the server.
+  // Client-derived: meeting is inside its scheduled window but the server has not marked it LIVE.
   in_progress: 'success',
   scheduled: 'info',
-  // The server uses ENDED/CANCELLED; both read as neutral, non-actionable.
+  // Mirrors the server's ENDED status.
   ended: 'neutral',
   cancelled: 'danger',
   completed: 'neutral',
@@ -53,7 +49,6 @@ const meetingJoinModeLabels: Record<string, string> = {
   open_link: 'Open link',
 };
 
-/** Display label for a join mode, used wherever the mode is shown as text. */
 export const getMeetingJoinModeLabel = (mode: string): string =>
   meetingJoinModeLabels[mode.toLowerCase()] ?? mode;
 

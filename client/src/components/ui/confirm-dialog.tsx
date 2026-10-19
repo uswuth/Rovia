@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -20,11 +21,6 @@ export interface ConfirmDialogProps {
   anchorRect?: DOMRect | null;
 }
 
-/**
- * Common reusable confirmation dialog.
- * Supports anchored popover positioning near the trigger action icon as well as centered display.
- * Layout: Icon on the left, title & description on the right, action buttons at the bottom.
- */
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   open,
   anchorRect,
@@ -66,7 +62,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   if (!open) return null;
 
-  // Calculate anchored fixed position if anchorRect is provided
   const positionStyle: React.CSSProperties = anchorRect
     ? (() => {
         const dialogWidth = 310;
@@ -97,10 +92,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const isAnchored = Boolean(anchorRect);
 
-  return (
+  return createPortal(
     <div
       className={cn(
-        'fixed inset-0 z-50',
+        'fixed inset-0 z-[110]',
         isAnchored ? 'bg-transparent' : 'flex items-center justify-center bg-transparent p-4',
         overlayClassName
       )}
@@ -113,11 +108,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         style={positionStyle}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'w-full max-w-[315px] rounded-xl border border-border/90 dark:border-zinc-700/90 bg-card/95 dark:bg-zinc-900/95 backdrop-blur-md p-3.5 shadow-2xl dark:shadow-[0_12px_40px_rgba(0,0,0,0.9)] outline-none animate-in fade-in-0 zoom-in-95',
+          'w-full max-w-[315px] rounded-xs border border-border/90 dark:border-zinc-700/90 bg-card/95 dark:bg-zinc-900/95 backdrop-blur-md p-3.5 shadow-2xl dark:shadow-[0_12px_40px_rgba(0,0,0,0.9)] outline-none animate-in fade-in-0 zoom-in-95',
           className
         )}
       >
-        {/* Top: Icon on left side, Content (Title + Description) on right side */}
         <div className="flex items-start gap-3">
           {icon && (
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-500/15 text-rose-500 border border-rose-500/25 shrink-0 mt-0.5">
@@ -130,7 +124,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </div>
         </div>
 
-        {/* Bottom: Two buttons (NO separator line) */}
         <div className="flex items-center justify-end gap-2 pt-3">
           <Button
             type="button"
@@ -162,6 +155,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -10,6 +10,7 @@ export interface TaskMember {
 
 export interface TaskItem {
   taskId: string;
+  taskCode?: string;
   taskTitle: string;
   taskDescription?: string;
   taskStatus: TaskStatusType;

@@ -9,9 +9,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { Member } from '@/types/member.types';
 import { useAuth } from '@/context/AuthContext';
-import { getMemberId, getRoleCategory } from './member-utils';
+import { getMemberId, getRoleCategory, normalizeMemberList } from './member-utils';
 import { getUserStatusTone } from '@/lib/status-tone';
-import { useScrollFade } from '@/hooks/useScrollFade';
 
 export interface RosterDetailModalProps {
   open: boolean;
@@ -46,20 +45,23 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
   const isHost = (user?.userRole || '').toUpperCase() === 'HOST';
   const canModify = canManage !== undefined ? canManage : (isTopAdmin || isHost);
 
-  const scrollRef = useScrollFade<HTMLDivElement>();
   const [search, setSearch] = useState('');
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
 
+  const deduplicatedMembers = useMemo(() => {
+    return normalizeMemberList(members);
+  }, [members]);
+
   const filteredMembers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return members;
-    return members.filter((m) => {
+    if (!q) return deduplicatedMembers;
+    return deduplicatedMembers.filter((m) => {
       const name = m.userName || '';
       const email = m.userEmail || '';
       const role = m.userRole || '';
       return name.toLowerCase().includes(q) || email.toLowerCase().includes(q) || role.toLowerCase().includes(q);
     });
-  }, [members, search]);
+  }, [deduplicatedMembers, search]);
 
   const columns: Column<Member>[] = [
     {
@@ -70,7 +72,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
         const email = m.userEmail || '';
         return (
           <div className="flex items-center gap-2.5 min-w-[180px]">
-            <div className="w-8 h-8 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs shrink-0 border border-emerald-500/30">
+            <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0 border border-primary/30">
               {name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
@@ -162,7 +164,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
             <div className="flex justify-end items-center gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30 inline-flex items-center gap-1 cursor-default">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-primary/15 text-primary border border-primary/30 inline-flex items-center gap-1 cursor-default">
                     <Check size={12} />
                     <span>Locked Host</span>
                   </span>
@@ -187,7 +189,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
                   type="button"
                   onClick={() => onUpdateRole(mId, 'Member')}
                   className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer ${currentRole === 'Member'
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                     }`}
                 >
@@ -197,7 +199,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
                   type="button"
                   onClick={() => onUpdateRole(mId, 'Host')}
                   className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer ${currentRole === 'Host'
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                     }`}
                 >
@@ -228,8 +230,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
       open={open}
       onClose={onClose}
       title={title}
-      description={`Viewing full roster details for ${projectName || teamName || 'workspace'}. Authorized updates are saved instantly.`}
-      className="max-w-4xl"
+      className="w-[95vw] sm:w-[88vw] lg:w-[80vw] max-w-6xl min-w-[320px] sm:min-w-[640px] lg:min-w-[850px]"
     >
       <div className="space-y-4">
         {/* Filter and stats row */}
@@ -247,25 +248,22 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
           <div className="flex items-center gap-2 text-xs">
             <Badge tone="success" className="gap-1">
               <Users size={12} />
-              <span>{members.length} Members Total</span>
+              <span>{deduplicatedMembers.length} Members Total</span>
             </Badge>
           </div>
         </div>
 
         {/* Member Table */}
-        <div ref={scrollRef} className="max-h-[420px] overflow-y-auto scroll-fade-y rounded-md border border-border">
-          <DataTable
-            columns={columns}
-            data={filteredMembers}
-            keyExtractor={(m) => getMemberId(m)}
-          />
-        </div>
+        <DataTable
+          columns={columns}
+          data={filteredMembers}
+          keyExtractor={(m) => getMemberId(m)}
+          pageSize={5}
+          pageSizeOptions={[5, 10, 20]}
+        />
 
         {/* Footer info */}
-        <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground border-t border-border">
-          <p className="text-[11px]">
-            {isTopAdmin ? 'SuperAdmin & Admin privileges active: You may adjust host assignments or remove team members.' : 'Viewing in read-only mode.'}
-          </p>
+        <div className="flex items-center justify-end pt-2 text-xs text-muted-foreground border-t border-border">
           <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>

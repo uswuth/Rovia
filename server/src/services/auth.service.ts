@@ -21,6 +21,14 @@ export const registerUserService = async (
   const userEmail = input.userEmail.toLowerCase().trim();
   const password = input.password;
 
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(password)) {
+    throw ApiError.badRequest(
+      'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)',
+      [{ field: 'password', message: 'Password does not meet complexity requirements' }]
+    );
+  }
+
   const existingUser = await User.findOne({ user_email: userEmail });
   if (existingUser) {
     throw ApiError.badRequest('User with this email already exists', [
@@ -34,7 +42,6 @@ export const registerUserService = async (
   let assignedOrgId: string | undefined;
 
   if (isCreatingOrg) {
-    // ── CASE 1: Toggle = TRUE (Creating Organization -> SuperAdmin) ──
     const orgName = (input.organizationName || '').trim();
     if (!orgName) {
       throw ApiError.badRequest('Organization name is required when creating an organization', [
@@ -47,8 +54,7 @@ export const registerUserService = async (
       .trim()
       .replace(/[^a-z0-9]/g, '-');
 
-    // Collision handling: try a random suffix, then a timestamp suffix, so a
-    // repeated collision can never surface as a raw duplicate-key 500.
+    // On slug collision, retry with a random then a timestamp suffix instead of a duplicate-key 500.
     const slugExists = async (slug: string) =>
       Boolean(await Organization.findOne({ organization_slug: slug }).lean());
     let finalSlug = baseSlug;
@@ -74,8 +80,7 @@ export const registerUserService = async (
     user.refreshToken = refreshToken;
     await user.save();
 
-    // 2. Create Organization with user as owner. If this fails, the half-created
-    // user is rolled back so a failed signup never consumes the email address.
+    // If org creation fails, roll back the half-created user so a failed signup frees the email.
     const newOrg = await Organization.create({
       organization_name: orgName,
       organization_slug: finalSlug,
@@ -86,11 +91,9 @@ export const registerUserService = async (
       throw error;
     });
 
-    // 3. Link organization to user
     user.organization_id = newOrg._id;
     await user.save();
 
-    // 4. Generate accessToken with organizationId included in the payload
     const accessToken = user.generateAccessToken();
 
     const populatedUser = await User.findById(user._id).populate('organization_id', ORGANIZATION_POPULATE);
@@ -144,9 +147,39 @@ export const loginUserService = async (input: IUserLoginInput): Promise<IAuthTok
     throw ApiError.unauthorized('Invalid email or password');
   }
 
+  if (user.locked_until && user.locked_until.getTime() > Date.now()) {
+    const remainingMinutes = Math.ceil((user.locked_until.getTime() - Date.now()) / (60 * 1000));
+    throw ApiError.tooManyRequests(
+      `Account is temporarily locked due to repeated failed login attempts. Please try again in ${remainingMinutes} minute(s).`
+    );
+  }
+
   const isPasswordValid = await user.comparePassword(password);
   if (!isPasswordValid) {
+    user.failed_login_attempts = (user.failed_login_attempts || 0) + 1;
+    if (user.failed_login_attempts >= 5) {
+      user.locked_until = new Date(Date.now() + 15 * 60 * 1000);
+      user.failed_login_attempts = 0;
+      await user.save();
+      throw ApiError.tooManyRequests(
+        'Account is locked due to too many failed attempts. Please try again in 15 minutes.'
+      );
+    }
+    await user.save();
     throw ApiError.unauthorized('Invalid email or password');
+  }
+
+  if (user.failed_login_attempts > 0 || user.locked_until) {
+    user.failed_login_attempts = 0;
+    user.locked_until = null;
+  }
+
+  if (user.organization_id) {
+    const org = await Organization.findById(user.organization_id).select('organization_owner_id');
+    if (org?.organization_owner_id && org.organization_owner_id.toString() === user._id.toString()) {
+      user.user_role = 'SuperAdmin';
+      user.is_super_admin = true;
+    }
   }
 
   const accessToken = user.generateAccessToken();
@@ -179,6 +212,14 @@ export const refreshAccessTokenService = async (incomingRefreshToken: string): P
   const user = await User.findById(decoded.id).select('+refreshToken');
   if (!user || user.refreshToken !== incomingRefreshToken) {
     throw ApiError.unauthorized('Invalid or expired refresh token');
+  }
+
+  if (user.organization_id) {
+    const org = await Organization.findById(user.organization_id).select('organization_owner_id');
+    if (org?.organization_owner_id && org.organization_owner_id.toString() === user._id.toString()) {
+      user.user_role = 'SuperAdmin';
+      user.is_super_admin = true;
+    }
   }
 
   const newAccessToken = user.generateAccessToken();
@@ -222,10 +263,12 @@ export const changePasswordService = async (
     throw ApiError.badRequest('Current password and new password are required');
   }
 
-  if (newPassword.length < 6) {
-    throw ApiError.badRequest('New password must be at least 6 characters long', [
-      { field: 'newPassword', message: 'Password must be at least 6 characters' }
-    ]);
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    throw ApiError.badRequest(
+      'New password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)',
+      [{ field: 'newPassword', message: 'Password does not meet complexity requirements' }]
+    );
   }
 
   const user = await User.findById(userId).select('+password');
