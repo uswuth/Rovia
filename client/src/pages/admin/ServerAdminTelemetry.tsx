@@ -59,49 +59,8 @@ export const ServerAdminTelemetry: React.FC = () => {
     return `${d > 0 ? `${d}d ` : ''}${h}h ${m}m ${s}s`;
   };
 
-  const services: ServiceHealthItem[] = metrics?.servicesHealth || [
-    { name: 'Core API Server', status: 'HEALTHY', latencyMs: 4, type: 'HTTP / Express' },
-    { name: 'MongoDB Database', status: 'HEALTHY', latencyMs: 2, type: 'Database' },
-    { name: 'Socket.IO Gateway', status: 'HEALTHY', latencyMs: 1, type: 'WebSockets' },
-    { name: 'WebRTC SFU Node', status: 'HEALTHY', latencyMs: 6, type: 'Media Server' },
-    { name: 'Security Vault', status: 'OPERATIONAL', latencyMs: 1, type: 'Auth & Secrets' },
-    { name: 'Prometheus Exporter', status: 'SCRAPING', latencyMs: 3, type: 'Telemetry' }
-  ];
-
-  const securityLogs: SecurityAuditItem[] = metrics?.recentSecurityAudits || [
-    {
-      id: 'sec-01',
-      event: 'SERVER_ADMIN_LOGIN',
-      status: 'SUCCESS',
-      sourceIp: '127.0.0.1',
-      userAgent: 'Cluster-Control-Plane',
-      timestamp: new Date().toISOString()
-    },
-    {
-      id: 'sec-02',
-      event: 'METRICS_SCRAPE_REQUEST',
-      status: 'VERIFIED',
-      sourceIp: '127.0.0.1',
-      userAgent: 'Prometheus/2.45',
-      timestamp: new Date(Date.now() - 45_000).toISOString()
-    },
-    {
-      id: 'sec-03',
-      event: 'TENANT_ROSTER_DISCOVERY',
-      status: 'AUTHORIZED',
-      sourceIp: 'Internal-Mesh',
-      userAgent: 'IntellMeet-Service',
-      timestamp: new Date(Date.now() - 180_000).toISOString()
-    },
-    {
-      id: 'sec-04',
-      event: 'WEBRTC_ICE_NEGOTIATION',
-      status: 'ENCRYPTED',
-      sourceIp: 'Gateway-Node-01',
-      userAgent: 'Socket.io-Engine',
-      timestamp: new Date(Date.now() - 320_000).toISOString()
-    }
-  ];
+  const services: ServiceHealthItem[] = metrics?.servicesHealth || [];
+  const securityLogs: SecurityAuditItem[] = metrics?.recentSecurityAudits || [];
 
   return (
     <div className="w-full space-y-6 pb-12">
