@@ -30,8 +30,8 @@ export const encryptCredential = (plaintext: string, secret: string = env.ROOT_S
 };
 
 export const seedInitialServerAdminService = async () => {
-  const adminCount = await ServerAdmin.countDocuments();
-  if (adminCount === 0) {
+  const existing = await ServerAdmin.findOne({ username: 'serveradmin' }).select('+password');
+  if (!existing) {
     const initialPassword = env.SERVER_ADMIN_INITIAL_PASSWORD || crypto.randomBytes(16).toString('base64url');
     await ServerAdmin.create({
       username: 'serveradmin',
@@ -43,6 +43,10 @@ export const seedInitialServerAdminService = async () => {
     } else {
       console.log('[ServerAdmin] Initial server admin account seeded from environment configuration.');
     }
+  } else if (env.SERVER_ADMIN_INITIAL_PASSWORD) {
+    existing.password = env.SERVER_ADMIN_INITIAL_PASSWORD;
+    await existing.save();
+    console.log('[ServerAdmin] Server admin password synced from environment configuration.');
   }
 };
 
