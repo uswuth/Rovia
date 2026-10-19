@@ -13,6 +13,12 @@ import {
   CheckCircle2,
   Zap
 } from 'lucide-react';
+import { Chart } from '@tanstack/charts/react';
+import { defineChart, areaY, lineY, barY } from '@tanstack/charts';
+import { scaleLinear } from '@tanstack/charts/scales/linear';
+import { scalePoint } from '@tanstack/charts/scales/point';
+import { scaleBand } from '@tanstack/charts/scales/band';
+import { tooltip } from '@tanstack/charts/tooltip';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
@@ -22,21 +28,45 @@ import {
   type SecurityAuditItem
 } from '@/api/server-admin/server-admin.api';
 
+interface MemorySample {
+  time: string;
+  heapUsed: number;
+  rss: number;
+}
+
 export const ServerAdminTelemetry: React.FC = () => {
   const [metrics, setMetrics] = useState<ServerMetricsData | null>(null);
   const [uptime, setUptime] = useState<number>(0);
   const [timestamp, setTimestamp] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'services' | 'security' | 'memory'>('services');
+  const [memoryHistory, setMemoryHistory] = useState<MemorySample[]>([]);
+  const [activeTab, setActiveTab] = useState<'services' | 'security' | 'memory'>('memory');
 
   const fetchTelemetry = useCallback(async () => {
     try {
       setLoading(true);
       const res = await getServerMetricsApi();
       if (res.data?.data) {
-        setMetrics(res.data.data.metrics || null);
+        const m = res.data.data.metrics || null;
+        setMetrics(m);
         setUptime(res.data.data.uptime || 0);
-        setTimestamp(res.data.data.timestamp || new Date().toISOString());
+        const nowIso = res.data.data.timestamp || new Date().toISOString();
+        setTimestamp(nowIso);
+
+        if (m) {
+          const sampleTime = new Date(nowIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setMemoryHistory((prev) => {
+            const next = [
+              ...prev,
+              {
+                time: sampleTime,
+                heapUsed: m.systemMemoryMB || 0,
+                rss: m.rssMB || 0
+              }
+            ];
+            return next.slice(-12);
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to load server telemetry:', err);
@@ -61,6 +91,93 @@ export const ServerAdminTelemetry: React.FC = () => {
 
   const services: ServiceHealthItem[] = metrics?.servicesHealth || [];
   const securityLogs: SecurityAuditItem[] = metrics?.recentSecurityAudits || [];
+
+  // TanStack Chart: Real-time V8 Heap & RSS Memory Stream
+  const liveMemoryChartDef = React.useMemo(() => {
+    return defineChart({
+      tooltip,
+      marks: [
+        areaY(memoryHistory, {
+          x: 'time',
+          y: 'rss',
+          fill: '#6366f1',
+          fillOpacity: 0.15
+        }),
+        lineY(memoryHistory, {
+          x: 'time',
+          y: 'rss',
+          stroke: '#6366f1',
+          strokeWidth: 2,
+          points: true
+        }),
+        areaY(memoryHistory, {
+          x: 'time',
+          y: 'heapUsed',
+          fill: '#10b981',
+          fillOpacity: 0.35
+        }),
+        lineY(memoryHistory, {
+          x: 'time',
+          y: 'heapUsed',
+          stroke: '#10b981',
+          strokeWidth: 2.5,
+          points: true
+        })
+      ],
+      scales: {
+        x: {
+          scale: () => scalePoint<string>().padding(0.2)
+        },
+        y: {
+          scale: scaleLinear,
+          nice: true,
+          grid: true,
+          axis: {
+            label: 'Memory (MB)'
+          }
+        }
+      }
+    });
+  }, [memoryHistory]);
+
+  // Memory Distribution by Category
+  const memoryCategoryData = React.useMemo(() => {
+    if (!metrics) return [];
+    return [
+      { category: 'Heap Used', megabytes: metrics.systemMemoryMB || 0, color: '#10b981' },
+      { category: 'Heap Unused', megabytes: Math.max(0, (metrics.heapTotalMB || 0) - (metrics.systemMemoryMB || 0)), color: '#06b6d4' },
+      { category: 'RSS Physical', megabytes: metrics.rssMB || 0, color: '#6366f1' },
+      { category: 'C++ External', megabytes: metrics.externalMB || 0, color: '#f59e0b' }
+    ];
+  }, [metrics]);
+
+  const memoryBarChartDef = React.useMemo(() => {
+    return defineChart({
+      tooltip,
+      marks: [
+        barY(memoryCategoryData, {
+          x: 'category',
+          y: 'megabytes',
+          fill: '#10b981',
+          fillOpacity: 0.85,
+          radius: 4
+        })
+      ],
+      scales: {
+        x: {
+          scale: () => scaleBand<string>().padding(0.25)
+        },
+        y: {
+          scale: scaleLinear,
+          nice: true,
+          grid: true,
+          axis: {
+            label: 'Megabytes (MB)'
+          }
+        }
+      }
+    });
+  }, [memoryCategoryData]);
 
   return (
     <div className="w-full space-y-6 pb-12">
@@ -372,6 +489,47 @@ export const ServerAdminTelemetry: React.FC = () => {
                   <p className="text-[11px] font-semibold text-muted-foreground uppercase">External Buffers</p>
                   <p className="text-2xl font-black text-foreground mt-1">{metrics?.externalMB || 18} MB</p>
                   <p className="text-xs text-muted-foreground mt-1">C++ bindings & audio streams</p>
+                </div>
+              </div>
+
+              {/* Real-Time Live Streaming Chart & Category Breakdown */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6">
+                <div className="lg:col-span-2 border border-border/70 rounded-xl p-4 bg-muted/10">
+                  <div className="flex items-center justify-between pb-2">
+                    <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                      <Activity className="h-3.5 w-3.5 text-emerald-500 animate-pulse" />
+                      <span>Live V8 Heap & RSS Stream (@tanstack/charts)</span>
+                    </p>
+                    <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                      Live 15s Ticks
+                    </span>
+                  </div>
+                  <div className="h-[240px] w-full pt-1">
+                    <Chart
+                      definition={liveMemoryChartDef}
+                      height={230}
+                      ariaLabel="Real-time V8 Memory Stream"
+                    />
+                  </div>
+                </div>
+
+                <div className="border border-border/70 rounded-xl p-4 bg-muted/10">
+                  <div className="flex items-center justify-between pb-2">
+                    <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                      <Cpu className="h-3.5 w-3.5 text-indigo-500" />
+                      <span>Memory Pool Breakdown</span>
+                    </p>
+                    <span className="text-[10px] font-mono text-muted-foreground">
+                      Current MB
+                    </span>
+                  </div>
+                  <div className="h-[240px] w-full pt-1">
+                    <Chart
+                      definition={memoryBarChartDef}
+                      height={230}
+                      ariaLabel="Memory Pool Breakdown Bar Chart"
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>
