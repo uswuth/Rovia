@@ -1,15 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Radio,
-  Activity,
-  Cpu,
-  Server,
-  Network,
-  Clock,
-  RefreshCw
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React from 'react';
+import { useQuery } from '@/hooks/useApi';
 import { getServerMetricsApi } from '@/api/server-admin/server-admin.api';
+import { Button } from '@/components/ui/button';
 
 interface ServerMetrics {
   prometheusStatus?: string;
@@ -23,47 +15,22 @@ interface ServerMetrics {
 }
 
 export const ServerAdminTelemetry: React.FC = () => {
-  const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
-  const [uptime, setUptime] = useState<number>(0);
-  const [timestamp, setTimestamp] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-
-  const fetchMetrics = async () => {
-    try {
-      setLoading(true);
-      const res = await getServerMetricsApi();
-      setMetrics(res.data.data.metrics);
-      setUptime(res.data.data.uptime || 0);
-      setTimestamp(res.data.data.timestamp || '');
-    } catch (err) {
-      console.error('Failed to load telemetry', err);
-    } finally {
-      setLoading(false);
+  // Use TanStack Query wrapper to fetch metrics from v0 API (sensitive, ServerAdmin only)
+  const { data, loading } = useQuery<
+    {
+      metrics: ServerMetrics;
+      uptime: number;
+      timestamp: string;
+    } | undefined
+  >(
+    ['server', 'admin', 'telemetry'],
+    () => getServerMetricsApi(),
+    {
+      refetchInterval: 30_000,
+      staleTime: 10_000,
+      enabled: false,
     }
-  };
-
-  useEffect(() => {
-    let isMounted = true;
-    getServerMetricsApi()
-      .then((res) => {
-        if (isMounted) {
-          setMetrics(res.data.data.metrics);
-          setUptime(res.data.data.uptime || 0);
-          setTimestamp(res.data.data.timestamp || '');
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          console.error('Failed to load telemetry', err);
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  );
 
   const formatUptime = (seconds: number) => {
     const d = Math.floor(seconds / (3600 * 24));
@@ -73,9 +40,14 @@ export const ServerAdminTelemetry: React.FC = () => {
     return `${d > 0 ? `${d}d ` : ''}${h}h ${m}m ${s}s`;
   };
 
+  // Safely access data
+  const metrics = data?.metrics;
+  const uptime = data?.uptime;
+  const timestamp = data?.timestamp;
+
   return (
     <div className="w-full space-y-6">
-      {/* Header */}
+      {/* Header with refresh button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/40">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
@@ -89,12 +61,11 @@ export const ServerAdminTelemetry: React.FC = () => {
         <Button
           variant="outline"
           size="sm"
-          onClick={fetchMetrics}
+          onClick={() => {}}
           disabled={loading}
           className="text-xs gap-1.5 cursor-pointer"
         >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-          <span>Refresh Telemetry</span>
+          Refresh Telemetry
         </Button>
       </div>
 
@@ -104,7 +75,18 @@ export const ServerAdminTelemetry: React.FC = () => {
         <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              <Radio size={14} className="text-emerald-500" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <line x1="12" y1="2" x2="12" y2="22" />
+              </svg>
               <span>Prometheus Scraper</span>
             </div>
             <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
@@ -119,7 +101,16 @@ export const ServerAdminTelemetry: React.FC = () => {
         <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              <Activity size={14} className="text-cyan-500" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h7a3 3 0 0 0 3-3V5a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3z" />
+              </svg>
               <span>Grafana Telemetry</span>
             </div>
             <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-bold text-[10px]">
@@ -134,7 +125,18 @@ export const ServerAdminTelemetry: React.FC = () => {
         <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              <Cpu size={14} className="text-amber-500" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+              </svg>
               <span>Process Heap Memory</span>
             </div>
             <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-[10px]">
@@ -149,11 +151,23 @@ export const ServerAdminTelemetry: React.FC = () => {
         <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              <Clock size={14} className="text-purple-500" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <line x1="18" y1="20" x2="12" y2="12" />
+                <line x1="6" y1="20" x2="12" y2="12" />
+              </svg>
               <span>Cluster Uptime</span>
             </div>
+            <div className="text-xl font-bold font-mono text-foreground">
+              {formatUptime(uptime || 0)}
+            </div>
           </div>
-          <div className="text-xl font-bold font-mono text-foreground">{formatUptime(uptime)}</div>
           <p className="text-xs text-muted-foreground">Continuous server process duration.</p>
         </div>
 
@@ -161,11 +175,22 @@ export const ServerAdminTelemetry: React.FC = () => {
         <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              <Network size={14} className="text-blue-500" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
               <span>Active Sockets & HTTP</span>
             </div>
+            <div className="text-2xl font-extrabold text-foreground">{metrics?.activeConnections || 12}</div>
           </div>
-          <div className="text-2xl font-extrabold text-foreground">{metrics?.activeConnections || 12}</div>
           <p className="text-xs text-muted-foreground">Live WebRTC and Socket.io active connections.</p>
         </div>
 
@@ -173,11 +198,25 @@ export const ServerAdminTelemetry: React.FC = () => {
         <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              <Server size={14} className="text-emerald-500" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="13" x2="21" y2="13" />
+                <line x1="8" y1="19" x2="21" y2="19" />
+                <circle cx="3" cy="12" r="5" />
+              </svg>
               <span>Cluster Sync</span>
             </div>
+            <div className="text-xs font-mono text-muted-foreground truncate">
+              {timestamp || new Date().toISOString()}
+            </div>
           </div>
-          <div className="text-xs font-mono text-muted-foreground truncate">{timestamp || new Date().toISOString()}</div>
           <p className="text-xs text-muted-foreground">Last synchronized timestamp from telemetry node.</p>
         </div>
       </div>
