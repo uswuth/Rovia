@@ -33,8 +33,9 @@ export const ServerAdminLayout: React.FC = () => {
       if (res.data?.data?.metrics?.prometheusStatus) {
         setPrometheusStatus(res.data.data.metrics.prometheusStatus);
       }
-    } catch {
-          } finally {
+    } catch (error) {
+          console.error(error);
+        } finally {
       setRefreshing(false);
     }
   }, [navigate]);

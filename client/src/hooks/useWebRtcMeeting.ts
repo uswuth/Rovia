@@ -104,6 +104,7 @@ export const useWebRtcMeeting = (
   }, []);
 
   const makingOfferRef = useRef<Record<string, boolean>>({});
+  const sendOfferRef = useRef<((userId: string, pc: RTCPeerConnection) => Promise<void>) | null>(null);
 
   const sendOffer = useCallback(async (userId: string, pc: RTCPeerConnection) => {
     try {
@@ -112,7 +113,7 @@ export const useWebRtcMeeting = (
         const handleStateChange = async () => {
           if (pc.signalingState === 'stable') {
             pc.removeEventListener('signalingstatechange', handleStateChange);
-            await sendOffer(userId, pc);
+            await sendOfferRef.current?.(userId, pc);
           }
         };
         pc.addEventListener('signalingstatechange', handleStateChange);
@@ -128,6 +129,10 @@ export const useWebRtcMeeting = (
       makingOfferRef.current[userId] = false;
     }
   }, [meetingId]);
+
+  useEffect(() => {
+    sendOfferRef.current = sendOffer;
+  }, [sendOffer]);
 
   const renegotiateAll = useCallback(async () => {
     for (const [userId, pc] of Object.entries(connections.current)) {
@@ -155,13 +160,17 @@ export const useWebRtcMeeting = (
 
       const senders = pc.getSenders();
       if (!senders.some((s) => s.track?.kind === 'audio')) {
-        try { pc.addTransceiver('audio', { direction: 'sendrecv' }); } catch { }
+        try { pc.addTransceiver('audio', { direction: 'sendrecv' }); } catch {
+          // Transceiver might already exist or not supported
+        }
       }
       // Ensure at least 2 video transceivers exist (Slot 1: Camera, Slot 2: Screen share)
       const videoTransceivers = pc.getTransceivers().filter((t) => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
       const requiredVideoTransceivers = 2;
       for (let i = videoTransceivers.length; i < requiredVideoTransceivers; i++) {
-        try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch { }
+        try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch {
+          // Transceiver might already exist or not supported
+        }
       }
       applyBitratesToConnection(pc);
 
@@ -479,7 +488,7 @@ export const useWebRtcMeeting = (
       setPeers({});
       disconnectMeetingSocket();
     };
-  }, [enabled, meetingId, createConnection, upsertPeer]);
+  }, [enabled, meetingId, createConnection, upsertPeer, options?.visitorId]);
 
   /** Toggle a local track and tell the room. */
   const setTrackEnabled = useCallback(
@@ -522,6 +531,36 @@ export const useWebRtcMeeting = (
     },
     [meetingId, renegotiateAll]
   );
+
+  const stopScreenShare = useCallback(async () => {
+    if (!screenRef.current) return;
+    const screenTracks = screenRef.current.getTracks();
+    screenTracks.forEach((track) => track.stop());
+    screenRef.current = null;
+    setScreenStream(null);
+    setIsScreenSharing(false);
+
+    const cameraTrack = localRef.current?.getVideoTracks()[0] ?? null;
+    for (const [userId, pc] of Object.entries(connections.current)) {
+      const senders = pc.getSenders();
+      const screenSender = senders.find((s) => screenTracks.includes(s.track!));
+      if (screenSender) {
+        pc.removeTrack(screenSender);
+        await sendOffer(userId, pc);
+      } else {
+        const videoSender = senders.find((s) => s.track?.kind === 'video');
+        if (videoSender && cameraTrack) {
+          await videoSender.replaceTrack(cameraTrack);
+        }
+      }
+    }
+
+    const cameraOn = Boolean(cameraTrack && cameraTrack.enabled);
+    socketRef.current?.emit('meeting:state', {
+      meetingId,
+      state: { isScreenSharing: false, videoEnabled: cameraOn }
+    });
+  }, [meetingId, sendOffer]);
 
   const startScreenShare = useCallback(async () => {
     try {
@@ -567,37 +606,7 @@ export const useWebRtcMeeting = (
     } catch (err) {
       console.warn('Screen share canceled or denied:', err);
     }
-  }, [meetingId, sendOffer]);
-
-  const stopScreenShare = useCallback(async () => {
-    if (!screenRef.current) return;
-    const screenTracks = screenRef.current.getTracks();
-    screenTracks.forEach((track) => track.stop());
-    screenRef.current = null;
-    setScreenStream(null);
-    setIsScreenSharing(false);
-
-    const cameraTrack = localRef.current?.getVideoTracks()[0] ?? null;
-    for (const [userId, pc] of Object.entries(connections.current)) {
-      const senders = pc.getSenders();
-      const screenSender = senders.find((s) => screenTracks.includes(s.track!));
-      if (screenSender) {
-        pc.removeTrack(screenSender);
-        await sendOffer(userId, pc);
-      } else {
-        const videoSender = senders.find((s) => s.track?.kind === 'video');
-        if (videoSender && cameraTrack) {
-          await videoSender.replaceTrack(cameraTrack);
-        }
-      }
-    }
-
-    const cameraOn = Boolean(cameraTrack && cameraTrack.enabled);
-    socketRef.current?.emit('meeting:state', {
-      meetingId,
-      state: { isScreenSharing: false, videoEnabled: cameraOn }
-    });
-  }, [meetingId, sendOffer]);
+  }, [meetingId, sendOffer, stopScreenShare]);
 
   const toggleScreenShare = useCallback(() => {
     if (isScreenSharing) {

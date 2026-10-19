@@ -26,7 +26,7 @@ export const ServerAdminDashboard: React.FC = () => {
   const navigate = useNavigate();
 
   // Fetch metrics using v0 API (sensitive, ServerAdmin only) via useQuery wrapper
-  const { data: metrics, error: _metricsError, loading: isMetricsLoading } = useQuery<
+  const { data: metrics, loading: isMetricsLoading } = useQuery<
     ServerMetrics | undefined
   >(
     ['server', 'admin', 'metrics'],
@@ -38,7 +38,7 @@ export const ServerAdminDashboard: React.FC = () => {
   );
 
   // Fetch organizations using v0 API
-  const { data: orgData, error: _orgsError } = useQuery<
+  const { data: orgData } = useQuery<
     OrgData[] | undefined
   >(
     ['server', 'admin', 'organizations'],

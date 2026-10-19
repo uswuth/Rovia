@@ -56,8 +56,9 @@ export function NavMain({
       const updated = { ...prev, [title]: isOpen }
       try {
         localStorage.setItem("sidebar_collapsible_menu_states", JSON.stringify(updated))
-      } catch {
-              }
+      } catch (error) {
+        console.error(error);
+      }
       return updated
     })
   }
