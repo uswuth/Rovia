@@ -10,6 +10,8 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { TimeFormatProvider } from '@/context/TimeFormatContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SidebarLayout } from '@/components/layout/SidebarLayout';
+import { useSEO } from '@/hooks/useSEO';
+import { CookieConsent } from '@/components/CookieConsent';
 
 const Login = lazy(() => import('@/pages/login/Login').then((m) => ({ default: m.Login })));
 const Signup = lazy(() => import('@/pages/signup/Signup').then((m) => ({ default: m.Signup })));
@@ -29,6 +31,7 @@ const ServerAdminOrganizations = lazy(() => import('@/pages/admin/ServerAdminOrg
 const ServerAdminOrgView = lazy(() => import('@/pages/admin/ServerAdminOrgView').then((m) => ({ default: m.ServerAdminOrgView })));
 const CreateServerAdminOrg = lazy(() => import('@/pages/admin/CreateServerAdminOrg').then((m) => ({ default: m.CreateServerAdminOrg })));
 const ServerAdminTelemetry = lazy(() => import('@/pages/admin/ServerAdminTelemetry').then((m) => ({ default: m.ServerAdminTelemetry })));
+const NotFoundPage = lazy(() => import('@/pages/not-found/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 const OrgMembers = lazy(() => import('@/pages/organization/OrgMembers').then((m) => ({ default: m.OrgMembers })));
 const CreateOrgMember = lazy(() => import('@/pages/organization/CreateOrgMember').then((m) => ({ default: m.CreateOrgMember })));
 const UserProfile = lazy(() => import('@/pages/organization/UserProfile').then((m) => ({ default: m.UserProfile })));
@@ -93,17 +96,20 @@ const MeetingRoomRoute = () => {
 
 const queryClient = createQueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <ThemeProvider>
-        <TimeFormatProvider>
-          <AuthProvider>
-            <ProjectProvider>
-              <OrganizationProvider>
-                <TooltipProvider>
-                  <Suspense fallback={<SuspenseFallback />}>
-                    <Routes>
+const App = () => {
+  useSEO();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ThemeProvider>
+          <TimeFormatProvider>
+            <AuthProvider>
+              <ProjectProvider>
+                <OrganizationProvider>
+                  <TooltipProvider>
+                    <Suspense fallback={<SuspenseFallback />}>
+                      <CookieConsent />
+                      <Routes>
                       <Route path="/" element={<Navigate to="/login" replace />} />
                       <Route
                         path="/login"
@@ -164,6 +170,7 @@ const App = () => (
                         <Route path="/tasks/:id/edit" element={<CreateTask />} />
                         <Route path="/settings" element={<SettingsPage />} />
                       </Route>
+                      <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                   </Suspense>
                 </TooltipProvider>
@@ -172,10 +179,11 @@ const App = () => (
           </AuthProvider>
         </TimeFormatProvider>
       </ThemeProvider>
-    </BrowserRouter>
-    {/* Vite strips devtools from the production bundle. */}
-    <ReactQueryDevtools initialIsOpen={false} />
-  </QueryClientProvider>
-);
+      </BrowserRouter>
+      {/* Vite strips devtools from the production bundle. */}
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+  );
+};
 
 export default App;

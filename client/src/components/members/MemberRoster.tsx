@@ -16,9 +16,9 @@ export interface MemberRosterProps {
   members: Member[];
   /** Map of member ID -> role ('Host' | 'Member') */
   value: Record<string, 'Host' | 'Member'>;
-  
+
   onChange: (value: Record<string, 'Host' | 'Member'>) => void;
-  
+
   title?: string;
   /** Singular entity noun for dialogs/tooltips (e.g. "project", "meeting") */
   entityName?: string;
@@ -26,7 +26,7 @@ export interface MemberRosterProps {
   lockSuperAdmin?: boolean;
   /** Optional class name on outer container */
   className?: string;
-  
+
   minHeight?: string;
   /** Name of the project or meeting to mention in confirmation dialogs */
   projectName?: string;
@@ -207,7 +207,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
   return (
     <div
       className={cn(
-        'flex flex-col h-full rounded-xl border border-border bg-card/60 p-4.5 space-y-3 shadow-xs',
+        'flex flex-col h-full rounded-xs border border-border bg-card/60 p-4.5 space-y-3 shadow-xs',
         className,
       )}
     >
@@ -232,7 +232,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
 
       {/* Host limit warning notification */}
       {warningMessage && (
-        <div className="flex items-center justify-between gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400 backdrop-blur-md shadow-xs animate-in fade-in duration-200 shrink-0 overflow-hidden">
+        <div className="flex items-center justify-between gap-2.5 rounded-sm border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400 backdrop-blur-md shadow-xs animate-in fade-in duration-200 shrink-0 overflow-hidden">
           <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             <AlertTriangle size={15} className="shrink-0 text-amber-500" />
             <div
@@ -313,7 +313,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                       <div
                         key={memberId}
                         className={cn(
-                          'flex items-center justify-between p-2.5 rounded-lg border transition-all',
+                          'flex items-center justify-between p-2.5 rounded-sm border transition-all',
                           isSuperAdmin
                             ? 'border-primary/50 bg-primary/10'
                             : isSelected
@@ -351,20 +351,20 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                             /* Read-only view for regular Members */
                             <div className="flex items-center gap-1.5">
                               {isSuperAdmin ? (
-                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-primary/15 text-primary border border-primary/30">
+                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-sm bg-primary/15 text-primary border border-primary/30">
                                   SuperAdmin
                                 </span>
                               ) : isAdmin ? (
-                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
+                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-sm bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
                                   Admin
                                 </span>
                               ) : isSelected ? (
                                 currentRole === 'Host' ? (
-                                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-sm bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
                                     Host
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-secondary text-secondary-foreground border border-border">
+                                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-sm bg-secondary text-secondary-foreground border border-border">
                                     Member
                                   </span>
                                 )

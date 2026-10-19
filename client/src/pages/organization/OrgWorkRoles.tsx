@@ -26,7 +26,7 @@ export const OrgWorkRoles: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-    const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<WorkRoleItem | null>(null);
   const [form, setForm] = useState({ roleName: '', tagName: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -125,7 +125,7 @@ export const OrgWorkRoles: React.FC = () => {
 
   return (
     <div className="w-full max-w-full min-w-0 bg-background text-foreground p-6 lg:p-8 space-y-6">
-      {}
+      { }
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
@@ -170,7 +170,7 @@ export const OrgWorkRoles: React.FC = () => {
         </div>
       </div>
 
-      {}
+      { }
       <DataTable
         columns={columns}
         data={filteredRoles}
@@ -182,7 +182,7 @@ export const OrgWorkRoles: React.FC = () => {
       {/* Create / Edit Work Role Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-card border border-border rounded-sm max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-border/50 pb-3">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                 <Briefcase size={18} className="text-primary" />

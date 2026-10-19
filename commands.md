@@ -26,6 +26,16 @@ commands from the repository root.
 | `pnpm lint:fix` | Runs ESLint with auto-fix |
 | `pnpm lint:server` / `pnpm lint:client` | Lints one package |
 
+## E2E Testing & Seeding (Playwright)
+
+| Command | What it does |
+| --- | --- |
+| `pnpm test:e2e` | Runs end-to-end tests headless with full video demo recording |
+| `pnpm test:e2e:ui` | Runs tests in interactive Playwright UI mode with time-travel debugger |
+| `pnpm test:e2e:report` | Opens HTML report displaying test steps and recorded videos |
+| `npx playwright test --headed` | Runs E2E tests in a visible desktop browser window |
+| `npx playwright install chromium` | Installs or updates the Chromium browser binary for Playwright |
+
 ## API
 
 | Command | What it does |

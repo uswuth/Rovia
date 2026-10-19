@@ -14,6 +14,65 @@ export interface CreateOrgWithCredentialsPayload {
   adminEmail: string;
 }
 
+export interface WeeklyTrendItem {
+  week: string;
+  meetings: number;
+  attendees: number;
+  tasksCompleted: number;
+  avgDurationMin: number;
+  productivityScore: number;
+}
+
+export interface MeetingStatusItem {
+  status: string;
+  count: number;
+}
+
+export interface ServiceHealthItem {
+  name: string;
+  status: string;
+  latencyMs: number;
+  type: string;
+}
+
+export interface SecurityAuditItem {
+  id: string;
+  event: string;
+  status: string;
+  sourceIp: string;
+  userAgent: string;
+  timestamp: string;
+}
+
+export interface ServerMetricsData {
+  prometheusStatus?: string;
+  grafanaStatus?: string;
+  activeConnections?: number;
+  apiLatencyMs?: number;
+  systemMemoryMB?: number;
+  heapTotalMB?: number;
+  rssMB?: number;
+  externalMB?: number;
+  nodeVersion?: string;
+  platform?: string;
+  totalOrganizations?: number;
+  totalUsers?: number;
+  activeUsers?: number;
+  totalMeetings?: number;
+  totalTasks?: number;
+  totalRecordings?: number;
+  weeklyTrends?: WeeklyTrendItem[];
+  meetingsByStatus?: MeetingStatusItem[];
+  servicesHealth?: ServiceHealthItem[];
+  recentSecurityAudits?: SecurityAuditItem[];
+}
+
+export interface ServerMetricsResponse {
+  uptime?: number;
+  timestamp?: string;
+  metrics?: ServerMetricsData;
+}
+
 // Server Admin Login - uses v1 API version
 // All endpoints use /api/v1/server-admin/...
 export const loginServerAdminApi = async (payload: ServerAdminLoginPayload) => {
@@ -22,15 +81,15 @@ export const loginServerAdminApi = async (payload: ServerAdminLoginPayload) => {
 
 // v1: Public-facing endpoints (no special auth beyond bearerAuth)
 export const getServerMetricsApi = async () => {
-  return await api.post('/server-admin/metrics', {});
+  return await api.get('/server-admin/metrics');
 };
 
 export const getAllOrganizationsServerAdminApi = async () => {
-  return await api.post('/server-admin/organizations', {});
+  return await api.get('/server-admin/organizations');
 };
 
 export const getOrgDetailsServerAdminApi = async (orgId: string) => {
-  return await api.post(`/server-admin/organizations/${orgId}`, { orgId });
+  return await api.get(`/server-admin/organizations/${orgId}`);
 };
 
 export const createOrgWithCredentialsApi = async (payload: CreateOrgWithCredentialsPayload) => {

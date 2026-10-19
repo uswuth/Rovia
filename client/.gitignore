@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright generated reports, videos, and cache
+test-results/
+playwright-report/
+blob-report/
+.playwright/
