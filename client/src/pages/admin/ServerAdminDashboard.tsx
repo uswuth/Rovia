@@ -77,18 +77,9 @@ export const ServerAdminDashboard: React.FC = () => {
     };
   }, []);
 
-  // Filter trends based on selected range
+  // Filter trends based on selected range using strictly real endpoint values
   const filteredTrends = useMemo(() => {
-    const raw = metricsData?.weeklyTrends || [
-      { week: 'Wk 1', meetings: 4, attendees: 18, tasksCompleted: 11, avgDurationMin: 28, productivityScore: 75 },
-      { week: 'Wk 2', meetings: 6, attendees: 24, tasksCompleted: 16, avgDurationMin: 34, productivityScore: 78 },
-      { week: 'Wk 3', meetings: 5, attendees: 22, tasksCompleted: 19, avgDurationMin: 31, productivityScore: 81 },
-      { week: 'Wk 4', meetings: 8, attendees: 32, tasksCompleted: 23, avgDurationMin: 39, productivityScore: 84 },
-      { week: 'Wk 5', meetings: 9, attendees: 38, tasksCompleted: 27, avgDurationMin: 36, productivityScore: 87 },
-      { week: 'Wk 6', meetings: 12, attendees: 46, tasksCompleted: 33, avgDurationMin: 42, productivityScore: 89 },
-      { week: 'Wk 7', meetings: 14, attendees: 52, tasksCompleted: 38, avgDurationMin: 40, productivityScore: 92 },
-      { week: 'Wk 8', meetings: 16, attendees: 60, tasksCompleted: 44, avgDurationMin: 45, productivityScore: 95 }
-    ];
+    const raw = metricsData?.weeklyTrends || [];
 
     if (selectedRange === '4w') {
       return raw.slice(-4);
@@ -97,13 +88,7 @@ export const ServerAdminDashboard: React.FC = () => {
   }, [metricsData, selectedRange]);
 
   const meetingStatusData = useMemo(() => {
-    const raw = metricsData?.meetingsByStatus || [
-      { status: 'LIVE', count: 3 },
-      { status: 'SCHEDULED', count: 14 },
-      { status: 'ENDED', count: 58 },
-      { status: 'CANCELLED', count: 4 }
-    ];
-    return raw;
+    return metricsData?.meetingsByStatus || [];
   }, [metricsData]);
 
   // Dynamic calculations for deep analytics KPI highlights
@@ -115,8 +100,8 @@ export const ServerAdminDashboard: React.FC = () => {
       filteredTrends.reduce((acc, curr) => acc + curr.avgDurationMin, 0) / (filteredTrends.length || 1)
     );
     const avgAttendeesPerMeeting = totalMeetings > 0 ? (totalAttendees / totalMeetings).toFixed(1) : '0';
-    const latestScore = filteredTrends[filteredTrends.length - 1]?.productivityScore ?? 88;
-    const initialScore = filteredTrends[0]?.productivityScore ?? 75;
+    const latestScore = filteredTrends.length > 0 ? (filteredTrends[filteredTrends.length - 1]?.productivityScore ?? 0) : 0;
+    const initialScore = filteredTrends.length > 0 ? (filteredTrends[0]?.productivityScore ?? 0) : 0;
     const productivityGrowth = latestScore - initialScore;
 
     return {

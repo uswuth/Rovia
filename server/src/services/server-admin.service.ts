@@ -103,7 +103,7 @@ export const getServerAdminMetricsService = async () => {
     Recording.countDocuments()
   ]);
 
-  // Generate 8-week historical productivity & meeting attendee trends
+  // Query real weekly metrics across the last 8 weeks
   const now = new Date();
   const weeklyTrends = [];
   for (let i = 7; i >= 0; i--) {
@@ -111,29 +111,49 @@ export const getServerAdminMetricsService = async () => {
     const weekEnd = new Date(weekStart.getTime() + (7 * 24 * 60 * 60 * 1000));
     const label = `Wk ${8 - i}`;
 
-    const weekMeetings = await Meeting.countDocuments({
+    // Real meetings in this 7-day range
+    const weekMeetingsDocs = await Meeting.find({
       created_at: { $gte: weekStart, $lt: weekEnd }
-    });
+    }).select('meeting_participants meeting_duration_minutes');
+
+    const weekMeetings = weekMeetingsDocs.length;
+
+    // Real attendee count: sum of participants across the meetings created in this window
+    let realAttendees = 0;
+    let totalDurationMinutes = 0;
+    for (const doc of weekMeetingsDocs) {
+      const pCount = Array.isArray(doc.meeting_participants) ? doc.meeting_participants.length : 0;
+      realAttendees += pCount;
+      totalDurationMinutes += (typeof doc.meeting_duration_minutes === 'number' ? doc.meeting_duration_minutes : 0);
+    }
+
+    const avgDurationMin = weekMeetings > 0 ? Math.round(totalDurationMinutes / weekMeetings) : 0;
+
+    // Real tasks completed in this 7-day range (checking both uppercase and lowercase enum values)
     const weekTasksCompleted = await Task.countDocuments({
-      task_status: 'COMPLETED',
-      updated_at: { $gte: weekStart, $lt: weekEnd }
+      task_status: { $in: ['completed', 'COMPLETED'] },
+      updated_at: { $gte: weekStart, $lt: weekEnd },
+      is_deleted: { $ne: true }
     });
 
-    // Compute realistic attendee & duration analytics
-    const baseAttendees = Math.max(weekMeetings * 4, (8 - i) * 6 + 12);
-    const avgDurationMin = Math.round(25 + ((i % 3) * 8) + Math.min(weekMeetings * 2, 20));
+    // Real productivity score formula based strictly on meeting execution and task resolution
+    let productivityScore = 0;
+    if (weekMeetings > 0 || weekTasksCompleted > 0) {
+      const taskRatio = weekMeetings > 0 ? (weekTasksCompleted / weekMeetings) : weekTasksCompleted;
+      productivityScore = Math.min(100, Math.round(Math.min(taskRatio * 20, 80) + (weekMeetings > 0 ? 20 : 0)));
+    }
 
     weeklyTrends.push({
       week: label,
-      meetings: Math.max(weekMeetings, Math.round((8 - i) * 1.5) + 3),
-      attendees: baseAttendees,
-      tasksCompleted: Math.max(weekTasksCompleted, (8 - i) * 4 + 7),
+      meetings: weekMeetings,
+      attendees: realAttendees,
+      tasksCompleted: weekTasksCompleted,
       avgDurationMin,
-      productivityScore: Math.min(100, Math.round(72 + ((8 - i) * 2.8) + (weekTasksCompleted > 0 ? 5 : 0)))
+      productivityScore
     });
   }
 
-  // Meeting types and status distribution
+  // Real meeting status counts directly from collection
   const meetingsByStatus = [
     { status: 'LIVE', count: await Meeting.countDocuments({ meeting_status: 'LIVE' }) },
     { status: 'SCHEDULED', count: await Meeting.countDocuments({ meeting_status: 'SCHEDULED' }) },
@@ -141,14 +161,17 @@ export const getServerAdminMetricsService = async () => {
     { status: 'CANCELLED', count: await Meeting.countDocuments({ meeting_status: 'CANCELLED' }) }
   ];
 
+  // Real active connections: count of currently LIVE meetings or active users
+  const liveMeetingsCount = meetingsByStatus.find((m) => m.status === 'LIVE')?.count || 0;
+
   return {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     metrics: {
       prometheusStatus: 'HEALTHY',
       grafanaStatus: 'ACTIVE',
-      activeConnections: Math.floor(Math.random() * 25) + 12,
-      apiLatencyMs: Math.floor(Math.random() * 35) + 12,
+      activeConnections: liveMeetingsCount,
+      apiLatencyMs: 0,
       systemMemoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
       totalOrganizations: totalOrgs,
       totalUsers,
