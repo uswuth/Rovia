@@ -28,12 +28,33 @@ export interface MeetingStatusItem {
   count: number;
 }
 
+export interface ServiceHealthItem {
+  name: string;
+  status: string;
+  latencyMs: number;
+  type: string;
+}
+
+export interface SecurityAuditItem {
+  id: string;
+  event: string;
+  status: string;
+  sourceIp: string;
+  userAgent: string;
+  timestamp: string;
+}
+
 export interface ServerMetricsData {
   prometheusStatus?: string;
   grafanaStatus?: string;
   activeConnections?: number;
   apiLatencyMs?: number;
   systemMemoryMB?: number;
+  heapTotalMB?: number;
+  rssMB?: number;
+  externalMB?: number;
+  nodeVersion?: string;
+  platform?: string;
   totalOrganizations?: number;
   totalUsers?: number;
   activeUsers?: number;
@@ -42,6 +63,8 @@ export interface ServerMetricsData {
   totalRecordings?: number;
   weeklyTrends?: WeeklyTrendItem[];
   meetingsByStatus?: MeetingStatusItem[];
+  servicesHealth?: ServiceHealthItem[];
+  recentSecurityAudits?: SecurityAuditItem[];
 }
 
 export interface ServerMetricsResponse {
