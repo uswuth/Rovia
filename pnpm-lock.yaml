@@ -5,13 +5,6 @@ importers:
 
   .:
     configDependencies: {}
-    packageManagerDependencies:
-      '@pnpm/exe':
-        specifier: 12.6.0
-        version: 12.6.0
-      pnpm:
-        specifier: 12.6.0
-        version: 12.6.0
 
 packages:
 
