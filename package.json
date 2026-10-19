@@ -20,9 +20,13 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:tools": "docker compose --profile tools up -d",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "concurrently": "^9.1.2"
   },
   "packageManager": "pnpm@11.9.0"

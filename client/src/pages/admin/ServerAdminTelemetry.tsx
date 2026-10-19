@@ -42,9 +42,11 @@ export const ServerAdminTelemetry: React.FC = () => {
   const [memoryHistory, setMemoryHistory] = useState<MemorySample[]>([]);
   const [activeTab, setActiveTab] = useState<'services' | 'security' | 'memory'>('memory');
 
-  const fetchTelemetry = useCallback(async () => {
+  const fetchTelemetry = useCallback(async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setLoading(true);
+      }
       const res = await getServerMetricsApi();
       if (res.data?.data) {
         const m = res.data.data.metrics || null;
@@ -76,9 +78,52 @@ export const ServerAdminTelemetry: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 15_000);
-    return () => clearInterval(interval);
+    let isCancelled = false;
+
+    const run = async () => {
+      try {
+        const res = await getServerMetricsApi();
+        if (isCancelled) return;
+        if (res.data?.data) {
+          const m = res.data.data.metrics || null;
+          setMetrics(m);
+          setUptime(res.data.data.uptime || 0);
+          const nowIso = res.data.data.timestamp || new Date().toISOString();
+          setTimestamp(nowIso);
+
+          if (m) {
+            const sampleTime = new Date(nowIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setMemoryHistory((prev) => {
+              const next = [
+                ...prev,
+                {
+                  time: sampleTime,
+                  heapUsed: m.systemMemoryMB || 0,
+                  rss: m.rssMB || 0
+                }
+              ];
+              return next.slice(-12);
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load initial server telemetry:', err);
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void run();
+    const interval = setInterval(() => {
+      void fetchTelemetry(false);
+    }, 15_000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
   }, [fetchTelemetry]);
 
   const formatUptime = (seconds: number) => {
@@ -201,7 +246,7 @@ export const ServerAdminTelemetry: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchTelemetry}
+            onClick={() => void fetchTelemetry(true)}
             disabled={loading}
             className="text-xs gap-1.5 cursor-pointer h-8"
           >
@@ -214,7 +259,7 @@ export const ServerAdminTelemetry: React.FC = () => {
       {/* Grid of Real-Time Cluster Health Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Prometheus Scraper */}
-        <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs">
+        <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <Zap className="h-4 w-4 text-emerald-500" />
@@ -229,7 +274,7 @@ export const ServerAdminTelemetry: React.FC = () => {
         </div>
 
         {/* Grafana Latency */}
-        <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs">
+        <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <Activity className="h-4 w-4 text-cyan-500" />
@@ -246,7 +291,7 @@ export const ServerAdminTelemetry: React.FC = () => {
         </div>
 
         {/* Process Heap Memory */}
-        <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs">
+        <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <Cpu className="h-4 w-4 text-amber-500" />
@@ -265,7 +310,7 @@ export const ServerAdminTelemetry: React.FC = () => {
         </div>
 
         {/* Cluster Uptime */}
-        <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs">
+        <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <Clock className="h-4 w-4 text-indigo-500" />
@@ -282,7 +327,7 @@ export const ServerAdminTelemetry: React.FC = () => {
         </div>
 
         {/* Active Sockets & WebRTC */}
-        <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs">
+        <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <Network className="h-4 w-4 text-purple-500" />
@@ -299,7 +344,7 @@ export const ServerAdminTelemetry: React.FC = () => {
         </div>
 
         {/* Cluster Environment Sync */}
-        <div className="rounded-xl border border-border/80 bg-card p-5 space-y-3 shadow-xs">
+        <div className="rounded-sm border border-border/80 bg-card p-5 space-y-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <Server className="h-4 w-4 text-emerald-500" />
@@ -323,11 +368,10 @@ export const ServerAdminTelemetry: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('services')}
-            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'services'
-                ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
+            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'services'
+              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
           >
             <Server className="h-3.5 w-3.5" />
             <span>Microservice Heartbeats</span>
@@ -336,11 +380,10 @@ export const ServerAdminTelemetry: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('security')}
-            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'security'
-                ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
+            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'security'
+              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
           >
             <ShieldCheck className="h-3.5 w-3.5" />
             <span>Security Audit & Access Logs</span>
@@ -349,11 +392,10 @@ export const ServerAdminTelemetry: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('memory')}
-            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'memory'
-                ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
+            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'memory'
+              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
           >
             <HardDrive className="h-3.5 w-3.5" />
             <span>Process Memory Breakdown</span>
@@ -467,25 +509,25 @@ export const ServerAdminTelemetry: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 rounded-xl border border-border/70 bg-card">
+                <div className="p-4 rounded-sm border border-border/70 bg-card">
                   <p className="text-[11px] font-semibold text-muted-foreground uppercase">Heap Used</p>
                   <p className="text-2xl font-black text-foreground mt-1">{metrics?.systemMemoryMB || 64} MB</p>
                   <p className="text-xs text-muted-foreground mt-1">Actively utilized object memory</p>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/70 bg-card">
+                <div className="p-4 rounded-sm border border-border/70 bg-card">
                   <p className="text-[11px] font-semibold text-muted-foreground uppercase">Heap Total</p>
                   <p className="text-2xl font-black text-foreground mt-1">{metrics?.heapTotalMB || 82} MB</p>
                   <p className="text-xs text-muted-foreground mt-1">Total committed V8 heap size</p>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/70 bg-card">
+                <div className="p-4 rounded-sm border border-border/70 bg-card">
                   <p className="text-[11px] font-semibold text-muted-foreground uppercase">Resident Set (RSS)</p>
                   <p className="text-2xl font-black text-foreground mt-1">{metrics?.rssMB || 110} MB</p>
                   <p className="text-xs text-muted-foreground mt-1">RAM occupied in physical memory</p>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/70 bg-card">
+                <div className="p-4 rounded-sm border border-border/70 bg-card">
                   <p className="text-[11px] font-semibold text-muted-foreground uppercase">External Buffers</p>
                   <p className="text-2xl font-black text-foreground mt-1">{metrics?.externalMB || 18} MB</p>
                   <p className="text-xs text-muted-foreground mt-1">C++ bindings & audio streams</p>
@@ -494,11 +536,11 @@ export const ServerAdminTelemetry: React.FC = () => {
 
               {/* Real-Time Live Streaming Chart & Category Breakdown */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6">
-                <div className="lg:col-span-2 border border-border/70 rounded-xl p-4 bg-muted/10">
+                <div className="lg:col-span-2 border border-border/70 rounded-sm p-4 bg-muted/10">
                   <div className="flex items-center justify-between pb-2">
                     <p className="text-xs font-bold text-foreground flex items-center gap-2">
                       <Activity className="h-3.5 w-3.5 text-emerald-500 animate-pulse" />
-                      <span>Live V8 Heap & RSS Stream (@tanstack/charts)</span>
+                      <span>Live V8 Heap & RSS Stream</span>
                     </p>
                     <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
                       Live 15s Ticks
@@ -513,7 +555,7 @@ export const ServerAdminTelemetry: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="border border-border/70 rounded-xl p-4 bg-muted/10">
+                <div className="border border-border/70 rounded-sm p-4 bg-muted/10">
                   <div className="flex items-center justify-between pb-2">
                     <p className="text-xs font-bold text-foreground flex items-center gap-2">
                       <Cpu className="h-3.5 w-3.5 text-indigo-500" />

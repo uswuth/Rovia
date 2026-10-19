@@ -16,8 +16,8 @@ import {
   Server
 } from 'lucide-react';
 import { Chart } from '@tanstack/charts/react';
-import { defineChart, barY, lineY, areaY, barX } from '@tanstack/charts';
-import { scaleBand } from '@tanstack/charts/scales/band';
+import { defineChart, lineY, areaY } from '@tanstack/charts';
+import { pie, polar, radialArc } from '@tanstack/charts/polar';
 import { scaleLinear } from '@tanstack/charts/scales/linear';
 import { scalePoint } from '@tanstack/charts/scales/point';
 import { tooltip } from '@tanstack/charts/tooltip';
@@ -149,22 +149,28 @@ export const ServerAdminDashboard: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  // TanStack Chart 1: Multi-Week Attendee Volume & Participation Trends
-  const attendeeVolumeChartDef = useMemo(() => {
+  // TanStack Chart 1: Multi-Week Attendee Volume Area Chart (PowerBI style area curve)
+  const attendeeVolumeAreaChartDef = useMemo(() => {
     return defineChart({
       tooltip,
       marks: [
-        barY(filteredTrends, {
+        areaY(filteredTrends, {
           x: 'week',
           y: 'attendees',
           fill: '#10b981',
-          fillOpacity: 0.88,
-          radius: 4
+          fillOpacity: 0.35
+        }),
+        lineY(filteredTrends, {
+          x: 'week',
+          y: 'attendees',
+          stroke: '#10b981',
+          strokeWidth: 3,
+          points: true
         })
       ],
       scales: {
         x: {
-          scale: () => scaleBand<string>().padding(0.24)
+          scale: () => scalePoint<string>().padding(0.2)
         },
         y: {
           scale: scaleLinear,
@@ -178,11 +184,17 @@ export const ServerAdminDashboard: React.FC = () => {
     });
   }, [filteredTrends]);
 
-  // TanStack Chart 2: Meeting Count & Concurrency Trend (Line with points)
-  const meetingVelocityChartDef = useMemo(() => {
+  // TanStack Chart 2: Meeting Count Velocity Area Chart
+  const meetingVelocityAreaChartDef = useMemo(() => {
     return defineChart({
       tooltip,
       marks: [
+        areaY(filteredTrends, {
+          x: 'week',
+          y: 'meetings',
+          fill: '#6366f1',
+          fillOpacity: 0.3
+        }),
         lineY(filteredTrends, {
           x: 'week',
           y: 'meetings',
@@ -206,6 +218,43 @@ export const ServerAdminDashboard: React.FC = () => {
       }
     });
   }, [filteredTrends]);
+
+  // TanStack Chart: Radial Donut Chart for Meeting Status
+  const meetingRadialDonutChartDef = useMemo(() => {
+    const validData = meetingStatusData.filter((d) => d.count > 0);
+    const dataToUse = validData.length > 0 ? validData : [{ status: 'NO DATA', count: 1 }];
+    const slices = pie(dataToUse, { value: 'count' });
+    const statuses = dataToUse.map((s) => s.status);
+
+    return defineChart({
+      marks: [
+        polar({
+          inset: 8,
+          radiusRatio: 0.85,
+          marks: [
+            radialArc(slices, {
+              innerRadius: ({ radius }: { radius: number }) => radius * 0.62,
+              cornerRadius: 5,
+              color: 'status',
+              key: 'status'
+            })
+          ],
+          scales: {
+            angle: null,
+            radius: null
+          }
+        })
+      ],
+      scales: {
+        x: null,
+        y: null
+      },
+      color: {
+        domain: statuses,
+        range: ['#10b981', '#6366f1', '#94a3b8', '#ef4444']
+      }
+    });
+  }, [meetingStatusData]);
 
   // TanStack Chart 3: Productivity Score & Task Velocity Area Curve
   const productivityTrendChartDef = useMemo(() => {
@@ -242,35 +291,6 @@ export const ServerAdminDashboard: React.FC = () => {
     });
   }, [filteredTrends]);
 
-  // TanStack Chart 4: Meeting Lifecycle Status Distribution (Horizontal Bar Chart)
-  const meetingDistributionChartDef = useMemo(() => {
-    return defineChart({
-      tooltip,
-      marks: [
-        barX(meetingStatusData, {
-          x: 'count',
-          y: 'status',
-          fill: '#8b5cf6',
-          fillOpacity: 0.85,
-          radius: 4
-        })
-      ],
-      scales: {
-        x: {
-          scale: scaleLinear,
-          nice: true,
-          grid: true,
-          axis: {
-            label: 'Count'
-          }
-        },
-        y: {
-          scale: () => scaleBand<string>().padding(0.2)
-        }
-      }
-    });
-  }, [meetingStatusData]);
-
   return (
     <div className="w-full space-y-6 pb-12">
       {/* Top Banner & Quick Controls */}
@@ -296,22 +316,20 @@ export const ServerAdminDashboard: React.FC = () => {
             <button
               type="button"
               onClick={() => setSelectedRange('8w')}
-              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
-                selectedRange === '8w'
-                  ? 'bg-emerald-500 text-white shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${selectedRange === '8w'
+                ? 'bg-emerald-500 text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+                }`}
             >
               8 Weeks
             </button>
             <button
               type="button"
               onClick={() => setSelectedRange('4w')}
-              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
-                selectedRange === '4w'
-                  ? 'bg-emerald-500 text-white shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${selectedRange === '4w'
+                ? 'bg-emerald-500 text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+                }`}
             >
               Last 4 Weeks
             </button>
@@ -331,7 +349,7 @@ export const ServerAdminDashboard: React.FC = () => {
 
       {/* Cluster Health & Platform Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-border/70 bg-card p-4.5 shadow-xs relative overflow-hidden">
+        <div className="rounded-sm border border-border/70 bg-card p-4.5 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -355,7 +373,7 @@ export const ServerAdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-xl border border-border/70 bg-card p-4.5 shadow-xs">
+        <div className="rounded-sm border border-border/70 bg-card p-4.5 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -374,7 +392,7 @@ export const ServerAdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-xl border border-border/70 bg-card p-4.5 shadow-xs">
+        <div className="rounded-sm border border-border/70 bg-card p-4.5 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -394,7 +412,7 @@ export const ServerAdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-xl border border-border/70 bg-card p-4.5 shadow-xs">
+        <div className="rounded-sm border border-border/70 bg-card p-4.5 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -420,11 +438,10 @@ export const ServerAdminDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('overview')}
-          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'overview'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
+          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'overview'
+            ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+            : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
         >
           <Activity className="h-3.5 w-3.5" />
           <span>Attendance & Meeting Velocity</span>
@@ -432,11 +449,10 @@ export const ServerAdminDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('productivity')}
-          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'productivity'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
+          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'productivity'
+            ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+            : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
         >
           <TrendingUp className="h-3.5 w-3.5" />
           <span>Productivity & Task Completion</span>
@@ -444,11 +460,10 @@ export const ServerAdminDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('distribution')}
-          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'distribution'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
+          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'distribution'
+            ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+            : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
         >
           <Calendar className="h-3.5 w-3.5" />
           <span>Meeting Status Distribution</span>
@@ -458,17 +473,17 @@ export const ServerAdminDashboard: React.FC = () => {
       {/* View 1: Attendee Volume & Meeting Velocity */}
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Chart 1: Bar Chart of Multi-Week Attendees */}
+          {/* Chart 1: Area Chart of Multi-Week Attendees */}
           <Card className="border border-border/80 shadow-xs">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base font-bold flex items-center gap-2">
                     <Users className="h-4 w-4 text-emerald-500" />
-                    <span>Multi-Week Attendee Volume (@tanstack/charts)</span>
+                    <span>Multi-Week Attendee Volume (@tanstack/charts Area)</span>
                   </CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Aggregated participants joining organization meetings per calendar week.
+                    Continuous participant stream & attendance gradient across calendar weeks.
                   </p>
                 </div>
                 <span className="text-xs font-mono font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded">
@@ -479,9 +494,9 @@ export const ServerAdminDashboard: React.FC = () => {
             <CardContent>
               <div className="h-[280px] w-full pt-2">
                 <Chart
-                  definition={attendeeVolumeChartDef}
+                  definition={attendeeVolumeAreaChartDef}
                   height={270}
-                  ariaLabel="Multi-Week Attendee Volume Chart"
+                  ariaLabel="Multi-Week Attendee Volume Area Chart"
                 />
               </div>
               <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-3 text-center">
@@ -492,7 +507,7 @@ export const ServerAdminDashboard: React.FC = () => {
                 <div>
                   <p className="text-[11px] text-muted-foreground">Peak Volume</p>
                   <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                    {Math.max(...filteredTrends.map((t) => t.attendees))} users
+                    {Math.max(0, ...filteredTrends.map((t) => t.attendees))} users
                   </p>
                 </div>
                 <div>
@@ -503,14 +518,14 @@ export const ServerAdminDashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Chart 2: Meeting Volume Curve */}
+          {/* Chart 2: Meeting Volume Area Curve */}
           <Card className="border border-border/80 shadow-xs">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base font-bold flex items-center gap-2">
                     <Activity className="h-4 w-4 text-indigo-500" />
-                    <span>Weekly Meeting Velocity Curve (@tanstack/charts)</span>
+                    <span>Weekly Meeting Velocity Curve (@tanstack/charts Area)</span>
                   </CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Total meetings initiated across tenant workspaces each week.
@@ -524,9 +539,9 @@ export const ServerAdminDashboard: React.FC = () => {
             <CardContent>
               <div className="h-[280px] w-full pt-2">
                 <Chart
-                  definition={meetingVelocityChartDef}
+                  definition={meetingVelocityAreaChartDef}
                   height={270}
-                  ariaLabel="Weekly Meeting Velocity Curve"
+                  ariaLabel="Weekly Meeting Velocity Area Curve"
                 />
               </div>
               <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-3 text-center">
@@ -537,7 +552,7 @@ export const ServerAdminDashboard: React.FC = () => {
                 <div>
                   <p className="text-[11px] text-muted-foreground">Weekly Velocity</p>
                   <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                    {(aggregateKpis.totalMeetings / filteredTrends.length).toFixed(1)} / wk
+                    {filteredTrends.length > 0 ? (aggregateKpis.totalMeetings / filteredTrends.length).toFixed(1) : '0.0'} / wk
                   </p>
                 </div>
                 <div>
@@ -632,28 +647,37 @@ export const ServerAdminDashboard: React.FC = () => {
       {/* View 3: Meeting Status Distribution */}
       {activeTab === 'distribution' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Horizontal Bar Chart of Meeting Statuses */}
-          <Card className="border border-border/80 shadow-xs">
+          {/* Radial Donut Chart with Centered Text (Shadcn / PowerBI KPI style) */}
+          <Card className="border border-border/80 shadow-xs relative overflow-hidden">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base font-bold flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-purple-500" />
-                    <span>Meeting Lifecycle Status (@tanstack/charts Horizontal Bar)</span>
+                    <span>Meeting Composition (Radial Donut with Centered KPI)</span>
                   </CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Distribution of meetings categorized by real-time lifecycle state.
+                    Proportional share of live, scheduled, completed, and cancelled sessions.
                   </p>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[280px] w-full pt-2">
+              <div className="relative h-[280px] w-full flex items-center justify-center">
                 <Chart
-                  definition={meetingDistributionChartDef}
+                  definition={meetingRadialDonutChartDef}
                   height={270}
-                  ariaLabel="Meeting Lifecycle Status Distribution Chart"
+                  ariaLabel="Meeting Status Radial Donut Chart"
                 />
+                {/* Centered KPI Label (Shadcn Radial Chart with Text style) */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+                  <span className="text-3xl font-black tracking-tight text-foreground">
+                    {metricsData?.totalMeetings ?? meetingStatusData.reduce((acc, c) => acc + c.count, 0)}
+                  </span>
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5">
+                    Total Meetings
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -672,15 +696,14 @@ export const ServerAdminDashboard: React.FC = () => {
                   <div key={item.status} className="py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <span
-                        className={`w-2.5 h-2.5 rounded-full ${
-                          item.status === 'LIVE'
-                            ? 'bg-emerald-500 animate-pulse'
-                            : item.status === 'SCHEDULED'
+                        className={`w-2.5 h-2.5 rounded-full ${item.status === 'LIVE'
+                          ? 'bg-emerald-500 animate-pulse'
+                          : item.status === 'SCHEDULED'
                             ? 'bg-indigo-500'
                             : item.status === 'ENDED'
-                            ? 'bg-muted-foreground/60'
-                            : 'bg-destructive'
-                        }`}
+                              ? 'bg-muted-foreground/60'
+                              : 'bg-destructive'
+                          }`}
                       />
                       <span className="text-xs font-bold text-foreground tracking-wide">
                         {item.status}

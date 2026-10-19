@@ -8,6 +8,12 @@ dist/
 client/dist/
 server/dist/
 
+# Playwright generated reports, test videos, traces, and caches
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
 # Secrets & local env (never commit)
 .env
 .env.local
@@ -35,6 +41,7 @@ server/docs/
 server/tests/bruno/
 graphify-out/
 .devtool/
+.devtools/
 .archify/
 
 # Local-only tooling and agent instructions. These drive work on this machine
