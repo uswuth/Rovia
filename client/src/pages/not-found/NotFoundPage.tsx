@@ -128,9 +128,8 @@ export const NotFoundPage: React.FC = () => {
 
         <pre
           onClick={triggerAsciiPulse}
-          className={`font-mono leading-[1.0] font-normal select-none whitespace-pre text-left inline-block transition-all duration-200 max-w-full overflow-hidden text-primary cursor-pointer hover:scale-105 active:scale-95 ${
-            isGlitching ? 'opacity-80 translate-x-[2px] skew-x-1' : ''
-          }`}
+          className={`font-mono leading-[1.0] font-normal select-none whitespace-pre text-left inline-block transition-all duration-200 max-w-full overflow-hidden text-primary cursor-pointer hover:scale-105 active:scale-95 ${isGlitching ? 'opacity-80 translate-x-[2px] skew-x-1' : ''
+            }`}
           title="Click to pulse"
           style={{
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
