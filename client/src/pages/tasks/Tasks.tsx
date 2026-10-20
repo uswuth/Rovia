@@ -281,9 +281,9 @@ export const Tasks: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
           <CommonTabs
-            size="xs"
+            size="sm"
             value={viewMode}
             onChange={(val) => setViewMode(val as 'kanban' | 'table')}
             items={[
@@ -296,7 +296,7 @@ export const Tasks: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={loadData}
-            className="h-9 px-3 gap-1.5 cursor-pointer"
+            className="h-8 w-8 p-0 rounded-xs cursor-pointer"
             title="Refresh Tasks"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -304,10 +304,11 @@ export const Tasks: React.FC = () => {
 
           {canManage && (
             <Button
+              size="sm"
               onClick={() => navigate('/tasks/new')}
-              className="h-9 shadow-xs shrink-0 gap-2 cursor-pointer"
+              className="h-8 px-3 gap-1.5 rounded-xs text-xs font-semibold shadow-xs shrink-0 cursor-pointer"
             >
-              <Plus size={15} />
+              <Plus size={14} />
               <span>Create Task</span>
             </Button>
           )}

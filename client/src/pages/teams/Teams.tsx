@@ -139,22 +139,26 @@ export const Teams: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-                      {/* View Mode Toggle: Cards vs Table */}
-                      <CommonTabs
-                        items={VIEW_MODE_TABS}
-                        value={viewMode}
-                        onChange={(val) => setViewMode(val as 'cards' | 'table')}
-                        size="xs"
-                      />
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* View Mode Toggle: Cards vs Table */}
+            <CommonTabs
+              items={VIEW_MODE_TABS}
+              value={viewMode}
+              onChange={(val) => setViewMode(val as 'cards' | 'table')}
+              size="sm"
+            />
 
-                      {isAdmin && (
-                        <Button onClick={() => navigate('/teams/new')} className="gap-2 cursor-pointer bg-cyan-500 hover:bg-cyan-400 transition-colors text-white">
-                          <Plus size={16} />
-                          <span>Create Team</span>
-                        </Button>
-                      )}
-                    </div>
+            {isAdmin && (
+              <Button
+                size="sm"
+                onClick={() => navigate('/teams/new')}
+                className="h-8 px-3 gap-1.5 rounded-xs text-xs font-semibold cursor-pointer"
+              >
+                <Plus size={14} />
+                <span>Create Team</span>
+              </Button>
+            )}
+          </div>
         </div>
 
         { }

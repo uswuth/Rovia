@@ -62,7 +62,7 @@ export const ServerAdminDashboard: React.FC = () => {
           return null;
         }),
       getAllOrganizationsServerAdminApi()
-        .then((res: AxiosResponse<any>) => {
+        .then((res: AxiosResponse<{ data?: unknown[] }>) => {
           const list = res.data?.data || [];
           return Array.isArray(list) ? list.length : 0;
         })

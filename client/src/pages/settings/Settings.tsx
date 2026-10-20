@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, User, Palette, Lock } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { CommonTabs } from '@/components/ui/common-tabs';
 import { ProfileTab } from '@/components/settings/ProfileTab';
 import { AppearanceTab } from '@/components/settings/AppearanceTab';

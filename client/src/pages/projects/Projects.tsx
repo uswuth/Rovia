@@ -20,7 +20,7 @@ import {
 } from '@/types/project.types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
-import { CommonTabs, type TabItem } from '@/components/ui/common-tabs';
+import { CommonTabs } from '@/components/ui/common-tabs';
 import { Badge } from '@/components/ui/badge';
 import { CodeBadge } from '@/components/ui/CodeBadge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -95,7 +95,7 @@ export const Projects: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
           <CommonTabs
             items={[
               { id: 'cards', label: 'Cards', icon: <LayoutGrid size={13} /> },
@@ -103,14 +103,15 @@ export const Projects: React.FC = () => {
             ]}
             value={viewMode}
             onChange={(val) => setViewMode(val as 'cards' | 'table')}
-            size="xs"
+            size="sm"
           />
 
           <Button
+            size="sm"
             onClick={() => navigate('/projects/new')}
-            className="shadow-xs shrink-0 gap-2 cursor-pointer"
+            className="h-8 px-3 gap-1.5 rounded-xs text-xs font-semibold shadow-xs shrink-0 cursor-pointer"
           >
-            <FolderPlus size={15} />
+            <FolderPlus size={14} />
             <span>Create Project</span>
           </Button>
         </div>

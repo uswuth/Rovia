@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, Video, Users, Copy, Check, Share2, Play, Building2, FolderGit2 } from 'lucide-react';
+import { Calendar, Clock, Users, Copy, Check, Share2, Play, Building2, FolderGit2 } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

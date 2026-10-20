@@ -2,7 +2,7 @@
 
 import { Tabs } from '@heroui/react';
 import { cn } from '@/lib/utils';
-import type { ReactNode, Key } from 'react';
+import type { ReactNode } from 'react';
 
 // Re-export Tabs so consumers can use Tabs.Panel without a separate import.
 export { Tabs };

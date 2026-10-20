@@ -21,14 +21,15 @@ import { RosterDetailModal } from '@/components/members/RosterDetailModal';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { getAvatarColorByName } from '@/components/ui/avatar-colors';
 import { useQuery } from '@/hooks/useApi';
+import { queryKeys } from '@/api/queryClient';
 import { getMeetings } from '@/api/meeting/meeting.api';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { Meeting, MeetingStatus } from '@/api/meeting/meeting.types';
 import type { Member } from '@/types/member.types';
 import { CommonTabs, type TabItem } from '@/components/ui/common-tabs';
-import { formatDuration } from '@/lib/format-date';
 import { formatDurationHuman } from '@/utils/duration';
 import { formatCountdown } from '@/lib/format-countdown';
+import { shareOrCopy } from '@/lib/share';
 
 /** `IN_PROGRESS` is client-derived: inside the scheduled window before the server marks it LIVE. */
 type MeetingDisplayStatus = MeetingStatus | 'IN_PROGRESS';
@@ -37,7 +38,7 @@ export const Meetings: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuth();
-  const { org, members: orgMembers } = useOrganization();
+  const { members: orgMembers } = useOrganization();
   const { projects, selectedProject } = useProject();
   const { teams } = useTeams();
   const VIEW_MODE_TABS: TabItem[] = [
@@ -418,7 +419,7 @@ export const Meetings: React.FC = () => {
         );
       },
     },
-  ], [projects, teams, now, formatDateTimeStr, copiedMeetingId, navigate]);
+  ], [projects, teams, now, formatDateTimeStr, copiedMeetingId, navigate, expandedMeetingIds]);
 
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
@@ -433,32 +434,32 @@ export const Meetings: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-                  {/* View Mode Toggle: List vs Table */}
-                  <CommonTabs
-                    items={VIEW_MODE_TABS}
-                    value={viewMode}
-                    onChange={(val) => setViewMode(val as 'cards' | 'table')}
-                    size="xs"
-                  />
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* View Mode Toggle: List vs Table */}
+          <CommonTabs
+            items={VIEW_MODE_TABS}
+            value={viewMode}
+            onChange={(val) => setViewMode(val as 'cards' | 'table')}
+            size="sm"
+          />
 
-                  <Button
-                    size="sm"
-                    disabled={isSelectedProjectReadOnly || !canCreateMeeting}
-                    onClick={() => !isSelectedProjectReadOnly && canCreateMeeting && navigate(filterProjectId ? `/meetings/new?projectId=${filterProjectId}` : '/meetings/new')}
-                    className="gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed bg-cyan-500 hover:bg-cyan-400 transition-colors"
-                    title={
-                      !canCreateMeeting
-                        ? 'Only project/team hosts, Admins, or SuperAdmins can schedule meetings'
-                        : isSelectedProjectReadOnly
-                          ? `Selected project is ${activeProjectStatus}. Re-activate status to Active to schedule meetings.`
-                          : 'Schedule Meeting'
-                    }
-                  >
-                    <Plus size={15} />
-                    <span>Schedule Meeting</span>
-                  </Button>
-                </div>
+          <Button
+            size="sm"
+            disabled={isSelectedProjectReadOnly || !canCreateMeeting}
+            onClick={() => !isSelectedProjectReadOnly && canCreateMeeting && navigate(filterProjectId ? `/meetings/new?projectId=${filterProjectId}` : '/meetings/new')}
+            className="h-8 px-3 gap-1.5 rounded-xs text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            title={
+              !canCreateMeeting
+                ? 'Only project/team hosts, Admins, or SuperAdmins can schedule meetings'
+                : isSelectedProjectReadOnly
+                  ? `Selected project is ${activeProjectStatus}. Re-activate status to Active to schedule meetings.`
+                  : 'Schedule Meeting'
+            }
+          >
+            <Plus size={14} />
+            <span>Schedule Meeting</span>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">

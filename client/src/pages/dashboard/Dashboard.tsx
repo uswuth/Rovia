@@ -17,6 +17,7 @@ import { getTeamsApi } from '@/api/teams/teams.api';
 import { getMeetings } from '@/api/meeting/meeting.api';
 import { getTasksApi } from '@/api/tasks/tasks.api';
 import { extractApiItems } from '@/utils/apiResponse';
+import { DashboardCharts } from '@/components/dashboard/DashboardCharts';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -218,6 +219,16 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        {!loading && (
+          <DashboardCharts
+            projectsCount={projectsCount ?? 0}
+            teamsCount={teamsCount ?? 0}
+            meetingsCount={meetingsCount ?? 0}
+            tasksCount={tasksCount ?? 0}
+            totalMembers={totalMembers}
+            activeAdmins={activeAdmins}
+          />
+        )}
       </div>
     </div>
   );
