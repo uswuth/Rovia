@@ -82,9 +82,26 @@ export const generateProjectCode = async (
 };
 
 export const generateSessionCode = async (
-  model: CodeGeneratorModel,
-  organizationId?: string
+  _model?: CodeGeneratorModel,
+  _organizationId?: string
 ): Promise<string> => {
-  const filter = organizationId ? { organization_id: organizationId } : {};
-  return generateSequentialCode(ENTITY_PREFIXES.MEETING, model, 'meeting_join_code', filter);
+  // UUID v7: time-sortable 128-bit UUID ensuring global uniqueness across all organizations
+  const bytes = crypto.randomBytes(16);
+  const now = Date.now();
+
+  // 48-bit timestamp
+  bytes[0] = (now / 0x10000000000) & 0xff;
+  bytes[1] = (now / 0x100000000) & 0xff;
+  bytes[2] = (now / 0x1000000) & 0xff;
+  bytes[3] = (now / 0x10000) & 0xff;
+  bytes[4] = (now / 0x100) & 0xff;
+  bytes[5] = now & 0xff;
+
+  // version 7 (0b0111)
+  bytes[6] = (bytes[6] & 0x0f) | 0x70;
+  // variant RFC 4122 (0b10)
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 };
