@@ -258,7 +258,7 @@ export const CreateOrgMember: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Role" htmlFor="user-role" required error={errors.userRole?.message}>
               {isTargetSuperAdmin ? (
-                <div className="flex items-center gap-2 h-10 px-3 border border-border/80 bg-muted/30 rounded-md select-none">
+                <div className="flex items-center gap-2 h-10 px-3 border border-border/80 bg-muted/30 rounded-sm select-none">
                   <span className="font-semibold text-xs text-foreground">SuperAdmin</span>
                   <span className="text-[10px] text-primary font-medium bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-sm">
                     Org Owner (Locked)
@@ -299,7 +299,7 @@ export const CreateOrgMember: React.FC = () => {
 
             <FormField label="Status" htmlFor="user-status" required error={errors.userStatus?.message}>
               {isTargetSuperAdmin ? (
-                <div className="flex items-center gap-2 h-10 px-3 border border-border/80 bg-muted/30 rounded-md select-none">
+                <div className="flex items-center gap-2 h-10 px-3 border border-border/80 bg-muted/30 rounded-sm select-none">
                   <span className="font-semibold text-xs text-foreground">Active</span>
                   <span className="text-[10px] text-primary font-medium bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-sm">
                     Locked

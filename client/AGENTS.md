@@ -53,7 +53,7 @@ first, then use it. Never introduce a one-off color.
 
 ## 4. Shape and Motion
 
-- **Sharp, not soft.** Small radii (`rounded-md`, `rounded-lg`). No
+- **Sharp, not soft.** Small radii (`rounded-sm`, `rounded-sm`). No
   `rounded-3xl`, no pill-shaped containers.
 - **Never over-curve corners.** `rounded-full` only on avatars, dots, badges.
 - **Icons carry no background.** A bare Lucide icon at a consistent size and

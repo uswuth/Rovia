@@ -97,7 +97,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          'flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-xs shadow-xs transition-colors',
+          'flex h-9 w-full items-center justify-between rounded-xs border border-input bg-transparent px-3 py-2 text-xs shadow-xs transition-colors',
           'hover:bg-accent/40 focus:outline-hidden focus:ring-1 focus:ring-ring',
           'disabled:cursor-not-allowed disabled:opacity-50 text-foreground',
           open && 'ring-1 ring-ring border-ring',
@@ -110,7 +110,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               {selectedOption.icon && <span className="shrink-0">{selectedOption.icon}</span>}
               <span className="truncate font-medium text-foreground">{selectedOption.label}</span>
               {selectedOption.badge && (
-                <span className="px-1.5 py-0.2 rounded-sm text-[10px] font-mono bg-muted text-muted-foreground border border-border/50">
+                <span className="px-1.5 py-0.2 rounded-xs text-[10px] font-mono bg-muted text-muted-foreground border border-border/50">
                   {selectedOption.badge}
                 </span>
               )}
@@ -135,7 +135,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[220px] rounded-md border border-border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 overflow-hidden">
+        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[220px] rounded-xs border border-border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 overflow-hidden">
           <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border/60 bg-muted/20">
             <Search size={13} className="text-muted-foreground shrink-0" />
             <input

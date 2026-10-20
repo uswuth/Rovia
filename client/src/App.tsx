@@ -13,6 +13,7 @@ import { SidebarLayout } from '@/components/layout/SidebarLayout';
 import { useSEO } from '@/hooks/useSEO';
 import { CookieConsent } from '@/components/CookieConsent';
 
+const Home = lazy(() => import('@/pages/home/Home').then((m) => ({ default: m.Home })));
 const Login = lazy(() => import('@/pages/login/Login').then((m) => ({ default: m.Login })));
 const Signup = lazy(() => import('@/pages/signup/Signup').then((m) => ({ default: m.Signup })));
 const Dashboard = lazy(() => import('@/pages/dashboard/Dashboard').then((m) => ({ default: m.Dashboard })));
@@ -109,8 +110,8 @@ const App = () => {
                     <Suspense fallback={<SuspenseFallback />}>
                       <CookieConsent />
                       <Routes>
-                      <Route path="/" element={<Navigate to="/login" replace />} />
-                      <Route
+                        <Route path="/" element={<Home />} />
+                        <Route
                         path="/login"
                         element={
                           <GuestRoute>

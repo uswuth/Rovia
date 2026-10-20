@@ -379,7 +379,7 @@ export const MeetingQuestions = ({
             <Skeleton className="h-14 w-full" />
           </div>
         ) : error ? (
-          <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+          <p role="alert" className="rounded-sm border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
             {parseApiError(error).message}
           </p>
         ) : !questions?.length ? (

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { AxiosResponse } from 'axios';
 import {
   Download,
   Calendar,
@@ -21,14 +22,21 @@ import { pie, polar, radialArc } from '@tanstack/charts/polar';
 import { scaleLinear } from '@tanstack/charts/scales/linear';
 import { scalePoint } from '@tanstack/charts/scales/point';
 import { tooltip } from '@tanstack/charts/tooltip';
-
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { CommonTabs, type TabItem } from '@/components/ui/common-tabs';
 import {
   getServerMetricsApi,
   getAllOrganizationsServerAdminApi,
-  type ServerMetricsData
+  type ServerMetricsData,
+  type ServerMetricsResponse
 } from '@/api/server-admin/server-admin.api';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+
+const ANALYTICS_TABS: TabItem[] = [
+  { id: 'overview', label: 'Attendance & Meeting Velocity', icon: <Activity className="h-3.5 w-3.5" /> },
+  { id: 'productivity', label: 'Productivity & Task Completion', icon: <TrendingUp className="h-3.5 w-3.5" /> },
+  { id: 'distribution', label: 'Meeting Status Distribution', icon: <Calendar className="h-3.5 w-3.5" /> },
+];
 
 export const ServerAdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -37,29 +45,28 @@ export const ServerAdminDashboard: React.FC = () => {
   const [orgCount, setOrgCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [selectedRange, setSelectedRange] = useState<'8w' | '4w'>('8w');
-  const [activeTab, setActiveTab] = useState<'overview' | 'productivity' | 'distribution'>('overview');
 
   useEffect(() => {
     let isMounted = true;
 
     Promise.all([
       getServerMetricsApi()
-        .then((res) => {
-          if (res.data?.data?.metrics) {
-            return res.data.data.metrics as ServerMetricsData;
+        .then((res: AxiosResponse<ServerMetricsResponse>) => {
+          if (res.data?.metrics) {
+            return res.data.metrics;
           }
           return null;
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           console.error('Error fetching server metrics:', err);
           return null;
         }),
       getAllOrganizationsServerAdminApi()
-        .then((res) => {
+        .then((res: AxiosResponse<any>) => {
           const list = res.data?.data || [];
           return Array.isArray(list) ? list.length : 0;
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           console.error('Error fetching organizations:', err);
           return 0;
         })
@@ -312,7 +319,7 @@ export const ServerAdminDashboard: React.FC = () => {
 
         {/* Action Toolbar */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="inline-flex rounded-md border border-border bg-card p-1 shadow-xs">
+          <div className="inline-flex rounded-sm border border-border bg-card p-1 shadow-xs">
             <button
               type="button"
               onClick={() => setSelectedRange('8w')}
@@ -367,7 +374,7 @@ export const ServerAdminDashboard: React.FC = () => {
                 <ArrowUpRight className="h-3 w-3" />
               </button>
             </div>
-            <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <div className="p-3 rounded-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               <Layers className="h-5 w-5" />
             </div>
           </div>
@@ -386,7 +393,7 @@ export const ServerAdminDashboard: React.FC = () => {
                 <span className="text-emerald-500 font-bold">{metricsData?.activeUsers ?? 0}</span> active recently
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+            <div className="p-3 rounded-sm bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
               <Users className="h-5 w-5" />
             </div>
           </div>
@@ -406,7 +413,7 @@ export const ServerAdminDashboard: React.FC = () => {
                 <span>+{aggregateKpis.productivityGrowth}% across {selectedRange}</span>
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
+            <div className="p-3 rounded-sm bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
               <Zap className="h-5 w-5" />
             </div>
           </div>
@@ -426,7 +433,7 @@ export const ServerAdminDashboard: React.FC = () => {
                 <span>Latency: {metricsData?.apiLatencyMs || 22}ms</span>
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20">
+            <div className="p-3 rounded-sm bg-amber-500/10 text-amber-500 border border-amber-500/20">
               <Server className="h-5 w-5" />
             </div>
           </div>
@@ -434,303 +441,273 @@ export const ServerAdminDashboard: React.FC = () => {
       </div>
 
       {/* Analytics Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-border/60">
-        <button
-          type="button"
-          onClick={() => setActiveTab('overview')}
-          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'overview'
-            ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-            : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-        >
-          <Activity className="h-3.5 w-3.5" />
-          <span>Attendance & Meeting Velocity</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('productivity')}
-          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'productivity'
-            ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-            : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-        >
-          <TrendingUp className="h-3.5 w-3.5" />
-          <span>Productivity & Task Completion</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('distribution')}
-          className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'distribution'
-            ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-            : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-        >
-          <Calendar className="h-3.5 w-3.5" />
-          <span>Meeting Status Distribution</span>
-        </button>
-      </div>
+      <CommonTabs
+        items={ANALYTICS_TABS}
+        defaultValue="overview"
+        size="sm"
+      >
+        {/* View 1: Attendee Volume & Meeting Velocity */}
+        <CommonTabs.Panel id="overview">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Chart 1: Area Chart of Multi-Week Attendees */}
+            <Card className="border border-border/80 shadow-xs">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <Users className="h-4 w-4 text-emerald-500" />
+                      <span>Multi-Week Attendee Volume (@tanstack/charts Area)</span>
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Continuous participant stream & attendance gradient across calendar weeks.
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded">
+                    {aggregateKpis.totalAttendees} total
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[280px] w-full pt-2">
+                  <Chart
+                    definition={attendeeVolumeAreaChartDef}
+                    height={270}
+                    ariaLabel="Multi-Week Attendee Volume Area Chart"
+                  />
+                </div>
+                <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-3 text-center">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Avg / Meeting</p>
+                    <p className="text-sm font-bold text-foreground">{aggregateKpis.avgAttendeesPerMeeting} users</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Peak Volume</p>
+                    <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                      {Math.max(0, ...filteredTrends.map((t) => t.attendees))} users
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Active Periods</p>
+                    <p className="text-sm font-bold text-foreground">{filteredTrends.length} weeks</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-      {/* View 1: Attendee Volume & Meeting Velocity */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Chart 1: Area Chart of Multi-Week Attendees */}
-          <Card className="border border-border/80 shadow-xs">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <Users className="h-4 w-4 text-emerald-500" />
-                    <span>Multi-Week Attendee Volume (@tanstack/charts Area)</span>
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Continuous participant stream & attendance gradient across calendar weeks.
-                  </p>
+            {/* Chart 2: Meeting Volume Area Curve */}
+            <Card className="border border-border/80 shadow-xs">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-indigo-500" />
+                      <span>Weekly Meeting Velocity Curve (@tanstack/charts Area)</span>
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Total meetings initiated across tenant workspaces each week.
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded">
+                    {aggregateKpis.totalMeetings} meetings
+                  </span>
                 </div>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded">
-                  {aggregateKpis.totalAttendees} total
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[280px] w-full pt-2">
-                <Chart
-                  definition={attendeeVolumeAreaChartDef}
-                  height={270}
-                  ariaLabel="Multi-Week Attendee Volume Area Chart"
-                />
-              </div>
-              <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-3 text-center">
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Avg / Meeting</p>
-                  <p className="text-sm font-bold text-foreground">{aggregateKpis.avgAttendeesPerMeeting} users</p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[280px] w-full pt-2">
+                  <Chart
+                    definition={meetingVelocityAreaChartDef}
+                    height={270}
+                    ariaLabel="Weekly Meeting Velocity Area Curve"
+                  />
                 </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Peak Volume</p>
-                  <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                    {Math.max(0, ...filteredTrends.map((t) => t.attendees))} users
-                  </p>
+                <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-3 text-center">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Avg Duration</p>
+                    <p className="text-sm font-bold text-foreground">{aggregateKpis.avgDuration} min</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Weekly Velocity</p>
+                    <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                      {filteredTrends.length > 0 ? (aggregateKpis.totalMeetings / filteredTrends.length).toFixed(1) : '0.0'} / wk
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Recordings Total</p>
+                    <p className="text-sm font-bold text-foreground">{metricsData?.totalRecordings ?? 0}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Active Periods</p>
-                  <p className="text-sm font-bold text-foreground">{filteredTrends.length} weeks</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+        </CommonTabs.Panel>
 
-          {/* Chart 2: Meeting Volume Area Curve */}
-          <Card className="border border-border/80 shadow-xs">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-indigo-500" />
-                    <span>Weekly Meeting Velocity Curve (@tanstack/charts Area)</span>
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Total meetings initiated across tenant workspaces each week.
-                  </p>
+        {/* View 2: Productivity & Task Completion */}
+        <CommonTabs.Panel id="productivity">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2 border border-border/80 shadow-xs">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-cyan-500" />
+                      <span>Multi-Week Productivity Score Index (@tanstack/charts Area)</span>
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Composite score calculated from meeting frequency, participant engagement, and task completion speed.
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded">
+                    {aggregateKpis.latestScore}% Current
+                  </span>
                 </div>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded">
-                  {aggregateKpis.totalMeetings} meetings
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[280px] w-full pt-2">
-                <Chart
-                  definition={meetingVelocityAreaChartDef}
-                  height={270}
-                  ariaLabel="Weekly Meeting Velocity Area Curve"
-                />
-              </div>
-              <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-3 text-center">
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Avg Duration</p>
-                  <p className="text-sm font-bold text-foreground">{aggregateKpis.avgDuration} min</p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[290px] w-full pt-2">
+                  <Chart
+                    definition={productivityTrendChartDef}
+                    height={280}
+                    ariaLabel="Productivity Score Index Chart"
+                  />
                 </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Weekly Velocity</p>
-                  <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                    {filteredTrends.length > 0 ? (aggregateKpis.totalMeetings / filteredTrends.length).toFixed(1) : '0.0'} / wk
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Recordings Total</p>
-                  <p className="text-sm font-bold text-foreground">{metricsData?.totalRecordings ?? 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              </CardContent>
+            </Card>
 
-      {/* View 2: Productivity & Task Completion */}
-      {activeTab === 'productivity' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 border border-border/80 shadow-xs">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-cyan-500" />
-                    <span>Multi-Week Productivity Score Index (@tanstack/charts Area)</span>
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Composite score calculated from meeting frequency, participant engagement, and task completion speed.
-                  </p>
-                </div>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded">
-                  {aggregateKpis.latestScore}% Current
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[290px] w-full pt-2">
-                <Chart
-                  definition={productivityTrendChartDef}
-                  height={280}
-                  ariaLabel="Productivity Score Index Chart"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Breakdown / Detailed Metrics Column */}
-          <Card className="border border-border/80 shadow-xs flex flex-col justify-between">
-            <CardHeader>
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span>Task Execution Velocity</span>
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Action items completed post-meeting.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-3.5 rounded-lg bg-muted/40 border border-border/60">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase">Total Action Tasks</p>
-                <p className="text-2xl font-extrabold text-foreground mt-1">
-                  {metricsData?.totalTasks ?? 0}
+            {/* Breakdown / Detailed Metrics Column */}
+            <Card className="border border-border/80 shadow-xs flex flex-col justify-between">
+              <CardHeader>
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <span>Task Execution Velocity</span>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Action items completed post-meeting.
                 </p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                  <span>{aggregateKpis.totalTasks} completed in selected period</span>
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-lg bg-muted/40 border border-border/60">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase">Avg Meeting Run Time</p>
-                <p className="text-2xl font-extrabold text-foreground mt-1">
-                  {aggregateKpis.avgDuration} <span className="text-sm font-normal text-muted-foreground">minutes</span>
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5 text-indigo-500" />
-                  <span>Optimal engagement baseline</span>
-                </p>
-              </div>
-
-              <div className="pt-2">
-                <Button
-                  onClick={handleExportCsv}
-                  variant="outline"
-                  className="w-full text-xs font-semibold flex items-center justify-center gap-2"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Download Full Report (.CSV)</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* View 3: Meeting Status Distribution */}
-      {activeTab === 'distribution' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Radial Donut Chart with Centered Text (Shadcn / PowerBI KPI style) */}
-          <Card className="border border-border/80 shadow-xs relative overflow-hidden">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-purple-500" />
-                    <span>Meeting Composition (Radial Donut with Centered KPI)</span>
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Proportional share of live, scheduled, completed, and cancelled sessions.
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-3.5 rounded-sm bg-muted/40 border border-border/60">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase">Total Action Tasks</p>
+                  <p className="text-2xl font-extrabold text-foreground mt-1">
+                    {metricsData?.totalTasks ?? 0}
+                  </p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                    <span>{aggregateKpis.totalTasks} completed in selected period</span>
                   </p>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="relative h-[280px] w-full flex items-center justify-center">
-                <Chart
-                  definition={meetingRadialDonutChartDef}
-                  height={270}
-                  ariaLabel="Meeting Status Radial Donut Chart"
-                />
-                {/* Centered KPI Label (Shadcn Radial Chart with Text style) */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-                  <span className="text-3xl font-black tracking-tight text-foreground">
+
+                <div className="p-3.5 rounded-sm bg-muted/40 border border-border/60">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase">Avg Meeting Run Time</p>
+                  <p className="text-2xl font-extrabold text-foreground mt-1">
+                    {aggregateKpis.avgDuration} <span className="text-sm font-normal text-muted-foreground">minutes</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 text-indigo-500" />
+                    <span>Optimal engagement baseline</span>
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <Button
+                    onClick={handleExportCsv}
+                    variant="outline"
+                    className="w-full text-xs font-semibold flex items-center justify-center gap-2"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>Download Full Report (.CSV)</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </CommonTabs.Panel>
+
+        {/* View 3: Meeting Status Distribution */}
+        <CommonTabs.Panel id="distribution">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Radial Donut Chart with Centered Text (Shadcn / PowerBI KPI style) */}
+            <Card className="border border-border/80 shadow-xs relative overflow-hidden">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-purple-500" />
+                      <span>Meeting Composition (Radial Donut with Centered KPI)</span>
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Proportional share of live, scheduled, completed, and cancelled sessions.
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="relative h-[280px] w-full flex items-center justify-center">
+                  <Chart
+                    definition={meetingRadialDonutChartDef}
+                    height={270}
+                    ariaLabel="Meeting Status Radial Donut Chart"
+                  />
+                  {/* Centered KPI Label (Shadcn Radial Chart with Text style) */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+                    <span className="text-3xl font-black tracking-tight text-foreground">
+                      {metricsData?.totalMeetings ?? meetingStatusData.reduce((acc, c) => acc + c.count, 0)}
+                    </span>
+                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5">
+                      Total Meetings
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Status Breakdown Table Card */}
+            <Card className="border border-border/80 shadow-xs">
+              <CardHeader>
+                <CardTitle className="text-base font-bold">Lifecycle State Breakdown</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Snapshot count of active, scheduled, concluded, and cancelled meetings.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y divide-border/60">
+                  {meetingStatusData.map((item) => (
+                    <div key={item.status} className="py-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full ${item.status === 'LIVE'
+                            ? 'bg-emerald-500 animate-pulse'
+                            : item.status === 'SCHEDULED'
+                              ? 'bg-indigo-500'
+                              : item.status === 'ENDED'
+                                ? 'bg-muted-foreground/60'
+                                : 'bg-destructive'
+                            }`}
+                        />
+                        <span className="text-xs font-bold text-foreground tracking-wide">
+                          {item.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-mono font-extrabold text-foreground">
+                          {item.count}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          meetings
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Total Meetings in Database</span>
+                  <span className="font-bold text-foreground">
                     {metricsData?.totalMeetings ?? meetingStatusData.reduce((acc, c) => acc + c.count, 0)}
                   </span>
-                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5">
-                    Total Meetings
-                  </span>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Status Breakdown Table Card */}
-          <Card className="border border-border/80 shadow-xs">
-            <CardHeader>
-              <CardTitle className="text-base font-bold">Lifecycle State Breakdown</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Snapshot count of active, scheduled, concluded, and cancelled meetings.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="divide-y divide-border/60">
-                {meetingStatusData.map((item) => (
-                  <div key={item.status} className="py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={`w-2.5 h-2.5 rounded-full ${item.status === 'LIVE'
-                          ? 'bg-emerald-500 animate-pulse'
-                          : item.status === 'SCHEDULED'
-                            ? 'bg-indigo-500'
-                            : item.status === 'ENDED'
-                              ? 'bg-muted-foreground/60'
-                              : 'bg-destructive'
-                          }`}
-                      />
-                      <span className="text-xs font-bold text-foreground tracking-wide">
-                        {item.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-mono font-extrabold text-foreground">
-                        {item.count}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        meetings
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
-                <span>Total Meetings in Database</span>
-                <span className="font-bold text-foreground">
-                  {metricsData?.totalMeetings ?? meetingStatusData.reduce((acc, c) => acc + c.count, 0)}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              </CardContent>
+            </Card>
+          </div>
+        </CommonTabs.Panel>
+      </CommonTabs>
 
       {/* Historical Data Summary Table */}
       <Card className="border border-border/80 shadow-xs">

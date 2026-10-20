@@ -44,7 +44,7 @@ export interface DataTableProps<T> {
   paginate?: boolean;
   pageSize?: number;
   pageSizeOptions?: number[];
-  
+
   page?: number;
   /** Total item count if using server-side pagination */
   totalCount?: number;
@@ -173,7 +173,7 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        'w-full max-w-full overflow-hidden rounded-md border border-border bg-card shadow-xs flex flex-col',
+        'w-full max-w-full overflow-hidden rounded-sm border border-border bg-card shadow-xs flex flex-col',
         wrapperClassName,
       )}
     >

@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, User, Palette, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CommonTabs } from '@/components/ui/common-tabs';
 import { ProfileTab } from '@/components/settings/ProfileTab';
 import { AppearanceTab } from '@/components/settings/AppearanceTab';
 import { SecurityTab } from '@/components/settings/SecurityTab';
 
-type SettingsTab = 'profile' | 'appearance' | 'security';
+type TabKey = 'profile' | 'appearance' | 'security';
 
-const TABS: { key: SettingsTab; label: string; icon: React.ReactNode }[] = [
+const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'profile', label: 'Profile Details', icon: <User size={15} /> },
   { key: 'appearance', label: 'Appearance', icon: <Palette size={15} /> },
   { key: 'security', label: 'Security & Password', icon: <Lock size={15} /> },
@@ -15,7 +16,7 @@ const TABS: { key: SettingsTab; label: string; icon: React.ReactNode }[] = [
 
 /** Settings shell: header, tab nav, and routing to the per-tab feature components. */
 export const SettingsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
+  const [activeTab, setActiveTab] = useState<TabKey>('profile');
 
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6 max-w-5xl">
@@ -29,25 +30,14 @@ export const SettingsPage: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex border-b border-border gap-2 text-sm font-medium">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2.5 border-b-2 font-semibold transition-all cursor-pointer -mb-px',
-              activeTab === tab.key
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-            )}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+      <CommonTabs
+        size="sm"
+        value={activeTab}
+        onChange={(val) => setActiveTab(val as TabKey)}
+        items={TABS.map((t) => ({ id: t.key, label: t.label, icon: t.icon }))}
+      />
 
+      {/* Render the selected tab content */}
       {activeTab === 'profile' && <ProfileTab />}
       {activeTab === 'appearance' && <AppearanceTab />}
       {activeTab === 'security' && <SecurityTab />}

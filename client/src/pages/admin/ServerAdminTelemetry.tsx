@@ -21,6 +21,7 @@ import { scaleBand } from '@tanstack/charts/scales/band';
 import { tooltip } from '@tanstack/charts/tooltip';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { CommonTabs, type TabItem } from '@/components/ui/common-tabs';
 import {
   getServerMetricsApi,
   type ServerMetricsData,
@@ -34,13 +35,18 @@ interface MemorySample {
   rss: number;
 }
 
+const TELEMETRY_TABS: TabItem[] = [
+  { id: 'services', label: 'Microservice Heartbeats', icon: <Server className="h-3.5 w-3.5" /> },
+  { id: 'security', label: 'Security Audit & Access Logs', icon: <ShieldCheck className="h-3.5 w-3.5" /> },
+  { id: 'memory', label: 'Process Memory Breakdown', icon: <HardDrive className="h-3.5 w-3.5" /> },
+];
+
 export const ServerAdminTelemetry: React.FC = () => {
   const [metrics, setMetrics] = useState<ServerMetricsData | null>(null);
   const [uptime, setUptime] = useState<number>(0);
   const [timestamp, setTimestamp] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [memoryHistory, setMemoryHistory] = useState<MemorySample[]>([]);
-  const [activeTab, setActiveTab] = useState<'services' | 'security' | 'memory'>('memory');
 
   const fetchTelemetry = useCallback(async (isInitial = false) => {
     try {
@@ -363,220 +369,182 @@ export const ServerAdminTelemetry: React.FC = () => {
 
       {/* Advanced Telemetry Section: Services Health, Security Logs & Memory Breakdown */}
       <div className="space-y-4">
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-border/60">
-          <button
-            type="button"
-            onClick={() => setActiveTab('services')}
-            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'services'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-          >
-            <Server className="h-3.5 w-3.5" />
-            <span>Microservice Heartbeats</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('security')}
-            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'security'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Security Audit & Access Logs</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('memory')}
-            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'memory'
-              ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-          >
-            <HardDrive className="h-3.5 w-3.5" />
-            <span>Process Memory Breakdown</span>
-          </button>
-        </div>
-
-        {/* Tab 1: Microservice Status */}
-        {activeTab === 'services' && (
-          <Card className="border border-border/80 shadow-xs">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span>Sub-Service Health & Latencies</span>
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Continuous diagnostics of internal API, database drivers, and media streaming nodes.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {services.map((svc) => (
-                  <div
-                    key={svc.name}
-                    className="p-3.5 rounded-lg border border-border/70 bg-muted/20 flex items-center justify-between"
-                  >
-                    <div>
-                      <p className="text-xs font-bold text-foreground">{svc.name}</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{svc.type}</p>
-                      <p className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">
-                        ~{svc.latencyMs}ms response
-                      </p>
+        <CommonTabs
+          items={TELEMETRY_TABS}
+          defaultValue="memory"
+          size="sm"
+        >
+          <CommonTabs.Panel id="services">
+            <Card className="border border-border/80 shadow-xs">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <span>Sub-Service Health & Latencies</span>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Continuous diagnostics of internal API, database drivers, and media streaming nodes.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {services.map((svc) => (
+                    <div
+                      key={svc.name}
+                      className="p-3.5 rounded-sm border border-border/70 bg-muted/20 flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="text-xs font-bold text-foreground">{svc.name}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{svc.type}</p>
+                        <p className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+                          ~{svc.latencyMs}ms response
+                        </p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        {svc.status}
+                      </span>
                     </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                      {svc.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Tab 2: Security Audit Logs */}
-        {activeTab === 'security' && (
-          <Card className="border border-border/80 shadow-xs">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-indigo-500" />
-                    <span>Control Plane Security Audits</span>
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Cryptographic access, server admin authentications, and internal mesh verification events.
-                  </p>
+                  ))}
                 </div>
-                <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-mono font-bold">
-                  AES-256-GCM / TLS 1.3
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-muted/50 text-muted-foreground font-semibold border-b border-border/60">
-                    <tr>
-                      <th className="py-2.5 px-3">Event Signature</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3">Source Origin</th>
-                      <th className="py-2.5 px-3">Agent / Daemon</th>
-                      <th className="py-2.5 px-3 text-right">Timestamp</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40 font-mono">
-                    {securityLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="py-2.5 px-3 font-semibold text-foreground flex items-center gap-2">
-                          <Lock className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-                          <span>{log.event}</span>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                            {log.status}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-muted-foreground">{log.sourceIp}</td>
-                        <td className="py-2.5 px-3 text-muted-foreground">{log.userAgent}</td>
-                        <td className="py-2.5 px-3 text-right text-muted-foreground">
-                          {new Date(log.timestamp).toLocaleTimeString()}
-                        </td>
+              </CardContent>
+            </Card>
+          </CommonTabs.Panel>
+          <CommonTabs.Panel id="security">
+            <Card className="border border-border/80 shadow-xs">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-indigo-500" />
+                      <span>Control Plane Security Audits</span>
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">
+                      Cryptographic access, server admin authentications, and internal mesh verification events.
+                    </p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-mono font-bold">
+                    AES-256-GCM / TLS 1.3
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-muted/50 text-muted-foreground font-semibold border-b border-border/60">
+                      <tr>
+                        <th className="py-2.5 px-3">Event Signature</th>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3">Source Origin</th>
+                        <th className="py-2.5 px-3">Agent / Daemon</th>
+                        <th className="py-2.5 px-3 text-right">Timestamp</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Tab 3: Process Memory Breakdown */}
-        {activeTab === 'memory' && (
-          <Card className="border border-border/80 shadow-xs">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <HardDrive className="h-4 w-4 text-amber-500" />
-                <span>Process Memory & Heap Distribution</span>
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Detailed breakdown of V8 engine resident set size and garbage-collected buffers.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 rounded-sm border border-border/70 bg-card">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase">Heap Used</p>
-                  <p className="text-2xl font-black text-foreground mt-1">{metrics?.systemMemoryMB || 64} MB</p>
-                  <p className="text-xs text-muted-foreground mt-1">Actively utilized object memory</p>
+                    </thead>
+                    <tbody className="divide-y divide-border/40 font-mono">
+                      {securityLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-foreground flex items-center gap-2">
+                            <Lock className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                            <span>{log.event}</span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              {log.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-muted-foreground">{log.sourceIp}</td>
+                          <td className="py-2.5 px-3 text-muted-foreground">{log.userAgent}</td>
+                          <td className="py-2.5 px-3 text-right text-muted-foreground">
+                            {new Date(log.timestamp).toLocaleTimeString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-
-                <div className="p-4 rounded-sm border border-border/70 bg-card">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase">Heap Total</p>
-                  <p className="text-2xl font-black text-foreground mt-1">{metrics?.heapTotalMB || 82} MB</p>
-                  <p className="text-xs text-muted-foreground mt-1">Total committed V8 heap size</p>
-                </div>
-
-                <div className="p-4 rounded-sm border border-border/70 bg-card">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase">Resident Set (RSS)</p>
-                  <p className="text-2xl font-black text-foreground mt-1">{metrics?.rssMB || 110} MB</p>
-                  <p className="text-xs text-muted-foreground mt-1">RAM occupied in physical memory</p>
-                </div>
-
-                <div className="p-4 rounded-sm border border-border/70 bg-card">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase">External Buffers</p>
-                  <p className="text-2xl font-black text-foreground mt-1">{metrics?.externalMB || 18} MB</p>
-                  <p className="text-xs text-muted-foreground mt-1">C++ bindings & audio streams</p>
-                </div>
-              </div>
-
-              {/* Real-Time Live Streaming Chart & Category Breakdown */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6">
-                <div className="lg:col-span-2 border border-border/70 rounded-sm p-4 bg-muted/10">
-                  <div className="flex items-center justify-between pb-2">
-                    <p className="text-xs font-bold text-foreground flex items-center gap-2">
-                      <Activity className="h-3.5 w-3.5 text-emerald-500 animate-pulse" />
-                      <span>Live V8 Heap & RSS Stream</span>
-                    </p>
-                    <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                      Live 15s Ticks
-                    </span>
+              </CardContent>
+            </Card>
+          </CommonTabs.Panel>
+          <CommonTabs.Panel id="memory">
+            <Card className="border border-border/80 shadow-xs">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <HardDrive className="h-4 w-4 text-amber-500" />
+                  <span>Process Memory & Heap Distribution</span>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Detailed breakdown of V8 engine resident set size and garbage-collected buffers.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-sm border border-border/70 bg-card">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase">Heap Used</p>
+                    <p className="text-2xl font-black text-foreground mt-1">{metrics?.systemMemoryMB || 64} MB</p>
+                    <p className="text-xs text-muted-foreground mt-1">Actively utilized object memory</p>
                   </div>
-                  <div className="h-[240px] w-full pt-1">
-                    <Chart
-                      definition={liveMemoryChartDef}
-                      height={230}
-                      ariaLabel="Real-time V8 Memory Stream"
-                    />
+
+                  <div className="p-4 rounded-sm border border-border/70 bg-card">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase">Heap Total</p>
+                    <p className="text-2xl font-black text-foreground mt-1">{metrics?.heapTotalMB || 82} MB</p>
+                    <p className="text-xs text-muted-foreground mt-1">Total committed V8 heap size</p>
+                  </div>
+
+                  <div className="p-4 rounded-sm border border-border/70 bg-card">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase">Resident Set (RSS)</p>
+                    <p className="text-2xl font-black text-foreground mt-1">{metrics?.rssMB || 110} MB</p>
+                    <p className="text-xs text-muted-foreground mt-1">RAM occupied in physical memory</p>
+                  </div>
+
+                  <div className="p-4 rounded-sm border border-border/70 bg-card">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase">External Buffers</p>
+                    <p className="text-2xl font-black text-foreground mt-1">{metrics?.externalMB || 18} MB</p>
+                    <p className="text-xs text-muted-foreground mt-1">C++ bindings & audio streams</p>
                   </div>
                 </div>
 
-                <div className="border border-border/70 rounded-sm p-4 bg-muted/10">
-                  <div className="flex items-center justify-between pb-2">
-                    <p className="text-xs font-bold text-foreground flex items-center gap-2">
-                      <Cpu className="h-3.5 w-3.5 text-indigo-500" />
-                      <span>Memory Pool Breakdown</span>
-                    </p>
-                    <span className="text-[10px] font-mono text-muted-foreground">
-                      Current MB
-                    </span>
+                {/* Real-Time Live Streaming Chart & Category Breakdown */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6">
+                  <div className="lg:col-span-2 border border-border/70 rounded-sm p-4 bg-muted/10">
+                    <div className="flex items-center justify-between pb-2">
+                      <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                        <Activity className="h-3.5 w-3.5 text-emerald-500 animate-pulse" />
+                        <span>Live V8 Heap & RSS Stream</span>
+                      </p>
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                        Live 15s Ticks
+                      </span>
+                    </div>
+                    <div className="h-[240px] w-full pt-1">
+                      <Chart
+                        definition={liveMemoryChartDef}
+                        height={230}
+                        ariaLabel="Real-time V8 Memory Stream"
+                      />
+                    </div>
                   </div>
-                  <div className="h-[240px] w-full pt-1">
-                    <Chart
-                      definition={memoryBarChartDef}
-                      height={230}
-                      ariaLabel="Memory Pool Breakdown Bar Chart"
-                    />
+
+                  <div className="border border-border/70 rounded-sm p-4 bg-muted/10">
+                    <div className="flex items-center justify-between pb-2">
+                      <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                        <Cpu className="h-3.5 w-3.5 text-indigo-500" />
+                        <span>Memory Pool Breakdown</span>
+                      </p>
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        Current MB
+                      </span>
+                    </div>
+                    <div className="h-[240px] w-full pt-1">
+                      <Chart
+                        definition={memoryBarChartDef}
+                        height={230}
+                        ariaLabel="Memory Pool Breakdown Bar Chart"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          </CommonTabs.Panel>
+        </CommonTabs>
       </div>
     </div>
   );

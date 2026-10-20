@@ -44,109 +44,109 @@ const PollItem: React.FC<{
   onVote,
   onClose,
 }) => {
-  const totalVotes = poll.pollOptions.reduce((acc, o) => acc + o.voteCount, 0);
+    const totalVotes = poll.pollOptions.reduce((acc, o) => acc + o.voteCount, 0);
 
-  return (
-    <li className="rounded-xs border border-border bg-card p-3.5 shadow-2xs space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-0.5">
-          <p className="text-xs font-bold text-foreground leading-snug">{poll.pollQuestion}</p>
-          <p className="text-[10px] text-muted-foreground">{totalVotes} total votes</p>
+    return (
+      <li className="rounded-xs border border-border bg-card p-3.5 shadow-2xs space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-0.5">
+            <p className="text-xs font-bold text-foreground leading-snug">{poll.pollQuestion}</p>
+            <p className="text-[10px] text-muted-foreground">{totalVotes} total votes</p>
+          </div>
+          <Badge tone={getPollStatusTone(poll.pollStatus)}>{poll.pollStatus.toLowerCase()}</Badge>
         </div>
-        <Badge tone={getPollStatusTone(poll.pollStatus)}>{poll.pollStatus.toLowerCase()}</Badge>
-      </div>
 
-      <ul className="space-y-2">
-        {(() => {
-          const maxVotes = Math.max(0, ...poll.pollOptions.map((o) => o.voteCount));
-          return poll.pollOptions.map((option) => {
-            const pct = totalVotes > 0 ? Math.round((option.voteCount / totalVotes) * 100) : 0;
-            const hasVotedThis = (option.voterIds || []).includes(currentUserId || '');
-            const isLeader = option.voteCount > 0 && option.voteCount === maxVotes;
-            const isTrailing = option.voteCount > 0 && option.voteCount < maxVotes;
+        <ul className="space-y-2">
+          {(() => {
+            const maxVotes = Math.max(0, ...poll.pollOptions.map((o) => o.voteCount));
+            return poll.pollOptions.map((option) => {
+              const pct = totalVotes > 0 ? Math.round((option.voteCount / totalVotes) * 100) : 0;
+              const hasVotedThis = (option.voterIds || []).includes(currentUserId || '');
+              const isLeader = option.voteCount > 0 && option.voteCount === maxVotes;
+              const isTrailing = option.voteCount > 0 && option.voteCount < maxVotes;
 
-            return (
-              <li key={option.optionId} className="space-y-1.5">
-                <button
-                  type="button"
-                  disabled={poll.pollStatus === 'CLOSED' || pending}
-                  onClick={() => onVote(poll.pollId, [option.optionId])}
-                  className={cn(
-                    'relative w-full overflow-hidden rounded-xs border text-left p-2.5 transition-all',
-                    poll.pollStatus === 'OPEN' ? 'cursor-pointer hover:border-emerald-500/60' : 'cursor-default opacity-90',
-                    hasVotedThis
-                      ? 'border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-600 dark:text-emerald-300'
-                      : 'border-border bg-muted/30 text-foreground'
-                  )}
-                >
-                  <div
+              return (
+                <li key={option.optionId} className="space-y-1.5">
+                  <button
+                    type="button"
+                    disabled={poll.pollStatus === 'CLOSED' || pending}
+                    onClick={() => onVote(poll.pollId, [option.optionId])}
                     className={cn(
-                      'absolute inset-y-0 left-0 transition-all duration-300 rounded-xs pointer-events-none',
-                      isLeader && 'bg-emerald-500/20 border-r border-emerald-400/60',
-                      isTrailing && 'bg-zinc-500/25 dark:bg-zinc-700/50 border-r border-zinc-400/50 dark:border-zinc-500/60'
+                      'relative w-full overflow-hidden rounded-xs border text-left p-2.5 transition-all',
+                      poll.pollStatus === 'OPEN' ? 'cursor-pointer hover:border-emerald-500/60' : 'cursor-default opacity-90',
+                      hasVotedThis
+                        ? 'border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-600 dark:text-emerald-300'
+                        : 'border-border bg-muted/30 text-foreground'
                     )}
-                    style={{ width: `${pct}%` }}
-                  />
-                <div className="relative z-10 flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1.5 truncate">
-                    {hasVotedThis && <Check size={13} className="text-emerald-500 shrink-0" />}
-                    <span className="truncate">{option.optionText}</span>
-                  </span>
-                  <span className="tabular-nums text-[11px] font-bold text-muted-foreground ml-2 shrink-0">
-                    {option.voteCount} ({pct}%)
-                  </span>
-                </div>
-              </button>
-
-              {canManage && option.voterIds && option.voterIds.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1 pl-1 pt-0.5">
-                  <span className="text-[10px] text-muted-foreground/70 mr-1 flex items-center gap-1">
-                    <Users size={10} />
-                    <span>Voted:</span>
-                  </span>
-                  {option.voterIds.map((vId) => {
-                    const vName = displayNameFor ? displayNameFor(vId) : vId.slice(-4);
-                    const vAvatar = getParticipantAvatar ? getParticipantAvatar(vId) : undefined;
-                    return (
-                      <span
-                        key={vId}
-                        className="inline-flex items-center gap-1 rounded-full bg-secondary/80 border border-border/60 px-2 py-0.5 text-[10px] text-secondary-foreground"
-                        title={vName}
-                      >
-                        <Avatar className="size-3.5 text-[8px]">
-                          {vAvatar && <AvatarImage src={vAvatar} alt={vName} />}
-                          <AvatarFallback name={vName} className={cn("font-bold text-[7px]", getAvatarColorByName(vName))}>
-                            {vName.charAt(0).toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="truncate max-w-[80px]">{vName}</span>
+                  >
+                    <div
+                      className={cn(
+                        'absolute inset-y-0 left-0 transition-all duration-300 rounded-xs pointer-events-none',
+                        isLeader && 'bg-emerald-500/20 border-r border-emerald-400/60',
+                        isTrailing && 'bg-zinc-500/25 dark:bg-zinc-700/50 border-r border-zinc-400/50 dark:border-zinc-500/60'
+                      )}
+                      style={{ width: `${pct}%` }}
+                    />
+                    <div className="relative z-10 flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5 truncate">
+                        {hasVotedThis && <Check size={13} className="text-emerald-500 shrink-0" />}
+                        <span className="truncate">{option.optionText}</span>
                       </span>
-                    );
-                  })}
-                </div>
-              )}
-            </li>
-          );
-        });
-      })()}
-      </ul>
+                      <span className="tabular-nums text-[11px] font-bold text-muted-foreground ml-2 shrink-0">
+                        {option.voteCount} ({pct}%)
+                      </span>
+                    </div>
+                  </button>
 
-      {canManage && poll.pollStatus === 'OPEN' && (
-        <div className="flex justify-end pt-1">
-          <Button
-            variant="destructive"
-            size="xs"
-            className="cursor-pointer text-xs h-7 px-2.5 rounded-xs"
-            onClick={() => onClose(poll.pollId)}
-            disabled={pending}
-          >
-            Close poll
-          </Button>
-        </div>
-      )}
-    </li>
-  );
-};
+                  {canManage && option.voterIds && option.voterIds.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 pl-1 pt-0.5">
+                      <span className="text-[10px] text-muted-foreground/70 mr-1 flex items-center gap-1">
+                        <Users size={10} />
+                        <span>Voted:</span>
+                      </span>
+                      {option.voterIds.map((vId) => {
+                        const vName = displayNameFor ? displayNameFor(vId) : vId.slice(-4);
+                        const vAvatar = getParticipantAvatar ? getParticipantAvatar(vId) : undefined;
+                        return (
+                          <span
+                            key={vId}
+                            className="inline-flex items-center gap-1 rounded-full bg-secondary/80 border border-border/60 px-2 py-0.5 text-[10px] text-secondary-foreground"
+                            title={vName}
+                          >
+                            <Avatar className="size-3.5 text-[8px]">
+                              {vAvatar && <AvatarImage src={vAvatar} alt={vName} />}
+                              <AvatarFallback name={vName} className={cn("font-bold text-[7px]", getAvatarColorByName(vName))}>
+                                {vName.charAt(0).toUpperCase() || 'U'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="truncate max-w-[80px]">{vName}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </li>
+              );
+            });
+          })()}
+        </ul>
+
+        {canManage && poll.pollStatus === 'OPEN' && (
+          <div className="flex justify-end pt-1">
+            <Button
+              variant="destructive"
+              size="xs"
+              className="cursor-pointer text-xs h-7 px-2.5 rounded-xs"
+              onClick={() => onClose(poll.pollId)}
+              disabled={pending}
+            >
+              Close poll
+            </Button>
+          </div>
+        )}
+      </li>
+    );
+  };
 
 const PollList: React.FC<PollListProps> = (props) => {
   const openPolls = props.polls.filter((p) => p.pollStatus === 'OPEN');
@@ -311,7 +311,7 @@ export const MeetingPolls: React.FC<MeetingPollsProps> = ({
     return (
       <div className="flex flex-col h-full min-h-0 space-y-3">
         {headerToolbar}
-        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+        <p role="alert" className="rounded-sm border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
           {parseApiError(error).message}
         </p>
       </div>
@@ -325,7 +325,7 @@ export const MeetingPolls: React.FC<MeetingPollsProps> = ({
       <div ref={scrollFadeRef} className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5 no-scrollbar scroll-fade-y">
         {/* Only one poll can be open at a time. */}
         {canManage && hasOpenPoll && (
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">
+          <div className="rounded-sm border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">
             <AlertCircle size={14} className="shrink-0" />
             <span>Active poll in progress</span>
           </div>

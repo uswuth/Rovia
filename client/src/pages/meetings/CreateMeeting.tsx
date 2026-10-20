@@ -446,7 +446,7 @@ export const CreateMeeting: React.FC = () => {
         </div>
 
         {!hasAnyHostPrivilege && !projectsLoading && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-xs text-destructive flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="rounded-sm border border-destructive/40 bg-destructive/10 p-4 text-xs text-destructive flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <AlertTriangle size={18} className="shrink-0" />
               <div>
@@ -470,7 +470,7 @@ export const CreateMeeting: React.FC = () => {
             <div className="lg:col-span-7 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {lockedProjectId ? (
-                  <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-3">
+                  <div className="flex items-center justify-between rounded-sm border border-border/60 bg-muted/30 p-3">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-muted-foreground">Project</p>
                       <p className="truncate text-sm font-bold text-foreground">
@@ -604,7 +604,7 @@ export const CreateMeeting: React.FC = () => {
 
                 <div
                   className={cn(
-                    'flex items-center justify-between text-xs px-3.5 py-2.5 rounded-md border',
+                    'flex items-center justify-between text-xs px-3.5 py-2.5 rounded-sm border',
                     watchedDuration > 0
                       ? 'bg-muted/40 border-border/70'
                       : 'bg-destructive/10 border-destructive/30 text-destructive'
@@ -626,7 +626,7 @@ export const CreateMeeting: React.FC = () => {
               </div>
 
               {isProjectReadOnly && (
-                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
+                <div className="rounded-sm border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
                   <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-500" />
                   <div className="space-y-0.5">
                     <p className="font-bold">Project is Read-Only ({activeProjectStatus.toUpperCase()})</p>
@@ -638,7 +638,7 @@ export const CreateMeeting: React.FC = () => {
               )}
 
               {!canScheduleMeeting && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive flex items-start gap-2.5">
+                <div className="rounded-sm border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive flex items-start gap-2.5">
                   <AlertTriangle size={16} className="shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
                     <p className="font-bold">Host or Admin Role Required</p>
@@ -646,8 +646,8 @@ export const CreateMeeting: React.FC = () => {
                       {lockedProjectId
                         ? 'You must be a host of this project, an Admin, or a SuperAdmin to schedule meetings for it.'
                         : selectedProjectId
-                        ? 'You must be a host of the selected project or team, an Admin, or a SuperAdmin to schedule meetings.'
-                        : 'Scheduling organization-wide meetings requires an Admin or SuperAdmin role. Select a project where you are a host to proceed.'}
+                          ? 'You must be a host of the selected project or team, an Admin, or a SuperAdmin to schedule meetings.'
+                          : 'Scheduling organization-wide meetings requires an Admin or SuperAdmin role. Select a project where you are a host to proceed.'}
                     </p>
                   </div>
                 </div>

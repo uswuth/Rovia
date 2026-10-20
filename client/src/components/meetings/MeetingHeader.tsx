@@ -123,7 +123,7 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
             variant="outline"
             size="sm"
             onClick={onShareLink || onCopyLink}
-            className="gap-1.5 text-xs h-8 px-3 rounded-md border-border/80 bg-secondary/50 hover:bg-secondary text-foreground cursor-pointer shrink-0 transition-colors shadow-xs"
+            className="gap-1.5 text-xs h-8 px-3 rounded-sm border-border/80 bg-secondary/50 hover:bg-secondary text-foreground cursor-pointer shrink-0 transition-colors shadow-xs"
           >
             {copied ? <Check size={14} className="text-primary" /> : <Share2 size={14} className="text-foreground" />}
             <span>{copied ? 'Shared!' : 'Share Link'}</span>
@@ -139,7 +139,7 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
                 type="button"
                 onClick={() => setShowRaisedHands((v) => !v)}
                 className={cn(
-                  'flex h-8 items-center justify-center gap-1.5 px-2.5 rounded-md border text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 shadow-xs',
+                  'flex h-8 items-center justify-center gap-1.5 px-2.5 rounded-sm border text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 shadow-xs',
                   showRaisedHands
                     ? 'bg-accent text-accent-foreground border-accent shadow-sm'
                     : 'bg-accent/15 hover:bg-accent/25 text-accent-foreground border-accent/40'
@@ -214,7 +214,7 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
                       <div
                         key={item.userId}
                         className={cn(
-                          'flex items-center justify-between p-2 rounded-lg border text-xs transition-colors',
+                          'flex items-center justify-between p-2 rounded-sm border text-xs transition-colors',
                           levelBg
                         )}
                       >
@@ -264,7 +264,7 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
               onOpenParticipants?.();
             }}
             className={cn(
-              'flex h-8 items-center justify-center gap-1.5 px-3 rounded-md border text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 shadow-xs',
+              'flex h-8 items-center justify-center gap-1.5 px-3 rounded-sm border text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 shadow-xs',
               isParticipantsOpen
                 ? 'bg-secondary text-foreground border-border shadow-xs'
                 : 'bg-secondary/50 hover:bg-secondary text-foreground border-border/80 hover:border-border'
@@ -278,7 +278,7 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
 
         <Tooltip content={net.tooltip} side="bottom" align="end">
           <div
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground transition-colors cursor-default select-none shrink-0 shadow-xs"
+            className="flex h-8 w-8 items-center justify-center rounded-sm border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground transition-colors cursor-default select-none shrink-0 shadow-xs"
             aria-label={net.tooltip}
           >
             {net.icon}

@@ -295,5 +295,73 @@ body {
   -webkit-mask-image: none !important;
 }
 
+/* IntellMeet Tabs — panel layout (HeroUI RAC TabPanel generates .tabs__panel) */
+.intellmeet-tabs .tabs__panel {
+  @apply w-full mt-4;
+}
 
-
+/* --- IntellMeet Tabs — segmented pill (dark charcoal/navy iOS-style toggle) --- */
+.intellmeet-tabs {
+  --tab-bg: transparent;
+  --tab-text: var(--foreground);
+  --tab-border: var(--border);
+  --tab-hover-bg: var(--accent);
+  --tab-focus-ring: var(--accent);
+  --tab-selected-bg: var(--accent);
+  --tab-radius: 0.5rem;
+}
+
+/* Tab list container — dark charcoal pill with thin border, transparent fill */
+.intellmeet-tabs .tabs-list {
+  @apply flex items-center gap-1 rounded-full border border-zinc-700/40 bg-transparent p-1;
+}
+
+/* Tab button — selected: accent color token background */
+.intellmeet-tabs [data-selected] {
+  @apply relative flex items-center justify-center gap-1.5 px-2.5 font-semibold whitespace-nowrap transition-all duration-150 ease-out outline-none rounded-full bg-transparent;
+  --tab-bg: var(--accent);
+}
+
+.intellmeet-tabs [data-selected] span:not(.tabs__indicator) {
+  @apply text-white;
+}
+
+/* Vertical divider between segments (removed) */
+.intellmeet-tabs [data-selected] + [data-selected]::before {
+  @apply absolute left-0 top-1/2 bottom-1/2 w-[1px] bg-border/60 hidden;
+}
+
+/* Removed hover separator display - kept hidden permanently */
+.intellmeet-tabs [data-hovered]:not([data-selected]) + [data-selected]::before {
+  @apply hidden;
+}
+
+/* Icon inside selected tab — high-contrast white */
+.intellmeet-tabs [data-selected] [class*="lucide-"] svg,
+.intellmeet-tabs [data-selected] svg {
+  @apply text-white;
+}
+
+/* Icon inside unselected tab — dimmer, lower contrast */
+.intellmeet-tabs [data-hovered]:not([data-selected]) [class*="lucide-"] svg,
+.intellmeet-tabs [data-hovered]:not([data-selected]) svg {
+  @apply text-white/60;
+}
+
+/* Inactive tab — transparent, lower contrast text */
+.intellmeet-tabs [data-hovered]:not([data-selected]) {
+  @apply bg-transparent text-white/70;
+}
+
+/* Focus-visible ring (keyboard focus only) */
+.intellmeet-tabs [data-focused]:not([data-selected]) {
+  @apply ring-1 ring-accent ring-offset-1 ring-offset-background;
+}
+
+/* Indicator (selected state underline / fill) */
+.intellmeet-tabs [data-selected] .tabs__indicator {
+  @apply pointer-events-none absolute z-[-1] rounded-full;
+}
+
+
+

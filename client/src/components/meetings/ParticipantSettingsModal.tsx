@@ -23,11 +23,11 @@ const PERMISSIONS: ReadonlyArray<{
   label: string;
   hint: string;
 }> = [
-  { key: 'canSendAudio', label: 'Microphone', hint: 'Allow this member to speak' },
-  { key: 'canSendVideo', label: 'Camera', hint: 'Allow this member to send video' },
-  { key: 'canShareScreen', label: 'Screen share', hint: 'Allow this member to present' },
-  { key: 'canUseChat', label: 'Chat & Polls', hint: 'Allow posting in chat & answering Q&A' },
-];
+    { key: 'canSendAudio', label: 'Microphone', hint: 'Allow this member to speak' },
+    { key: 'canSendVideo', label: 'Camera', hint: 'Allow this member to send video' },
+    { key: 'canShareScreen', label: 'Screen share', hint: 'Allow this member to present' },
+    { key: 'canUseChat', label: 'Chat & Polls', hint: 'Allow posting in chat & answering Q&A' },
+  ];
 
 const permissionsOf = (participant: MeetingParticipant): ParticipantPermissions => ({
   canSendAudio: participant.canSendAudio,
@@ -80,7 +80,7 @@ export const ParticipantSettingsModal = ({
         {PERMISSIONS.map((permission) => (
           <label
             key={permission.key}
-            className="flex cursor-pointer items-start gap-3 rounded-md border border-border bg-card px-3 py-2.5"
+            className="flex cursor-pointer items-start gap-3 rounded-sm border border-border bg-card px-3 py-2.5"
           >
             <input
               type="checkbox"

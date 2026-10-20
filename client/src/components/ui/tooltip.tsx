@@ -199,7 +199,7 @@ function TooltipContent({
       data-slot="tooltip-content"
       role="tooltip"
       className={cn(
-        "absolute z-[100] whitespace-nowrap rounded-md bg-zinc-900 border border-zinc-800 px-2.5 py-1 text-[11px] font-medium text-zinc-100 shadow-md animate-in fade-in-0 zoom-in-95 pointer-events-none select-none dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100",
+        "absolute z-[100] whitespace-nowrap rounded-sm bg-zinc-900 border border-zinc-800 px-2.5 py-1 text-[11px] font-medium text-zinc-100 shadow-md animate-in fade-in-0 zoom-in-95 pointer-events-none select-none dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100",
         getPositionClass(),
         className
       )}

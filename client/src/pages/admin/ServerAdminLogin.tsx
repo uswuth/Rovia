@@ -42,7 +42,7 @@ export const ServerAdminLogin = () => {
   };
 
   const inputCls =
-    'h-10.5 rounded-md border-border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground shadow-none transition-all hover:border-primary/50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_20px_color-mix(in_srgb,var(--custom-accent,#10b981)_30%,transparent)]';
+    'h-10.5 rounded-sm border-border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground shadow-none transition-all hover:border-primary/50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_20px_color-mix(in_srgb,var(--custom-accent,#10b981)_30%,transparent)]';
   const labelCls = 'text-[11px] font-medium text-muted-foreground';
 
   return (
@@ -402,7 +402,7 @@ export const ServerAdminLogin = () => {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full h-10.5 mt-2 bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground font-bold text-sm rounded-md transition-all duration-200 shadow-md cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full h-10.5 mt-2 bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground font-bold text-sm rounded-sm transition-all duration-200 shadow-md cursor-pointer flex items-center justify-center gap-2"
                   >
                     {loading ? (
                       <>

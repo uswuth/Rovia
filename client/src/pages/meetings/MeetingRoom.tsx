@@ -226,7 +226,7 @@ export const MeetingRoom: React.FC = () => {
     if (id && isAuthenticated) {
       joinMeeting(id).then(() => {
         void refetch();
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [id, isAuthenticated, refetch]);
 
@@ -288,7 +288,7 @@ export const MeetingRoom: React.FC = () => {
       if (id) {
         import('@/api/meeting/meeting-socket').then((m) => {
           m.getMeetingSocket().emit('meeting:leave', id);
-        }).catch(() => {});
+        }).catch(() => { });
       }
     };
     window.addEventListener('beforeunload', handleUnload);
@@ -373,9 +373,9 @@ export const MeetingRoom: React.FC = () => {
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      document.documentElement.requestFullscreen().catch(() => { });
     } else {
-      document.exitFullscreen().catch(() => {});
+      document.exitFullscreen().catch(() => { });
     }
   };
 
@@ -787,7 +787,7 @@ export const MeetingRoom: React.FC = () => {
   return (
     <div className="flex h-dvh max-h-dvh flex-col bg-background text-foreground overflow-hidden">
       {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-md bg-slate-900 text-white px-4 py-2 text-xs font-semibold shadow-xl flex items-center gap-2">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-sm bg-slate-900 text-white px-4 py-2 text-xs font-semibold shadow-xl flex items-center gap-2">
           <AlertCircle size={15} className="text-amber-400" />
           <span>{toastMessage}</span>
         </div>

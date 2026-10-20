@@ -55,7 +55,7 @@ export function NavUser({
             render={
               <SidebarMenuButton
                 size="lg"
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-md text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-150 border-none bg-transparent cursor-pointer"
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-sm text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-150 border-none bg-transparent cursor-pointer"
               />
             }
           >
@@ -70,7 +70,7 @@ export function NavUser({
             <ChevronsUpDownIcon className="ml-auto size-4 text-muted-foreground shrink-0 group-data-[collapsible=icon]:hidden" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-56 rounded-md bg-card border border-border text-card-foreground shadow-2xl p-1"
+            className="w-56 rounded-sm bg-card border border-border text-card-foreground shadow-2xl p-1"
             side="top"
             align="start"
             sideOffset={8}

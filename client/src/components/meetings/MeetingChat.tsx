@@ -199,10 +199,10 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
     const role = meetingRoleFor
       ? meetingRoleFor(userId)
       : matched?.participantRole === 'HOST'
-      ? 'Host'
-      : matched?.participantRole === 'MODERATOR'
-      ? 'Moderator'
-      : 'Member';
+        ? 'Host'
+        : matched?.participantRole === 'MODERATOR'
+          ? 'Moderator'
+          : 'Member';
     const email = emailFor ? emailFor(userId) : ((matched as unknown as Record<string, string | undefined>)?.userEmail || (matched as unknown as Record<string, string | undefined>)?.email);
 
     setSelectedProfileUser({
@@ -223,7 +223,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
     <div className="flex flex-col h-full min-h-0 w-full gap-2">
       {/* Pinned Active Poll Indexed Banner above Chat */}
       {activePoll && activePoll.pollStatus === 'OPEN' && (
-        <div className="shrink-0 rounded-md border border-border/80 bg-card/95 shadow-xs overflow-hidden transition-all">
+        <div className="shrink-0 rounded-sm border border-border/80 bg-card/95 shadow-xs overflow-hidden transition-all">
           <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b border-border/60 text-xs">
             <div
               className="flex items-center gap-1.5 font-medium text-foreground min-w-0 flex-1 cursor-pointer select-none"
@@ -430,7 +430,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
         </MessageScroller.Root>
       </MessageScroller.Provider>
 
-      {}
+      { }
       <div className="shrink-0 pt-1 pb-1 mt-auto flex flex-col justify-end">
         {/* Real-time Typing Indicator with official shadcn shimmer */}
         {Object.keys(typingUsers).length > 0 && (
@@ -483,7 +483,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
         )}
       </div>
 
-      {}
+      { }
       {selectedProfileUser && (
         <Modal
           open={Boolean(selectedProfileUser)}

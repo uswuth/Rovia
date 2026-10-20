@@ -66,7 +66,7 @@ const TimeScrollColumn: React.FC<TimeScrollColumnProps> = ({
               data-selected={isSelected}
               onClick={() => onSelect(item)}
               className={cn(
-                "w-full h-8 flex items-center justify-center rounded-md text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
+                "w-full h-8 flex items-center justify-center rounded-sm text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
                 isSelected
                   ? "bg-primary text-primary-foreground font-bold shadow-xs scale-102"
                   : "text-foreground hover:bg-secondary hover:text-primary"
@@ -212,7 +212,7 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
             <PopoverContent className="w-64 p-3 border-border bg-card shadow-xl" align="start">
               <div className="space-y-3">
                 {/* Header readout */}
-                <div className="text-center py-1 bg-secondary/50 rounded-md border border-border">
+                <div className="text-center py-1 bg-secondary/50 rounded-sm border border-border">
                   <span className="text-sm font-bold text-primary tracking-wider">
                     {formattedTimeDisplay}
                   </span>
@@ -244,7 +244,7 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
                         type="button"
                         onClick={() => updateTime(selectedHour, selectedMinute, "AM")}
                         className={cn(
-                          "w-full py-2 text-center rounded-md text-xs font-semibold transition-colors border border-border hover:bg-secondary cursor-pointer",
+                          "w-full py-2 text-center rounded-sm text-xs font-semibold transition-colors border border-border hover:bg-secondary cursor-pointer",
                           selectedPeriod === "AM" && "bg-primary text-primary-foreground border-primary hover:opacity-90 shadow-xs"
                         )}
                       >
@@ -254,7 +254,7 @@ export const DateTimePicker = React.forwardRef<HTMLInputElement, DateTimePickerP
                         type="button"
                         onClick={() => updateTime(selectedHour, selectedMinute, "PM")}
                         className={cn(
-                          "w-full py-2 text-center rounded-md text-xs font-semibold transition-colors border border-border hover:bg-secondary cursor-pointer",
+                          "w-full py-2 text-center rounded-sm text-xs font-semibold transition-colors border border-border hover:bg-secondary cursor-pointer",
                           selectedPeriod === "PM" && "bg-primary text-primary-foreground border-primary hover:opacity-90 shadow-xs"
                         )}
                       >

@@ -101,7 +101,7 @@ export const getServerOrgColumns = ({
           <button
             type="button"
             onClick={() => onView(org.organizationId)}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+            className="p-1 rounded-sm text-muted-foreground hover:text-foreground cursor-pointer"
             title="View Organization"
           >
             <ChevronRight size={15} />

@@ -59,7 +59,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
 
       <CardContent className="space-y-4">
         {error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <div className="flex items-start gap-2 rounded-sm border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -74,7 +74,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
         )}
 
         {summaryStatus === 'FAILED' && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+          <div className="flex items-start gap-2 rounded-sm border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <span>
               Summarisation did not complete. The transcript below is unaffected and can
@@ -151,7 +151,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
                 {speakers.map((speaker) => (
                   <div
                     key={speaker.speakerId ?? speaker.speakerName}
-                    className="rounded-md border border-border bg-muted/40 p-3"
+                    className="rounded-sm border border-border bg-muted/40 p-3"
                   >
                     <div className="mb-1 flex items-center gap-2">
                       <span className="text-xs font-semibold text-foreground">
@@ -175,7 +175,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
                 aria-label="Raw meeting transcript"
                 value={transcript.transcriptText}
                 rows={8}
-                className="w-full resize-y rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full resize-y rounded-sm border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             )}
           </section>

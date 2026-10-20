@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { DataTable } from '@/components/ui/data-table';
+import { CommonTabs } from '@/components/ui/common-tabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -281,31 +282,15 @@ export const Tasks: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          {/* View Mode Toggle */}
-          <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode('kanban')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${viewMode === 'kanban'
-                ? 'bg-background text-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-                }`}
-            >
-              <LayoutGrid size={13} />
-              <span>Kanban</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${viewMode === 'table'
-                ? 'bg-background text-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-                }`}
-            >
-              <List size={13} />
-              <span>Table</span>
-            </button>
-          </div>
+          <CommonTabs
+            size="xs"
+            value={viewMode}
+            onChange={(val) => setViewMode(val as 'kanban' | 'table')}
+            items={[
+              { id: 'kanban', label: 'Kanban', icon: <LayoutGrid size={13} /> },
+              { id: 'table', label: 'Table', icon: <List size={13} /> },
+            ]}
+          />
 
           <Button
             variant="outline"
@@ -533,7 +518,7 @@ export const Tasks: React.FC = () => {
                                       </Avatar>
                                     </div>
                                   </TooltipTrigger>
-                                  <TooltipContent side="left" align="start" className="p-2.5 space-y-1.5 text-left min-w-[160px] bg-popover text-popover-foreground border border-border shadow-md rounded-md z-50">
+                                  <TooltipContent side="left" align="start" className="p-2.5 space-y-1.5 text-left min-w-[160px] bg-popover text-popover-foreground border border-border shadow-md rounded-sm z-50">
                                     <div className="flex items-center gap-2">
                                       <Avatar className="size-6 text-[10px]">
                                         {creatorAvatar && <AvatarImage src={creatorAvatar} alt={creatorName} />}

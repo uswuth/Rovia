@@ -214,7 +214,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
+          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-sm group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
         >
           {children}
         </div>
@@ -236,7 +236,7 @@ function SidebarTrigger({
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       className={cn(
-        "flex size-7 items-center justify-center rounded-md text-foreground/70 hover:text-primary transition-colors cursor-pointer border-none bg-transparent hover:bg-transparent outline-hidden focus-visible:ring-0 shadow-none",
+        "flex size-7 items-center justify-center rounded-sm text-foreground/70 hover:text-primary transition-colors cursor-pointer border-none bg-transparent hover:bg-transparent outline-hidden focus-visible:ring-0 shadow-none",
         className
       )}
       onClick={(event) => {
@@ -371,7 +371,7 @@ function SidebarGroupLabel({
   ...props
 }: React.ComponentProps<"div"> & { render?: RenderableElement }) {
   const mergedClass = cn(
-    "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+    "flex h-8 shrink-0 items-center rounded-sm px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
     className
   )
 
@@ -403,7 +403,7 @@ function SidebarGroupAction({
   ...props
 }: React.ComponentProps<"button"> & { render?: RenderableElement }) {
   const mergedClass = cn(
-    "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform group-data-[collapsible=icon]:hidden after:absolute after:-inset-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
+    "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-sm p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform group-data-[collapsible=icon]:hidden after:absolute after:-inset-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
     className
   )
 
@@ -466,7 +466,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button flex w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left text-sm font-medium outline-none transition-all duration-150 border-none bg-transparent group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4.5 [&_svg]:shrink-0 [&_svg]:text-current cursor-pointer text-zinc-700 dark:text-zinc-300 hover:text-primary hover:bg-primary/10 data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold w-full",
+  "peer/menu-button group/menu-button flex w-full items-center gap-3 overflow-hidden rounded-sm px-3 py-2 text-left text-sm font-medium outline-none transition-all duration-150 border-none bg-transparent group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4.5 [&_svg]:shrink-0 [&_svg]:text-current cursor-pointer text-zinc-700 dark:text-zinc-300 hover:text-primary hover:bg-primary/10 data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold w-full",
   {
     variants: {
       variant: {
@@ -556,7 +556,7 @@ function SidebarMenuAction({
   showOnHover?: boolean
 }) {
   const mergedClass = cn(
-    "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-zinc-400 ring-sidebar-ring outline-hidden transition-transform group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-white peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 after:absolute after:-inset-2 hover:bg-zinc-800 hover:text-white focus-visible:ring-2 md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
+    "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-sm p-0 text-zinc-400 ring-sidebar-ring outline-hidden transition-transform group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-white peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 after:absolute after:-inset-2 hover:bg-zinc-800 hover:text-white focus-visible:ring-2 md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
     showOnHover &&
     "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-active/menu-button:text-white aria-expanded:opacity-100 md:opacity-0",
     className
@@ -593,7 +593,7 @@ function SidebarMenuBadge({
       data-slot="sidebar-menu-badge"
       data-sidebar="menu-badge"
       className={cn(
-        "pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium text-zinc-400 tabular-nums select-none group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-white peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 peer-data-active/menu-button:text-white",
+        "pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-sm px-1 text-xs font-medium text-zinc-400 tabular-nums select-none group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-white peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 peer-data-active/menu-button:text-white",
         className
       )}
       {...props}
@@ -616,12 +616,12 @@ function SidebarMenuSkeleton({
     <div
       data-slot="sidebar-menu-skeleton"
       data-sidebar="menu-skeleton"
-      className={cn("flex h-8 items-center gap-2 rounded-md px-2", className)}
+      className={cn("flex h-8 items-center gap-2 rounded-sm px-2", className)}
       {...props}
     >
       {showIcon && (
         <Skeleton
-          className="size-4 rounded-md"
+          className="size-4 rounded-sm"
           data-sidebar="menu-skeleton-icon"
         />
       )}
@@ -679,7 +679,7 @@ function SidebarMenuSubButton({
   render?: RenderableElement
 }) {
   const mergedClass = cn(
-    "flex h-8 w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-150 cursor-pointer border-none bg-transparent data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:bg-primary/15",
+    "flex h-8 w-full min-w-0 items-center gap-2 overflow-hidden rounded-sm px-2.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-150 cursor-pointer border-none bg-transparent data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:bg-primary/15",
     className
   )
 

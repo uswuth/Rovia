@@ -506,13 +506,13 @@ export const MeetingLobby: React.FC = () => {
                 </div>
 
                 {/* Name badge */}
-                <div className="absolute top-3 left-3 rounded-md bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-xs">
+                <div className="absolute top-3 left-3 rounded-sm bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-xs">
                   {displayName}
                 </div>
 
                 {/* Audio meter */}
                 {micEnabled && (
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2.5 py-1 backdrop-blur-xs">
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-sm bg-black/60 px-2.5 py-1 backdrop-blur-xs">
                     <span className="text-[10px] text-slate-300 font-medium">Mic</span>
                     <div className="h-1.5 w-10 overflow-hidden rounded-full bg-slate-700">
                       <div className="h-full bg-primary transition-all duration-75" style={{ width: `${audioLevel}%` }} />
@@ -542,7 +542,7 @@ export const MeetingLobby: React.FC = () => {
                           }
                         }}
                       >
-                        <SelectTrigger className="w-full h-9 rounded-md border-border bg-background px-3 text-xs text-foreground min-w-0" title={cameraTriggerLabel}>
+                        <SelectTrigger className="w-full h-9 rounded-sm border-border bg-background px-3 text-xs text-foreground min-w-0" title={cameraTriggerLabel}>
                           <span className="truncate flex-1 text-left">{cameraTriggerLabel}</span>
                         </SelectTrigger>
                         <SelectContent className="w-[max-content] min-w-[260px] max-w-[400px] shadow-lg">
@@ -570,7 +570,7 @@ export const MeetingLobby: React.FC = () => {
                           }
                         }}
                       >
-                        <SelectTrigger className="w-full h-9 rounded-md border-border bg-background px-3 text-xs text-foreground min-w-0" title={micTriggerLabel}>
+                        <SelectTrigger className="w-full h-9 rounded-sm border-border bg-background px-3 text-xs text-foreground min-w-0" title={micTriggerLabel}>
                           <span className="truncate flex-1 text-left">{micTriggerLabel}</span>
                         </SelectTrigger>
                         <SelectContent className="w-[max-content] min-w-[260px] max-w-[400px] shadow-lg">
@@ -595,7 +595,7 @@ export const MeetingLobby: React.FC = () => {
                           if (typeof val === 'string') setSelectedSpeaker(val);
                         }}
                       >
-                        <SelectTrigger className="w-full h-9 rounded-md border-border bg-background px-3 text-xs text-foreground min-w-0" title={speakerTriggerLabel}>
+                        <SelectTrigger className="w-full h-9 rounded-sm border-border bg-background px-3 text-xs text-foreground min-w-0" title={speakerTriggerLabel}>
                           <span className="truncate flex-1 text-left">{speakerTriggerLabel}</span>
                         </SelectTrigger>
                         <SelectContent className="w-[max-content] min-w-[260px] max-w-[400px] shadow-lg">
@@ -636,7 +636,7 @@ export const MeetingLobby: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={handleShare}
-                    className="gap-1.5 text-xs border-border hover:bg-secondary cursor-pointer rounded-md"
+                    className="gap-1.5 text-xs border-border hover:bg-secondary cursor-pointer rounded-sm"
                   >
                     <Share2 size={13} />
                     <span>{copied ? 'Copied' : 'Share'}</span>
@@ -679,7 +679,7 @@ export const MeetingLobby: React.FC = () => {
 
               {/* Organization Sign-In Prompt if not signed in */}
               {!isAuthenticated && (
-                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                <div className="rounded-sm border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400 font-medium">
                   🔒 Sign in to your organization account to join this meeting.
                 </div>
               )}
@@ -689,7 +689,7 @@ export const MeetingLobby: React.FC = () => {
                 <Button
                   disabled={!canJoin}
                   onClick={handleJoin}
-                  className="w-full h-11 text-sm font-semibold justify-center gap-2 rounded-md shadow-xs disabled:opacity-50"
+                  className="w-full h-11 text-sm font-semibold justify-center gap-2 rounded-sm shadow-xs disabled:opacity-50"
                 >
                   {!isEndedOrCancelled ? (
                     <Video size={16} />

@@ -376,7 +376,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                             </div>
                           ) : (lockSuperAdmin && isSuperAdmin) ? (
                             <>
-                              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-primary/15 text-primary border border-primary/30">
+                              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-sm bg-primary/15 text-primary border border-primary/30">
                                 SuperAdmin
                               </span>
                               <Tooltip className="w-auto shrink-0 inline-flex">
@@ -397,7 +397,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                             </>
                           ) : (lockSuperAdmin && isAdmin) ? (
                             <>
-                              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
+                              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-sm bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
                                 Admin
                               </span>
                               <Tooltip className="w-auto shrink-0 inline-flex">
@@ -420,7 +420,7 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                             /* Interactive controls for TopAdmin and Hosts on regular members */
                             <>
                               {isSelected && (
-                                <div className="flex items-center gap-1 bg-background/80 rounded-md p-0.5 border border-border">
+                                <div className="flex items-center gap-1 bg-background/80 rounded-sm p-0.5 border border-border">
                                   <button
                                     type="button"
                                     onClick={(e) => {

@@ -2,9 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   FolderGit2,
-  Users,
   Video,
-  CheckSquare,
   FolderPlus,
   Edit,
   LayoutList,
@@ -12,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
+import { useOrganization } from '@/context/OrganizationContext';
 import {
   getProjectName,
   getProjectCode,
@@ -21,6 +20,7 @@ import {
 } from '@/types/project.types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
+import { CommonTabs, type TabItem } from '@/components/ui/common-tabs';
 import { Badge } from '@/components/ui/badge';
 import { CodeBadge } from '@/components/ui/CodeBadge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,6 +33,10 @@ import { getMeetings } from '@/api/meeting/meeting.api';
 import type { Meeting } from '@/api/meeting/meeting.types';
 import { RosterDetailModal } from '@/components/members/RosterDetailModal';
 import { normalizeMemberList } from '@/components/members/member-utils';
+import { GroupedAvatars } from '@/components/members/GroupedAvatars';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { getAvatarColorByName } from '@/components/ui/avatar-colors';
+import { formatDate } from '@/lib/format-date';
 import type { Member } from '@/types/member.types';
 import { getProjectColumns, type ProjectRosterModalState } from './Projects.TanCol';
 
@@ -42,9 +46,11 @@ export const Projects: React.FC = () => {
   const currentTab = searchParams.get('status') || 'ALL';
   const { projects, loading } = useProject();
   const { user, isAuthenticated } = useAuth();
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const { members: orgMembers } = useOrganization();
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [gridPage, setGridPage] = useState(1);
   const [gridPageSize, setGridPageSize] = useState(6);
+  const [expandedProjectIds, setExpandedProjectIds] = useState<Record<string, boolean>>({});
   const [rosterModal, setRosterModal] = useState<ProjectRosterModalState | null>(null);
 
   // All meetings are fetched so the per-project meeting count is accurate.
@@ -90,34 +96,15 @@ export const Projects: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
-                viewMode === 'table'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title="Table View"
-            >
-              <LayoutList size={13} />
-              <span>Table</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
-                viewMode === 'grid'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title="Card Grid View"
-            >
-              <LayoutGrid size={13} />
-              <span>Cards</span>
-            </button>
-          </div>
+          <CommonTabs
+            items={[
+              { id: 'cards', label: 'Cards', icon: <LayoutGrid size={13} /> },
+              { id: 'table', label: 'Table', icon: <LayoutList size={13} /> },
+            ]}
+            value={viewMode}
+            onChange={(val) => setViewMode(val as 'cards' | 'table')}
+            size="xs"
+          />
 
           <Button
             onClick={() => navigate('/projects/new')}
@@ -138,9 +125,9 @@ export const Projects: React.FC = () => {
             loadingRowCount={4}
           />
         ) : (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, index) => (
-              <Skeleton key={index} className="h-44 w-full rounded-md" />
+              <Skeleton key={index} className="h-28 w-full rounded-sm" />
             ))}
           </div>
         )
@@ -172,7 +159,7 @@ export const Projects: React.FC = () => {
 
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="space-y-3">
               {paginatedGridProjects.map((project) => {
                 const pId = getProjectId(project);
                 const pName = getProjectName(project);
@@ -180,10 +167,95 @@ export const Projects: React.FC = () => {
                 const pDesc = getProjectDesc(project);
                 const pStatus = getProjectStatus(project);
 
-                const hostList = (project.hosts || []) as (Member | string)[];
-                const memberList = (project.members || []) as (Member | string)[];
-                const teamMembers = normalizeMemberList([...hostList, ...memberList]);
-                const teamCount = teamMembers.length || (project.memberCount || 1);
+                const isReadOnly = pStatus.toLowerCase() === 'completed' || pStatus.toLowerCase() === 'archived';
+                const isGlobalAdmin = Boolean(
+                  user?.isSuperAdmin || user?.userRole === 'SuperAdmin' || user?.userRole === 'Admin'
+                );
+                const isProjectHost = Boolean(
+                  user?.userId &&
+                  (project.hosts || []).some((h: unknown) => {
+                    if (typeof h === 'string') return h === user.userId;
+                    if (typeof h === 'object' && h !== null) {
+                      const obj = h as Record<string, unknown>;
+                      return (obj.userId || obj._id || obj.id) === user.userId;
+                    }
+                    return false;
+                  })
+                );
+                const canSchedule = isGlobalAdmin || isProjectHost;
+
+                // Member resolution with real orgMember names
+                const hostsArr = (project.hosts || []) as (Member | string | Record<string, unknown>)[];
+                const membersArr = (project.members || []) as (Member | string | Record<string, unknown>)[];
+
+                const resolveMember = (item: Member | string | Record<string, unknown>, defaultRole: 'Host' | 'Member'): Member => {
+                  let id = '';
+                  let rawName = '';
+                  let rawEmail = '';
+                  let rawAvatar = '';
+                  let rawRole = defaultRole;
+
+                  if (typeof item === 'string') {
+                    id = item;
+                  } else if (typeof item === 'object' && item !== null) {
+                    const obj = item as Record<string, unknown>;
+                    id = String(obj.userId || obj._id || obj.id || '');
+                    rawName = String(obj.userName || obj.name || '');
+                    rawEmail = String(obj.userEmail || obj.email || '');
+                    rawAvatar = String(obj.avatarUrl || obj.avatar || '');
+                    if (obj.userRole) rawRole = String(obj.userRole) as 'Host' | 'Member';
+                  }
+
+                  const matchedOrgMember = (orgMembers || []).find(
+                    (om) => (id && om.userId === id) || (rawEmail && om.userEmail?.toLowerCase() === rawEmail.toLowerCase())
+                  );
+
+                  const finalName =
+                    matchedOrgMember?.userName && !matchedOrgMember.userName.toLowerCase().startsWith('user')
+                      ? matchedOrgMember.userName
+                      : rawName && !rawName.toLowerCase().startsWith('user')
+                        ? rawName
+                        : matchedOrgMember?.userEmail
+                          ? matchedOrgMember.userEmail.split('@')[0]
+                          : rawEmail
+                            ? rawEmail.split('@')[0]
+                            : `${defaultRole}`;
+
+                  return {
+                    userId: id || finalName,
+                    userName: finalName,
+                    userEmail: matchedOrgMember?.userEmail || rawEmail,
+                    userRole: (matchedOrgMember?.userRole || rawRole) as Member['userRole'],
+                    userStatus: 'ACTIVE',
+                    avatarUrl: matchedOrgMember?.avatarUrl || rawAvatar || undefined,
+                  };
+                };
+
+                const resolvedHosts = hostsArr.map((h) => resolveMember(h, 'Host'));
+                const resolvedMembers = membersArr.map((m) => resolveMember(m, 'Member'));
+                const combinedMembers = normalizeMemberList([...resolvedHosts, ...resolvedMembers]);
+
+                const valueMap: Record<string, 'Host' | 'Member'> = {};
+                resolvedHosts.forEach((h) => {
+                  if (h.userId) valueMap[h.userId] = 'Host';
+                });
+                resolvedMembers.forEach((m) => {
+                  if (m.userId && !valueMap[m.userId]) valueMap[m.userId] = 'Member';
+                });
+
+                // Lead/Host avatar for tooltip
+                const leadMember = resolvedHosts[0] || combinedMembers[0];
+                const leadName = leadMember?.userName || 'Project Lead';
+                const leadRole = valueMap[leadMember?.userId || ''] || 'Host';
+                const leadInitial = leadName.charAt(0).toUpperCase();
+                const leadColor = getAvatarColorByName(leadName);
+
+                const createdAtRaw = project.createdAt || project.updatedAt;
+                const createdAtStr = createdAtRaw ? (formatDate(createdAtRaw, { includeTime: true }) || 'Recently') : 'Recently';
+
+                const isExpanded = Boolean(expandedProjectIds[pId || pName]);
+                const descLength = pDesc.trim().length;
+                const hasLongDescription = descLength > 120;
 
                 const projectMeetingsCount = (meetings || []).filter((m) => {
                   const mProjId = m.projectId || (m as unknown as Record<string, string>).project;
@@ -192,99 +264,145 @@ export const Projects: React.FC = () => {
                 const finalMeetingCount =
                   projectMeetingsCount > 0 ? projectMeetingsCount : (project.meetingCount || 0);
 
-                const finalTaskCount = project.taskCount || 0;
-
                 return (
                   <div
                     key={pId || pName}
-                    className="group relative rounded-xs border border-border bg-card text-card-foreground p-5 hover:border-primary/40 transition-all shadow-xs space-y-4 flex flex-col justify-between"
+                    className="group rounded-sm border border-border bg-card hover:border-primary/40 p-4 transition-all space-y-3 shadow-xs"
                   >
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <CodeBadge code={pCode} />
-                          <Badge tone={getProjectStatusTone(pStatus)}>{pStatus}</Badge>
-                        </div>
+                    {/* Top Header Row: Project Name on left; Status + Action Buttons + Lead Avatar at far right end */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <span className="font-bold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors leading-snug truncate block">
+                          {pName}
+                        </span>
+                      </div>
 
-                        <div className="flex items-center gap-1">
-                          {(() => {
-                            const isReadOnly = pStatus.toLowerCase() === 'completed' || pStatus.toLowerCase() === 'archived';
-                            const isGlobalAdmin = Boolean(
-                              user?.isSuperAdmin || user?.userRole === 'SuperAdmin' || user?.userRole === 'Admin'
-                            );
-                            const isProjectHost = Boolean(
-                              user?.userId &&
-                              (project.hosts || []).some((h: unknown) => {
-                                if (typeof h === 'string') return h === user.userId;
-                                if (typeof h === 'object' && h !== null) {
-                                  const obj = h as Record<string, unknown>;
-                                  return (obj.userId || obj._id || obj.id) === user.userId;
-                                }
-                                return false;
-                              })
-                            );
-                            const canSchedule = isGlobalAdmin || isProjectHost;
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge tone={getProjectStatusTone(pStatus)} className="text-[10px] capitalize">
+                          {pStatus}
+                        </Badge>
 
-                            return (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={isReadOnly || !canSchedule}
-                                onClick={() => !isReadOnly && canSchedule && navigate(`/meetings/new?projectId=${pCode || pId}`)}
-                                className="h-7 w-7 p-0 text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                title={
-                                  !canSchedule
-                                    ? 'Only project hosts, Admins, or SuperAdmins can schedule meetings'
-                                    : isReadOnly
-                                    ? `Project is ${pStatus}. Re-activate status to Active to schedule meetings.`
-                                    : 'Schedule meeting'
-                                }
-                              >
-                                <Video size={14} />
-                              </Button>
-                            );
-                          })()}
+                        <div className="flex items-center gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isReadOnly || !canSchedule}
+                            onClick={() => !isReadOnly && canSchedule && navigate(`/meetings/new?projectId=${pCode || pId}`)}
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-primary hover:bg-secondary cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            title={
+                              !canSchedule
+                                ? 'Only project hosts, Admins, or SuperAdmins can schedule meetings'
+                                : isReadOnly
+                                  ? `Project is ${pStatus}. Re-activate status to Active to schedule meetings.`
+                                  : 'Schedule meeting'
+                            }
+                          >
+                            <Video size={13} />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => navigate(`/projects/${pCode || pId}/edit`)}
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
                             title="Edit project"
                           >
-                            <Edit size={14} />
+                            <Edit size={12} />
                           </Button>
                         </div>
-                      </div>
 
-                      <h3 className="text-base font-bold text-foreground leading-snug">{pName}</h3>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {pDesc || 'No description provided for this project.'}
-                      </p>
+                        <Tooltip className="w-auto">
+                          <TooltipTrigger asChild>
+                            <div
+                              className={`size-6 rounded-full flex items-center justify-center font-bold text-[10px] ${leadColor} shrink-0 shadow-xs cursor-pointer ring-1 ring-border/60 hover:ring-primary/60 transition-all ml-0.5`}
+                            >
+                              {leadInitial}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            align="end"
+                            className="p-2 space-y-1 text-left min-w-[150px] bg-popover text-popover-foreground border border-border shadow-md rounded-sm z-50"
+                          >
+                            <div className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                              <span>{leadName}</span>
+                              <span className="text-[10px] font-normal px-1 py-0.2 rounded-xs bg-primary/15 text-primary border border-primary/20">
+                                {leadRole}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              Created at: <span className="text-foreground">{createdAtStr}</span>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                     </div>
 
-                    <div className="pt-3 border-t border-border grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="bg-secondary rounded-sm p-2">
-                        <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
-                          <Users size={12} />
-                          <span className="text-[10px]">Team</span>
-                        </div>
-                        <div className="font-bold text-foreground">{teamCount}</div>
+                    {/* Description Row: Description on left (max-w-2xl) with responsive inline toggle */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className={`w-full max-w-2xl ${isExpanded ? 'py-0.5' : 'h-8 min-h-[2rem] flex items-center'}`}>
+                        {pDesc ? (
+                          <p className={`text-xs text-muted-foreground leading-relaxed transition-all ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+                            {pDesc}
+                            {hasLongDescription && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedProjectIds((prev) => ({
+                                    ...prev,
+                                    [pId || pName]: !prev[pId || pName],
+                                  }));
+                                }}
+                                className="ml-1.5 text-primary hover:underline font-semibold inline-flex items-center cursor-pointer"
+                              >
+                                {isExpanded ? 'less' : 'more...'}
+                              </button>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/50 italic">
+                            No description provided for this project.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Row: CodeBadge & Meeting count on left, Grouped Avatars on right */}
+                    <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/20">
+                      <div className="flex flex-wrap items-center gap-2 min-w-0 text-xs text-muted-foreground">
+                        <CodeBadge
+                          code={pCode}
+                          onClick={() => {
+                            if (pId) navigate(`/projects/${pId}/edit`);
+                          }}
+                          title="Edit Project"
+                        />
+
+                        {finalMeetingCount > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-muted/60 border border-border/80 text-foreground text-xs font-mono">
+                            <Video size={11} className="text-primary shrink-0" />
+                            <span>{finalMeetingCount} {finalMeetingCount === 1 ? 'meet' : 'meets'}</span>
+                          </span>
+                        )}
                       </div>
 
-                      <div className="bg-secondary rounded-sm p-2">
-                        <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
-                          <Video size={12} />
-                          <span className="text-[10px]">Meets</span>
-                        </div>
-                        <div className="font-bold text-foreground">{finalMeetingCount}</div>
-                      </div>
-
-                      <div className="bg-secondary rounded-sm p-2">
-                        <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
-                          <CheckSquare size={12} />
-                          <span className="text-[10px]">Tasks</span>
-                        </div>
-                        <div className="font-bold text-foreground">{finalTaskCount}</div>
+                      <div className="shrink-0">
+                        {combinedMembers.length > 0 && (
+                          <GroupedAvatars
+                            members={combinedMembers}
+                            maxDisplay={4}
+                            size="xs"
+                            onClick={() => {
+                              setRosterModal({
+                                open: true,
+                                title: `${pName} — Project Roster`,
+                                members: combinedMembers,
+                                projectName: pName,
+                                value: valueMap,
+                              });
+                            }}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -303,7 +421,7 @@ export const Projects: React.FC = () => {
                 setGridPageSize(newSize);
                 setGridPage(1);
               }}
-              className="rounded-md border"
+              className="rounded-sm border"
             />
           </div>
         );
@@ -322,4 +440,5 @@ export const Projects: React.FC = () => {
     </div>
   );
 };
+
 

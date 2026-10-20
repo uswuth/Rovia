@@ -1,14 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Users, Search, UserMinus, ShieldCheck, Check } from 'lucide-react';
+import { Users, Search, ShieldCheck } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DataTable, type Column } from '@/components/ui/data-table';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { Member } from '@/types/member.types';
-import { useAuth } from '@/context/AuthContext';
 import { getMemberId, getRoleCategory, normalizeMemberList } from './member-utils';
 import { getUserStatusTone } from '@/lib/status-tone';
 
@@ -33,20 +30,8 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
   teamName,
   members = [],
   value = {},
-  onUpdateRole,
-  onRemoveMember,
-  canManage,
 }) => {
-  const { user } = useAuth();
-  const isTopAdmin = Boolean(
-    user?.isSuperAdmin ||
-    ['SUPERADMIN', 'SUPER_ADMIN', 'ADMIN'].includes((user?.userRole || '').toUpperCase())
-  );
-  const isHost = (user?.userRole || '').toUpperCase() === 'HOST';
-  const canModify = canManage !== undefined ? canManage : (isTopAdmin || isHost);
-
   const [search, setSearch] = useState('');
-  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
 
   const deduplicatedMembers = useMemo(() => {
     return normalizeMemberList(members);
@@ -149,80 +134,6 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
         return <Badge tone={getUserStatusTone(st)}>{st}</Badge>;
       },
     },
-    {
-      id: 'actions',
-      header: 'Actions',
-      align: 'right',
-      width: '130px',
-      cell: (m) => {
-        const mId = getMemberId(m);
-        const cat = getRoleCategory(m);
-        const isTop = cat === 'SUPER_ADMIN' || cat === 'ADMIN';
-
-        if (isTop) {
-          return (
-            <div className="flex justify-end items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-primary/15 text-primary border border-primary/30 inline-flex items-center gap-1 cursor-default">
-                    <Check size={12} />
-                    <span>Locked Host</span>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="left">Admins & SuperAdmins are locked as Hosts</TooltipContent>
-              </Tooltip>
-            </div>
-          );
-        }
-
-        if (!canModify) {
-          return <span className="text-[11px] text-muted-foreground/50 italic">Read Only</span>;
-        }
-
-        const currentRole = value[mId] || 'Member';
-
-        return (
-          <div className="flex items-center justify-end gap-1.5">
-            {onUpdateRole && (
-              <div className="flex items-center gap-1 bg-background/80 rounded-md p-0.5 border border-border">
-                <button
-                  type="button"
-                  onClick={() => onUpdateRole(mId, 'Member')}
-                  className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer ${currentRole === 'Member'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                >
-                  Member
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onUpdateRole(mId, 'Host')}
-                  className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-sm transition-colors cursor-pointer ${currentRole === 'Host'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                >
-                  Host
-                </button>
-              </div>
-            )}
-
-            {onRemoveMember && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setMemberToRemove({ id: mId, name: m.userName || m.userEmail || 'Member' })}
-                className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 cursor-pointer"
-                title="Remove Member"
-              >
-                <UserMinus size={14} />
-              </Button>
-            )}
-          </div>
-        );
-      },
-    },
   ];
 
   return (
@@ -234,7 +145,7 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
     >
       <div className="space-y-4">
         {/* Filter and stats row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
@@ -263,33 +174,12 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
         />
 
         {/* Footer info */}
-        <div className="flex items-center justify-end pt-2 text-xs text-muted-foreground border-t border-border">
+        <div className="flex items-center justify-end text-xs text-muted-foreground">
           <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>
         </div>
       </div>
-
-      {/* Remove Confirmation Dialog */}
-      <ConfirmDialog
-        open={Boolean(memberToRemove)}
-        onOpenChange={(op) => !op && setMemberToRemove(null)}
-        title="Remove Member from Roster"
-        description={
-          <>
-            Are you sure you want to remove <span className="font-semibold text-foreground">{memberToRemove?.name}</span> from{' '}
-            <span className="font-semibold text-foreground">{projectName || teamName || 'this roster'}</span>?
-          </>
-        }
-        confirmLabel="Remove"
-        onConfirm={() => {
-          if (memberToRemove && onRemoveMember) {
-            onRemoveMember(memberToRemove.id);
-            setMemberToRemove(null);
-          }
-        }}
-        variant="destructive"
-      />
     </Modal>
   );
 };

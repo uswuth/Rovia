@@ -111,7 +111,7 @@ export const MeetingSidebar: React.FC<MeetingSidebarProps> = ({
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="size-6 text-muted-foreground hover:text-foreground cursor-pointer rounded-md"
+            className="size-6 text-muted-foreground hover:text-foreground cursor-pointer rounded-sm"
             title="Close panel"
           >
             <X size={14} />

@@ -58,7 +58,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
         if (videoRef.current.srcObject !== stream) {
           videoRef.current.srcObject = stream;
         }
-        videoRef.current.play().catch(() => {});
+        videoRef.current.play().catch(() => { });
       }
     };
     const tracks = stream.getVideoTracks();
@@ -128,12 +128,12 @@ export const VideoTile: React.FC<VideoTileProps> = ({
       style={
         isScreenShare && videoAspect
           ? {
-              aspectRatio: `${videoAspect}`,
-              maxWidth: '100%',
-              maxHeight: '100%',
-              width: isFullscreen ? (videoAspect >= (window.innerWidth / window.innerHeight) ? '100vw' : 'auto') : '100%',
-              height: isFullscreen ? (videoAspect < (window.innerWidth / window.innerHeight) ? '100vh' : 'auto') : '100%',
-            }
+            aspectRatio: `${videoAspect}`,
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: isFullscreen ? (videoAspect >= (window.innerWidth / window.innerHeight) ? '100vw' : 'auto') : '100%',
+            height: isFullscreen ? (videoAspect < (window.innerWidth / window.innerHeight) ? '100vh' : 'auto') : '100%',
+          }
           : (isScreenShare ? { width: '100%', height: '100%', aspectRatio: '16/9', maxWidth: '100%', maxHeight: '100%' } : undefined)
       }
       className={cn(
@@ -141,9 +141,9 @@ export const VideoTile: React.FC<VideoTileProps> = ({
         isScreenShare
           ? "m-auto bg-black border-none size-full"
           : cn(
-              "bg-zinc-950",
-              fillContainer ? "w-full h-full" : "aspect-video w-full"
-            ),
+            "bg-zinc-950",
+            fillContainer ? "w-full h-full" : "aspect-video w-full"
+          ),
         isVideoShowing
           ? (isSpeaking
             ? speakerBorder
@@ -260,7 +260,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
       ) : (
         /* Normal camera tile bottom-left participant label */
         <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 max-w-[calc(100%-140px)]">
-          <div className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-white bg-black/60 backdrop-blur-xs shadow-xs">
+          <div className="flex items-center gap-1.5 rounded-sm px-2 py-1 text-[11px] font-medium text-white bg-black/60 backdrop-blur-xs shadow-xs">
             {host && (
               <Crown
                 size={12}
@@ -277,7 +277,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
 
       {!isScreenShare && (
         <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-30">
-          <div className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-white bg-black/60 backdrop-blur-xs shadow-xs">
+          <div className="flex items-center gap-1.5 rounded-sm px-2 py-1 text-[11px] font-medium text-white bg-black/60 backdrop-blur-xs shadow-xs">
             {speakerMuted ? (
               <Tooltip content="Speaker Output Muted" side="top" align="end">
                 <span className="flex items-center text-red-400">

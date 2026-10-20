@@ -71,7 +71,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     reset();
   };
 
-const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
+  const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +110,7 @@ const TITLE_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9 _-]*[a-zA-Z0-9])?$/;
         {(submitError || nameError) && (
           <div
             role="alert"
-            className="rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive"
+            className="rounded-sm border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive"
           >
             {nameError || submitError}
           </div>

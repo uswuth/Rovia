@@ -37,7 +37,7 @@ export const Login = () => {
     try {
       await login({ userEmail: data.userEmail, password: data.password });
       const returnUrl = (location.state as { from?: string } | null)?.from ||
-                        sessionStorage.getItem('intellmeet_redirect_url');
+        sessionStorage.getItem('intellmeet_redirect_url');
       sessionStorage.removeItem('intellmeet_redirect_url');
       if (returnUrl) {
         navigate(returnUrl, { replace: true });
@@ -54,7 +54,7 @@ export const Login = () => {
   };
 
   const inputCls =
-    'h-10.5 rounded-md border-border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground shadow-none transition-all hover:border-primary/50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_20px_color-mix(in_srgb,var(--custom-accent,#10b981)_30%,transparent)]';
+    'h-10.5 rounded-sm border-border bg-card px-3.5 text-sm text-foreground placeholder:text-muted-foreground shadow-none transition-all hover:border-primary/50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_20px_color-mix(in_srgb,var(--custom-accent,#10b981)_30%,transparent)]';
   const labelCls = 'text-[11px] font-medium text-muted-foreground';
 
   return (
@@ -70,7 +70,7 @@ export const Login = () => {
         position: 'relative',
       }}
     >
-      {}
+      { }
       <Box
         sx={{
           position: 'absolute',
@@ -99,7 +99,7 @@ export const Login = () => {
             boxSizing: 'border-box',
           }}
         >
-          {}
+          { }
           <Box
             sx={{
               width: '100%',
@@ -118,7 +118,7 @@ export const Login = () => {
                 '0 10px 30px -5px color-mix(in srgb, var(--custom-accent, #10b981) 30%, rgba(0,0,0,0.1)), 15px 0 45px -10px color-mix(in srgb, var(--custom-accent, #10b981) 40%, rgba(0,0,0,0.25))',
             }}
           >
-            {}
+            { }
             <Box
               sx={{
                 position: 'absolute',
@@ -152,7 +152,7 @@ export const Login = () => {
               }}
             />
 
-            {}
+            { }
             <Box
               sx={{
                 position: 'absolute',
@@ -169,7 +169,7 @@ export const Login = () => {
               }}
             />
 
-            {}
+            { }
             <Box
               sx={{
                 position: 'absolute',
@@ -184,7 +184,7 @@ export const Login = () => {
               }}
             />
 
-            {}
+            { }
             <Box sx={{ position: 'relative', zIndex: 10 }}>
               <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
                 <IntellMeetLogo
@@ -207,7 +207,7 @@ export const Login = () => {
               </Stack>
             </Box>
 
-            {}
+            { }
             <Stack spacing={4} sx={{ position: 'relative', zIndex: 10, width: '100%' }}>
               <Stack
                 direction={{ xs: 'column', xl: 'row' }}
@@ -445,7 +445,7 @@ export const Login = () => {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-10.5 mt-2 bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground font-bold text-sm rounded-md transition-all duration-200 shadow-md cursor-pointer"
+                    className="w-full h-10.5 mt-2 bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground font-bold text-sm rounded-sm transition-all duration-200 shadow-md cursor-pointer"
                   >
                     {isSubmitting ? (
                       <>

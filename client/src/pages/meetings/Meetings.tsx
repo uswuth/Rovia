@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Video, Calendar, Clock, Users, Play, Plus, FolderGit2, Search, X, Copy, Check, Share2 } from 'lucide-react';
+import { Video, Calendar, Clock, Users, Play, Plus, FolderGit2, Search, X, Copy, Check, Share2, LayoutGrid, Table2, Building2 } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
+import { useOrganization } from '@/context/OrganizationContext';
+import { useTeams } from '@/hooks/useTeams';
 import { useTimeFormat } from '@/context/TimeFormatContext';
 import { getProjectId, getProjectName, getProjectCode } from '@/types/project.types';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -10,18 +12,23 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable, type Column } from '@/components/ui/data-table';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { Pagination } from '@/components/ui/Pagination';
 import { getMeetingStatusTone } from '@/lib/status-tone';
+import { GroupedAvatars } from '@/components/members/GroupedAvatars';
+import { RosterDetailModal } from '@/components/members/RosterDetailModal';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { getAvatarColorByName } from '@/components/ui/avatar-colors';
 import { useQuery } from '@/hooks/useApi';
-import { queryKeys } from '@/api/queryClient';
 import { getMeetings } from '@/api/meeting/meeting.api';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { Meeting, MeetingStatus } from '@/api/meeting/meeting.types';
-import { formatCountdown } from '@/lib/format-countdown';
-import { shareOrCopy } from '@/lib/share';
+import type { Member } from '@/types/member.types';
+import { CommonTabs, type TabItem } from '@/components/ui/common-tabs';
 import { formatDuration } from '@/lib/format-date';
 import { formatDurationHuman } from '@/utils/duration';
+import { formatCountdown } from '@/lib/format-countdown';
 
 /** `IN_PROGRESS` is client-derived: inside the scheduled window before the server marks it LIVE. */
 type MeetingDisplayStatus = MeetingStatus | 'IN_PROGRESS';
@@ -30,12 +37,27 @@ export const Meetings: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAuthenticated } = useAuth();
+  const { org, members: orgMembers } = useOrganization();
   const { projects, selectedProject } = useProject();
+  const { teams } = useTeams();
+  const VIEW_MODE_TABS: TabItem[] = [
+    { id: 'cards', label: 'List', icon: <LayoutGrid size={13} /> },
+    { id: 'table', label: 'Table', icon: <Table2 size={13} /> },
+  ];
   const { formatDateTimeStr } = useTimeFormat();
 
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 300);
   const [copiedMeetingId, setCopiedMeetingId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [expandedMeetingIds, setExpandedMeetingIds] = useState<Record<string, boolean>>({});
+  const [rosterModal, setRosterModal] = useState<{
+    open: boolean;
+    title: string;
+    members: Member[];
+    projectName?: string;
+    teamName?: string;
+  } | null>(null);
 
   const handleCopyLink = (joinCode: string, meetingId: string) => {
     const joinUrl = `${window.location.origin}/meetings/join/${joinCode}`;
@@ -135,8 +157,8 @@ export const Meetings: React.FC = () => {
     });
   }, [sortedMeetings, debouncedSearch, currentTab, now]);
 
-  const [meetingPage, setMeetingPage] = React.useState(1);
-  const [meetingPageSize, setMeetingPageSize] = React.useState(5);
+  const [meetingPage, setMeetingPage] = useState(1);
+  const [meetingPageSize, setMeetingPageSize] = useState(5);
 
   const paginatedMeetings = displayedMeetings.slice(
     (meetingPage - 1) * meetingPageSize,
@@ -208,6 +230,196 @@ export const Meetings: React.FC = () => {
 
   const canCreateMeeting = isGlobalAdmin || (filterProjectId ? isHostOfSelectedProject : isHostOfAnyProject);
 
+  const meetingColumns: Column<Meeting>[] = useMemo(() => [
+    {
+      id: 'title',
+      header: 'Meeting Session',
+      minWidth: '220px',
+      cell: (m) => {
+        const projectMatch = projects.find((p) => getProjectId(p) === m.projectId);
+        const pCode = projectMatch ? getProjectCode(projectMatch) : null;
+        const pName = projectMatch ? getProjectName(projectMatch) : null;
+        const teamMatch = m.teamId ? teams.find((t) => (t.teamId || t._id) === m.teamId) : null;
+        const tName = teamMatch ? ((teamMatch.teamName || teamMatch.name) as string) : null;
+
+        return (
+          <div className="space-y-1">
+            <div className="font-semibold text-foreground text-sm flex items-center gap-2">
+              <span className="truncate">{m.meetingTitle}</span>
+              {(pCode || pName) ? (
+                <Badge tone="neutral" className="gap-1 font-mono text-[10px] shrink-0">
+                  <FolderGit2 size={10} className="text-primary" />
+                  <span>{pCode || pName}</span>
+                </Badge>
+              ) : tName ? (
+                <Badge tone="neutral" className="gap-1 text-[10px] shrink-0">
+                  <Users size={10} className="text-primary" />
+                  <span>{tName}</span>
+                </Badge>
+              ) : (
+                <Badge tone="neutral" className="gap-1 text-[10px] shrink-0 text-muted-foreground">
+                  <Building2 size={10} />
+                  <span>Org Meeting</span>
+                </Badge>
+              )}
+            </div>
+            {m.meetingDescription && (
+              <p className={`text-xs text-muted-foreground leading-relaxed ${expandedMeetingIds[m.meetingId] ? '' : 'line-clamp-2'}`}>
+                {m.meetingDescription}
+                {m.meetingDescription.length > 80 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedMeetingIds((prev) => ({
+                        ...prev,
+                        [m.meetingId]: !prev[m.meetingId],
+                      }));
+                    }}
+                    className="ml-1.5 text-primary hover:underline font-medium inline-flex items-center cursor-pointer"
+                  >
+                    {expandedMeetingIds[m.meetingId] ? 'less' : 'more...'}
+                  </button>
+                )}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      width: '130px',
+      minWidth: '110px',
+      cell: (m) => {
+        const scheduledDate = new Date(m.meetingScheduledAt);
+        const scheduledMs = scheduledDate.getTime();
+        const durationMinutes = m.meetingDurationMinutes || 30;
+        const earlyJoinMs = !isNaN(scheduledMs) ? scheduledMs - 5 * 60 * 1000 : 0;
+        const endMs = !isNaN(scheduledMs) ? scheduledMs + durationMinutes * 60 * 1000 : Infinity;
+        const isPastDuration = !isNaN(scheduledMs) && now > endMs;
+        const isEndedOrCancelled = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED' || (m.meetingStatus !== 'LIVE' && isPastDuration);
+
+        let statusLabel: MeetingDisplayStatus = m.meetingStatus;
+        if (m.meetingStatus === 'LIVE') {
+          statusLabel = 'IN_PROGRESS';
+        } else if (isEndedOrCancelled) {
+          statusLabel = m.meetingStatus === 'CANCELLED' ? 'CANCELLED' : 'ENDED';
+        } else if (now >= earlyJoinMs && now <= endMs) {
+          statusLabel = 'IN_PROGRESS';
+        } else if (!isNaN(scheduledMs) && now < earlyJoinMs) {
+          statusLabel = 'SCHEDULED';
+        }
+
+        return <Badge tone={getMeetingStatusTone(statusLabel)}>{statusLabel}</Badge>;
+      },
+    },
+    {
+      id: 'schedule',
+      header: 'Scheduled Time',
+      width: '180px',
+      minWidth: '150px',
+      cell: (m) => {
+        const scheduledDate = new Date(m.meetingScheduledAt);
+        const scheduledMs = scheduledDate.getTime();
+        const dateStr = !isNaN(scheduledMs) ? formatDateTimeStr(scheduledDate) : m.meetingScheduledAt;
+        return (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Calendar size={13} className="text-muted-foreground shrink-0" />
+            <span className="truncate">{dateStr}</span>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'duration',
+      header: 'Duration',
+      width: '130px',
+      minWidth: '100px',
+      cell: (m) => {
+        const durationMinutes = m.meetingDurationMinutes || 30;
+        return (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock size={13} className="text-muted-foreground shrink-0" />
+            <span>{formatDurationHuman(durationMinutes)}</span>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'participants',
+      header: 'Participants',
+      width: '120px',
+      minWidth: '100px',
+      cell: (m) => (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Users size={13} className="text-muted-foreground shrink-0" />
+          <span>{m.participants?.length || 1}</span>
+        </div>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      align: 'right' as const,
+      width: '180px',
+      minWidth: '160px',
+      cell: (m) => {
+        const scheduledDate = new Date(m.meetingScheduledAt);
+        const scheduledMs = scheduledDate.getTime();
+        const durationMinutes = m.meetingDurationMinutes || 30;
+        const earlyJoinMs = !isNaN(scheduledMs) ? scheduledMs - 5 * 60 * 1000 : 0;
+        const endMs = !isNaN(scheduledMs) ? scheduledMs + durationMinutes * 60 * 1000 : Infinity;
+        const isPastDuration = !isNaN(scheduledMs) && now > endMs;
+        const isTooEarly = !isNaN(scheduledMs) && now < earlyJoinMs;
+        const isEndedOrCancelled = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED' || (m.meetingStatus !== 'LIVE' && isPastDuration);
+        const canJoin = !isEndedOrCancelled && (!isTooEarly || m.meetingStatus === 'LIVE');
+
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            {!isEndedOrCancelled && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleCopyLink(m.meetingJoinCode, m.meetingId)}
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                  title="Copy meeting link"
+                >
+                  {copiedMeetingId === m.meetingId ? (
+                    <Check size={13} className="text-primary" />
+                  ) : (
+                    <Copy size={13} />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleShareLink(m.meetingJoinCode, m.meetingTitle)}
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                  title="Share meeting link"
+                >
+                  <Share2 size={13} />
+                </Button>
+              </>
+            )}
+
+            <Button
+              size="sm"
+              disabled={!canJoin}
+              onClick={() => navigate(`/meetings/join/${m.meetingJoinCode}`)}
+              className="h-7 px-2.5 text-xs gap-1 disabled:opacity-40"
+            >
+              {canJoin ? <Play size={11} fill="currentColor" /> : null}
+              <span>{isEndedOrCancelled ? 'Ended' : isTooEarly ? 'Scheduled' : 'Join'}</span>
+            </Button>
+          </div>
+        );
+      },
+    },
+  ], [projects, teams, now, formatDateTimeStr, copiedMeetingId, navigate]);
+
   return (
     <div className="w-full bg-background text-foreground p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -221,24 +433,32 @@ export const Meetings: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            size="sm"
-            disabled={isSelectedProjectReadOnly || !canCreateMeeting}
-            onClick={() => !isSelectedProjectReadOnly && canCreateMeeting && navigate(filterProjectId ? `/meetings/new?projectId=${filterProjectId}` : '/meetings/new')}
-            className="gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={
-              !canCreateMeeting
-                ? 'Only project/team hosts, Admins, or SuperAdmins can schedule meetings'
-                : isSelectedProjectReadOnly
-                ? `Selected project is ${activeProjectStatus}. Re-activate status to Active to schedule meetings.`
-                : 'Schedule Meeting'
-            }
-          >
-            <Plus size={15} />
-            <span>Schedule Meeting</span>
-          </Button>
-        </div>
+        <div className="flex items-center gap-3 shrink-0">
+                  {/* View Mode Toggle: List vs Table */}
+                  <CommonTabs
+                    items={VIEW_MODE_TABS}
+                    value={viewMode}
+                    onChange={(val) => setViewMode(val as 'cards' | 'table')}
+                    size="xs"
+                  />
+
+                  <Button
+                    size="sm"
+                    disabled={isSelectedProjectReadOnly || !canCreateMeeting}
+                    onClick={() => !isSelectedProjectReadOnly && canCreateMeeting && navigate(filterProjectId ? `/meetings/new?projectId=${filterProjectId}` : '/meetings/new')}
+                    className="gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed bg-cyan-500 hover:bg-cyan-400 transition-colors"
+                    title={
+                      !canCreateMeeting
+                        ? 'Only project/team hosts, Admins, or SuperAdmins can schedule meetings'
+                        : isSelectedProjectReadOnly
+                          ? `Selected project is ${activeProjectStatus}. Re-activate status to Active to schedule meetings.`
+                          : 'Schedule Meeting'
+                    }
+                  >
+                    <Plus size={15} />
+                    <span>Schedule Meeting</span>
+                  </Button>
+                </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
@@ -317,11 +537,20 @@ export const Meetings: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full rounded-md" />
-          ))}
-        </div>
+        viewMode === 'table' ? (
+          <DataTable
+            columns={meetingColumns}
+            data={[]}
+            loading={true}
+            loadingRowCount={5}
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-44 w-full rounded-sm" />
+            ))}
+          </div>
+        )
       ) : displayedMeetings.length === 0 ? (
         <EmptyState
           icon={Video}
@@ -329,8 +558,8 @@ export const Meetings: React.FC = () => {
             currentTab === 'upcoming'
               ? 'No upcoming meetings'
               : currentTab === 'past' || currentTab === 'ended'
-              ? 'No past meetings found'
-              : 'No meetings scheduled yet'
+                ? 'No past meetings found'
+                : 'No meetings scheduled yet'
           }
           description={
             activeProjectName
@@ -341,8 +570,25 @@ export const Meetings: React.FC = () => {
           onAction={canCreateMeeting ? () => navigate(filterProjectId ? `/meetings/new?projectId=${filterProjectId}` : '/meetings/new') : undefined}
           accentColor="emerald"
         />
-      ) : (
+      ) : viewMode === 'table' ? (
         <div className="space-y-4">
+          <DataTable
+            columns={meetingColumns}
+            data={paginatedMeetings}
+            keyExtractor={(m) => m.meetingId}
+            page={meetingPage}
+            pageSize={meetingPageSize}
+            pageSizeOptions={[5, 10, 25, 50]}
+            totalCount={displayedMeetings.length}
+            onPageChange={setMeetingPage}
+            onPageSizeChange={(newSize) => {
+              setMeetingPageSize(newSize);
+              setMeetingPage(1);
+            }}
+          />
+        </div>
+      ) : (
+        <div className="space-y-4 w-full">
           <div className="space-y-3">
             {paginatedMeetings.map((m) => {
               const scheduledDate = new Date(m.meetingScheduledAt);
@@ -350,7 +596,6 @@ export const Meetings: React.FC = () => {
               const dateStr = !isNaN(scheduledMs)
                 ? formatDateTimeStr(scheduledDate)
                 : m.meetingScheduledAt;
-              const participantCount = m.participants?.length || 1;
               const durationMinutes = m.meetingDurationMinutes || 30;
 
               const earlyJoinMs = !isNaN(scheduledMs) ? scheduledMs - 5 * 60 * 1000 : 0;
@@ -374,118 +619,244 @@ export const Meetings: React.FC = () => {
               }
 
               let buttonText = 'Join Room';
-              let buttonIcon: React.ReactNode = <Play size={14} fill="currentColor" className="shrink-0" />;
+              let buttonIcon: React.ReactNode = <Play size={13} fill="currentColor" className="shrink-0" />;
 
-              if (isEndedOrCancelled) {
-                buttonText = 'Meeting Ended';
-                buttonIcon = null;
-              } else if (isTooEarly) {
+              if (isTooEarly) {
                 buttonText = `Opens in ${formatCountdown(scheduledMs, now)}`;
-                buttonIcon = <Clock size={14} className="shrink-0" />;
+                buttonIcon = <Clock size={13} className="shrink-0" />;
               }
 
               const projectMatch = projects.find((p) => getProjectId(p) === m.projectId);
               const pCode = projectMatch ? getProjectCode(projectMatch) : null;
               const pName = projectMatch ? getProjectName(projectMatch) : null;
+              const teamMatch = m.teamId ? teams.find((t) => (t.teamId || t._id) === m.teamId) : null;
+              const tName = teamMatch ? ((teamMatch.teamName || teamMatch.name) as string) : null;
+
+              // Participant members with accurate names resolved from orgMembers, project, or participant object
+              const participantMembers: Member[] = (m.participants || []).map((p: unknown, idx: number) => {
+                let id = String(idx);
+                let role = 'Member';
+                let rawName = '';
+                let rawEmail = '';
+                let rawAvatar = '';
+
+                if (typeof p === 'object' && p !== null) {
+                  const pObj = p as Record<string, unknown>;
+                  id = String(pObj.userId || pObj._id || pObj.id || idx);
+                  role = String(pObj.participantRole || pObj.userRole || 'Member');
+                  rawName = String(pObj.userName || pObj.name || '');
+                  rawEmail = String(pObj.userEmail || pObj.email || '');
+                  rawAvatar = String(pObj.avatarUrl || pObj.avatar || '');
+                } else if (typeof p === 'string') {
+                  id = p;
+                }
+
+                // Match with registered workspace/organization member to get real actual name
+                const matchedOrgMember = (orgMembers || []).find(
+                  (om) => om.userId === id || (rawEmail && om.userEmail?.toLowerCase() === rawEmail.toLowerCase())
+                );
+
+                const finalName =
+                  (matchedOrgMember?.userName && !matchedOrgMember.userName.toLowerCase().startsWith('user'))
+                    ? matchedOrgMember.userName
+                    : (rawName && !rawName.toLowerCase().startsWith('user'))
+                      ? rawName
+                      : matchedOrgMember?.userEmail
+                        ? matchedOrgMember.userEmail.split('@')[0]
+                        : rawEmail
+                          ? rawEmail.split('@')[0]
+                          : `Participant ${idx + 1}`;
+
+                const finalEmail = matchedOrgMember?.userEmail || rawEmail;
+                const finalAvatar = matchedOrgMember?.avatarUrl || rawAvatar;
+
+                return {
+                  userId: id,
+                  userName: finalName,
+                  userEmail: finalEmail,
+                  userRole: (matchedOrgMember?.userRole || role) as Member['userRole'],
+                  userStatus: 'ACTIVE',
+                  avatarUrl: finalAvatar || undefined,
+                };
+              });
+
+              // Resolve host member and creator info for the "created by" avatar
+              const hostMember = participantMembers.find((p) => (p.userRole || '').toUpperCase() === 'HOST') || participantMembers[0];
+              const hostName = hostMember?.userName || 'NaN';
+              const creatorId = m.createdBy;
+              const creatorMember = (orgMembers || []).find((om) => om.userId === creatorId) || hostMember;
+              const creatorName = creatorMember?.userName || hostName;
+              const creatorRole = creatorMember?.userRole || hostMember?.userRole || 'Host';
+              const creatorInitial = creatorName.charAt(0).toUpperCase();
+              const creatorColor = getAvatarColorByName(creatorName);
+              const createdAtDate = m.createdAt ? new Date(m.createdAt) : scheduledDate;
+              const createdAtStr = !isNaN(createdAtDate.getTime()) ? formatDateTimeStr(createdAtDate) : 'Recently';
+              const isExpanded = Boolean(expandedMeetingIds[m.meetingId]);
+              const descLength = m.meetingDescription?.trim().length || 0;
+              const hasLongDescription = descLength > 120;
 
               return (
                 <div
                   key={m.meetingId}
-                  className="rounded-md border border-border bg-card hover:border-emerald-500/30 p-5 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs"
+                  className="group rounded-sm border border-border bg-card hover:border-primary/40 p-4 transition-all space-y-3 shadow-xs"
                 >
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge tone={getMeetingStatusTone(statusLabel)}>{statusLabel}</Badge>
-                      <Badge tone="neutral">{m.meetingJoinMode === 'INVITE_ONLY' ? 'Invite Only' : 'Open Link'}</Badge>
-                      {(pCode || pName) && (
-                        <Badge tone="neutral" className="gap-1 font-mono text-[10px]">
-                          <FolderGit2 size={10} className="text-primary" />
-                          <span>{pCode || pName}</span>
-                        </Badge>
+                  {/* Top Header Row: Title on left, Created By Avatar with tooltip + Status + Copy/Share on right */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-bold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors leading-snug truncate block">
+                        {m.meetingTitle}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge tone={getMeetingStatusTone(statusLabel)} className="text-[10px]">{statusLabel}</Badge>
+
+                      {!isEndedOrCancelled && (
+                        <div className="flex items-center gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyLink(m.meetingJoinCode, m.meetingId)}
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                            title="Copy link"
+                          >
+                            {copiedMeetingId === m.meetingId ? (
+                              <Check size={12} className="text-primary" />
+                            ) : (
+                              <Copy size={12} />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleShareLink(m.meetingJoinCode, m.meetingTitle)}
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                            title="Share"
+                          >
+                            <Share2 size={12} />
+                          </Button>
+                        </div>
+                      )}
+
+                      <Tooltip className="w-auto">
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`size-6 rounded-full flex items-center justify-center font-bold text-[10px] ${creatorColor} shrink-0 shadow-xs cursor-pointer ring-1 ring-border/60 hover:ring-primary/60 transition-all ml-0.5`}
+                          >
+                            {creatorInitial}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="end" className="p-2 space-y-1 text-left min-w-[150px] bg-popover text-popover-foreground border border-border shadow-md rounded-sm z-50">
+                          <div className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                            <span>{creatorName}</span>
+                            <span className="text-[10px] font-normal px-1 py-0.2 rounded-xs bg-primary/15 text-primary border border-primary/20">
+                              {creatorRole}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Created at: <span className="text-foreground">{createdAtStr}</span>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+
+                  {/* Description Row: Description on left (max-w-2xl) and Big Join Room button on right */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className={`w-full max-w-2xl ${isExpanded ? 'py-0.5' : 'h-8 min-h-[2rem] flex items-center'}`}>
+                      {m.meetingDescription ? (
+                        <p className={`text-xs text-muted-foreground leading-relaxed transition-all ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+                          {m.meetingDescription}
+                          {hasLongDescription && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedMeetingIds((prev) => ({
+                                  ...prev,
+                                  [m.meetingId]: !prev[m.meetingId],
+                                }));
+                              }}
+                              className="ml-1.5 text-primary hover:underline font-semibold inline-flex items-center cursor-pointer"
+                            >
+                              {isExpanded ? 'less' : 'more...'}
+                            </button>
+                          )}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground/50 italic">
+                          No description
+                        </p>
                       )}
                     </div>
 
-                    <h3 className="text-base font-bold text-foreground">{m.meetingTitle}</h3>
-                    {m.meetingDescription && (
-                      <p className="text-xs text-muted-foreground line-clamp-1">{m.meetingDescription}</p>
+                    {!isEndedOrCancelled && (
+                      <div className="shrink-0 self-start sm:self-center">
+                        <Button
+                          size="default"
+                          disabled={!canJoin}
+                          onClick={() => navigate(`/meetings/join/${m.meetingJoinCode}`)}
+                          className="h-8 px-4 text-xs font-semibold gap-1.5 cursor-pointer disabled:opacity-40 shadow-xs"
+                        >
+                          {buttonIcon}
+                          <span>{buttonText}</span>
+                        </Button>
+                      </div>
                     )}
-
-                    {(() => {
-                      let actualDurationStr: string | null = null;
-                      if (m.startedAt && m.endedAt) {
-                        const startMs = new Date(m.startedAt).getTime();
-                        const endMs = new Date(m.endedAt).getTime();
-                        if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
-                          const elapsedMins = Math.round((endMs - startMs) / (60 * 1000));
-                          actualDurationStr = formatDuration(elapsedMins);
-                        }
-                      }
-                      return (
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1">
-                          <span className="flex items-center gap-1">
-                            <Calendar size={13} className="text-muted-foreground" />
-                            {dateStr}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock size={13} className="text-muted-foreground" />
-                            {actualDurationStr ? (
-                              <span>{actualDurationStr} <span className="opacity-75">/ scheduled {formatDurationHuman(durationMinutes)}</span></span>
-                            ) : (
-                              <span>{formatDurationHuman(durationMinutes)}</span>
-                            )}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users size={13} className="text-muted-foreground" />
-                            {participantCount} Participant{participantCount !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      );
-                    })()}
                   </div>
 
-                  {!isEndedOrCancelled && (
-                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCopyLink(m.meetingJoinCode, m.meetingId)}
-                        className="gap-1 text-xs cursor-pointer border-border hover:bg-muted"
-                        title="Copy meeting link to clipboard"
-                      >
-                        {copiedMeetingId === m.meetingId ? (
-                          <>
-                            <Check size={13} className="text-primary" />
-                            <span>Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={13} />
-                            <span>Copy Link</span>
-                          </>
-                        )}
-                      </Button>
+                  {/* Bottom Row: Project and Team pills + Schedule on left, Grouped Avatars on right */}
+                  <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/20">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0 text-xs text-muted-foreground">
+                      {(pCode || pName) ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-muted/60 border border-border/80 text-foreground font-mono text-xs max-w-[150px] truncate">
+                          <FolderGit2 size={11} className="text-primary shrink-0" />
+                          <span className="truncate">{pCode || pName}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-muted/40 border border-border/60 text-muted-foreground text-xs">
+                          <Building2 size={11} />
+                          <span>Org Meeting</span>
+                        </span>
+                      )}
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleShareLink(m.meetingJoinCode, m.meetingTitle)}
-                        className="gap-1 text-xs cursor-pointer border-border hover:bg-muted"
-                        title="Share meeting join link"
-                      >
-                        <Share2 size={13} />
-                        <span>Share</span>
-                      </Button>
+                      {tName && (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-muted/60 border border-border/80 text-foreground text-xs max-w-[150px] truncate">
+                          <Users size={11} className="text-primary shrink-0" />
+                          <span className="truncate">{tName}</span>
+                        </span>
+                      )}
 
-                      <Button
-                        disabled={!canJoin}
-                        onClick={() => navigate(`/meetings/join/${m.meetingJoinCode}`)}
-                        className="justify-center gap-1.5 whitespace-nowrap disabled:opacity-50"
-                      >
-                        {buttonIcon}
-                        <span className="truncate">{buttonText}</span>
-                      </Button>
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-muted-foreground pl-1">
+                        <Calendar size={11} className="shrink-0" />
+                        <span>{dateStr}</span>
+                      </span>
+
+                      <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Clock size={11} className="shrink-0" />
+                        <span>{formatDurationHuman(durationMinutes)}</span>
+                      </span>
                     </div>
-                  )}
+
+                    <div className="shrink-0">
+                      {participantMembers.length > 0 && (
+                        <GroupedAvatars
+                          members={participantMembers}
+                          maxDisplay={4}
+                          size="xs"
+                          onClick={() => {
+                            setRosterModal({
+                              open: true,
+                              title: `${m.meetingTitle} — Participants`,
+                              members: participantMembers,
+                              projectName: pName || undefined,
+                              teamName: tName || undefined,
+                            });
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -496,15 +867,27 @@ export const Meetings: React.FC = () => {
             totalPages={meetingTotalPages}
             totalItems={displayedMeetings.length}
             pageSize={meetingPageSize}
-            pageSizeOptions={[5, 10, 25, 50]}
+            pageSizeOptions={[6, 12, 24, 48]}
             onPageChange={setMeetingPage}
             onPageSizeChange={(newSize) => {
               setMeetingPageSize(newSize);
               setMeetingPage(1);
             }}
-            className="rounded-md border"
+            className="rounded-sm border"
           />
         </div>
+      )}
+
+      {rosterModal && (
+        <RosterDetailModal
+          open={rosterModal.open}
+          onClose={() => setRosterModal(null)}
+          title={rosterModal.title}
+          projectName={rosterModal.projectName}
+          teamName={rosterModal.teamName}
+          members={rosterModal.members}
+          canManage={false}
+        />
       )}
     </div>
   );

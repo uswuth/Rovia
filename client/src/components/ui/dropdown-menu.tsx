@@ -207,7 +207,7 @@ function DropdownMenuItem({
   if (render) {
     return React.cloneElement(render, {
       className: cn(
-        "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer select-none",
+        "w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer select-none",
         variant === "destructive" &&
         "text-destructive hover:bg-destructive/10 hover:text-destructive",
         className,
@@ -226,7 +226,7 @@ function DropdownMenuItem({
       type="button"
       data-slot="dropdown-menu-item"
       className={cn(
-        "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-left text-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer select-none",
+        "w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-left text-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer select-none",
         variant === "destructive" &&
         "text-destructive hover:bg-destructive/10 hover:text-destructive",
         className
@@ -318,7 +318,7 @@ function DropdownMenuRadioItem({
       role="menuitemradio"
       aria-checked={isChecked}
       className={cn(
-        "relative flex w-full select-none items-center rounded-md py-1.5 pl-7 pr-2 text-xs text-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground cursor-pointer disabled:pointer-events-none disabled:opacity-50",
+        "relative flex w-full select-none items-center rounded-sm py-1.5 pl-7 pr-2 text-xs text-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground cursor-pointer disabled:pointer-events-none disabled:opacity-50",
         isChecked && "font-semibold bg-primary/10 text-primary",
         className
       )}

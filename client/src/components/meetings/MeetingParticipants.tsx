@@ -72,7 +72,7 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
 
   return (
     <div className="space-y-4">
-      {}
+      { }
       {raisedHands.length > 0 && (
         <div className="rounded-xs border border-border/80 bg-card p-3 shadow-xs space-y-2.5">
           <div className="flex items-center justify-between">
@@ -123,7 +123,7 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
                 <div
                   key={item.userId}
                   className={cn(
-                    'flex items-center justify-between p-2 rounded-md border text-xs transition-colors',
+                    'flex items-center justify-between p-2 rounded-sm border text-xs transition-colors',
                     levelBg
                   )}
                 >
@@ -164,7 +164,7 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
             <button
               type="button"
               onClick={() => setShowAllHands((v) => !v)}
-              className="w-full text-center py-1 text-[11px] font-semibold text-accent-foreground hover:bg-accent/10 rounded-md transition-colors cursor-pointer"
+              className="w-full text-center py-1 text-[11px] font-semibold text-accent-foreground hover:bg-accent/10 rounded-sm transition-colors cursor-pointer"
             >
               {showAllHands ? 'Show top 3 only' : `+${hiddenHandsCount} more in queue (show all ${raisedHands.length})`}
             </button>
@@ -173,7 +173,7 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
       )}
 
       {activeParticipants.length === 0 ? (
-        <p className="rounded-md border border-border bg-card p-4 text-xs text-muted-foreground">
+        <p className="rounded-sm border border-border bg-card p-4 text-xs text-muted-foreground">
           No active participants connected.
         </p>
       ) : (
@@ -208,7 +208,7 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
             return (
               <li
                 key={`${uId}-${index}`}
-                className="group relative flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-xs hover:border-emerald-500/30 transition-colors"
+                className="group relative flex items-center justify-between gap-3 rounded-sm border border-border bg-card px-3 py-2 text-xs hover:border-emerald-500/30 transition-colors"
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <Avatar className="size-8 shrink-0">

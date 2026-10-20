@@ -34,8 +34,8 @@ export const ServerAdminLayout: React.FC = () => {
         setPrometheusStatus(res.data.data.metrics.prometheusStatus);
       }
     } catch (error) {
-          console.error(error);
-        } finally {
+      console.error(error);
+    } finally {
       setRefreshing(false);
     }
   }, [navigate]);
@@ -54,7 +54,7 @@ export const ServerAdminLayout: React.FC = () => {
         }
       })
       .catch(() => {
-              });
+      });
 
     return () => {
       isMounted = false;
@@ -67,7 +67,7 @@ export const ServerAdminLayout: React.FC = () => {
     navigate('/server-admin/login', { replace: true });
   };
 
-    const getBreadcrumbLabel = () => {
+  const getBreadcrumbLabel = () => {
     const path = location.pathname;
     if (path.includes('/organizations/new')) return 'Organizations / New';
     if (path.match(/\/organizations\/[a-zA-Z0-9_-]+/)) return 'Organizations / Details';
@@ -78,7 +78,7 @@ export const ServerAdminLayout: React.FC = () => {
 
   return (
     <div className="flex h-dvh w-full bg-background text-foreground overflow-hidden">
-      {}
+      { }
       <aside className="w-64 border-r border-border bg-card flex flex-col justify-between shrink-0 select-none">
         <div className="flex flex-col">
           {/* Brand Header with separator matching top bar height (h-14) */}
@@ -94,15 +94,14 @@ export const ServerAdminLayout: React.FC = () => {
             </div>
           </div>
 
-          {}
+          { }
           <nav className="p-3 space-y-1">
             <NavLink
               to="/server-admin/dashboard"
               className={({ isActive }) =>
-                `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
-                  isActive
-                    ? 'bg-primary/10 text-primary font-bold'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-sm transition-colors ${isActive
+                  ? 'bg-primary/10 text-primary font-bold'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 }`
               }
             >
@@ -113,10 +112,9 @@ export const ServerAdminLayout: React.FC = () => {
             <NavLink
               to="/server-admin/organizations"
               className={({ isActive }) =>
-                `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
-                  isActive
-                    ? 'bg-primary/10 text-primary font-bold'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-sm transition-colors ${isActive
+                  ? 'bg-primary/10 text-primary font-bold'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 }`
               }
             >
@@ -127,10 +125,9 @@ export const ServerAdminLayout: React.FC = () => {
             <NavLink
               to="/server-admin/telemetry"
               className={({ isActive }) =>
-                `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
-                  isActive
-                    ? 'bg-primary/10 text-primary font-bold'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-sm transition-colors ${isActive
+                  ? 'bg-primary/10 text-primary font-bold'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 }`
               }
             >
@@ -155,7 +152,7 @@ export const ServerAdminLayout: React.FC = () => {
 
             <button
               onClick={handleLogout}
-              className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer shrink-0"
+              className="p-1.5 rounded-sm hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer shrink-0"
               title="Sign Out"
             >
               <LogOut size={15} />
@@ -183,7 +180,7 @@ export const ServerAdminLayout: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="p-2 rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               title="Toggle Theme"
             >
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
@@ -192,7 +189,7 @@ export const ServerAdminLayout: React.FC = () => {
             <button
               onClick={() => void checkAuthAndMetrics()}
               disabled={refreshing}
-              className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="p-2 rounded-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               title="Refresh"
             >
               <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
