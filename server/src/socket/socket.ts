@@ -52,12 +52,27 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
   ): { userId: string; organizationId: string; isSuperAdmin?: boolean } | null => {
     if (!token) return null;
     try {
-      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as { id?: string; organizationId?: string; isSuperAdmin?: boolean };
-      if (!decoded.id) return null;
+      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as {
+        id?: string;
+        userId?: string;
+        organizationId?: string;
+        isSuperAdmin?: boolean;
+        role?: string;
+        userRole?: string;
+      };
+      const userId = decoded.id || decoded.userId;
+      if (!userId) return null;
+      const role = (decoded.userRole || decoded.role || '').toUpperCase();
+      const isSuperAdmin = Boolean(
+        decoded.isSuperAdmin === true ||
+        role === 'SUPERADMIN' ||
+        role === 'SUPER_ADMIN' ||
+        role === 'SERVERADMIN'
+      );
       return {
-        userId: decoded.id,
+        userId,
         organizationId: decoded.organizationId ?? '',
-        isSuperAdmin: Boolean(decoded.isSuperAdmin)
+        isSuperAdmin
       };
     } catch {
       return null;
@@ -331,16 +346,47 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
         ack?: (result: { ok: boolean; error?: string }) => void
       ) => {
         try {
-          const joinedMeetingId = socket.data.meetingId ?? '';
-          const meetingCode = (socket.data as Record<string, unknown>).meetingCode as string | undefined;
-          if (!payload?.meetingId || !joinedMeetingId) {
+          let joinedMeetingId = socket.data.meetingId ?? '';
+          let meetingCode = (socket.data as Record<string, unknown>).meetingCode as string | undefined;
+
+          if (!payload?.meetingId) {
+            ack?.({ ok: false, error: 'Meeting ID is required' });
+            return;
+          }
+
+          // If the socket reconnects or hasn't had socket.data.meetingId bound yet, check access and self-heal
+          if (!joinedMeetingId || (payload.meetingId !== joinedMeetingId && payload.meetingId !== meetingCode)) {
+            const meetingCandidate = payload.meetingId.match(/^[0-9a-fA-F]{24}$/)
+              ? await Meeting.findById(payload.meetingId)
+              : await Meeting.findOne({ meeting_join_code: payload.meetingId });
+
+            if (meetingCandidate) {
+              const currentUserId = socket.data.userId ?? '';
+              const isSuper = Boolean(socket.data.isSuperAdmin);
+              const isCreator = meetingCandidate.created_by.toString() === currentUserId;
+              const isParticipant = meetingCandidate.meeting_participants.some(
+                (p) => String(p.userId) === currentUserId
+              );
+              const isOrgMember =
+                isSuper ||
+                (socket.data.organizationId &&
+                  meetingCandidate.organization_id.toString() === socket.data.organizationId);
+
+              if (isSuper || isCreator || isParticipant || isOrgMember) {
+                joinedMeetingId = meetingCandidate._id.toString();
+                meetingCode = meetingCandidate.meeting_join_code;
+                socket.data.meetingId = joinedMeetingId;
+                (socket.data as Record<string, unknown>).meetingCode = meetingCode;
+                await socket.join(`meeting:${joinedMeetingId}`);
+              }
+            }
+          }
+
+          if (!joinedMeetingId || (payload.meetingId !== joinedMeetingId && payload.meetingId !== meetingCode)) {
             ack?.({ ok: false, error: 'You are not in this meeting' });
             return;
           }
-          if (payload.meetingId !== joinedMeetingId && payload.meetingId !== meetingCode) {
-            ack?.({ ok: false, error: 'You are not in this meeting' });
-            return;
-          }
+
           const text = (payload.text ?? '').trim();
           if (!text) {
             ack?.({ ok: false, error: 'Message cannot be empty' });
