@@ -11,7 +11,7 @@ export interface AudioExtractionInput {
 }
 
 export interface AudioExtractionResult {
-  /** Absolute paths to temporary silence-trimmed, 16 kHz mono FLAC chunks. Split because a full meeting exceeds the transcription API's per-file ceiling. The caller must delete the containing directory when done. */
+  /** Absolute paths to temporary silence-trimmed, 16 kHz mono FLAC chunks. Split because a full meeting exceeds the transcription API's per-file ceiling. Empty when silence removal left nothing worth transcribing, so a silent track never reaches the model. The caller must delete the containing directory when done. */
   filePaths: string[];
   /** Combined duration across all chunks in milliseconds. */
   durationMs: number | null;
@@ -23,7 +23,7 @@ export interface AudioExtractor {
 
 export interface TranscriptionInput {
   filePath: string;
-  /** Omit for automatic language detection. */
+  /** Omit to use GROQ_TRANSCRIBE_LANGUAGE, which defaults to English. */
   language?: string;
   /** MIME type of the file on disk. Describes the bytes, not the original upload. */
   mimeType?: string;

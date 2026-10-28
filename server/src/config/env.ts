@@ -109,6 +109,10 @@ export const env: Readonly<EnvConfig> = Object.freeze({
   GROQ_API_KEY: resolveSecret('GROQ_API_KEY'),
   GROQ_BASE_URL: process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
   GROQ_TRANSCRIBE_MODEL: process.env.GROQ_TRANSCRIBE_MODEL || 'whisper-large-v3',
+  // English by default: Whisper misdetects noise as another language and then
+  // transliterates it, which is how a silent track becomes Norwegian gibberish.
+  // Set to "auto" to restore per-recording language detection.
+  GROQ_TRANSCRIBE_LANGUAGE: (process.env.GROQ_TRANSCRIBE_LANGUAGE || 'en').trim(),
   // An hour-long meeting is far past the default request timeout.
   GROQ_TIMEOUT_MS: parseInt(process.env.GROQ_TIMEOUT_MS || '600000', 10),
   OPENROUTER_API_KEY: resolveSecret('OPENROUTER_API_KEY'),

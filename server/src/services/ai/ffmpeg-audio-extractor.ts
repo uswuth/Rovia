@@ -17,6 +17,13 @@ const CHUNK_SECONDS = 600;
 const SILENCE_THRESHOLD_DB = -50;
 const SILENCE_MIN_DURATION_SECONDS = 1.5;
 
+/**
+ * Anything shorter than this after silence removal is not a person speaking, so
+ * the track is reported as silent instead of being uploaded. Sending a second of
+ * breath to the model is exactly how "Thank you for watching!" gets invented.
+ */
+const MIN_SPEECH_DURATION_MS = 800;
+
 /** ffmpeg selects its demuxer from the file extension, so the temporary copy has to carry the right one. The meeting recorder captures audio-only, but a video recording is still accepted for any caller that uses one. */
 const sourceExtensionFor = (mimeType: string): string => {
   const normalised = mimeType.trim().toLowerCase();
@@ -86,15 +93,35 @@ export class FfmpegAudioExtractor implements AudioExtractor {
         .map((name) => path.join(workDir, name));
 
       if (chunkPaths.length === 0) {
-        throw new ApiError(500, 'Recording contains no decodable audio track');
+        // FFmpeg succeeded, so the file was decodable; there was simply nothing
+        // above the silence threshold. A corrupt file fails the process above.
+        logger.info(
+          `Recording ${input.recordingId} (${input.label ?? 'unlabelled'}) is silent after ` +
+            'silence removal; skipping transcription for this track'
+        );
+        await fs.rm(workDir, { recursive: true, force: true });
+        return { filePaths: [], durationMs: 0 };
       }
 
       let totalBytes = 0;
       let totalDurationMs = 0;
+      // A chunk whose header cannot be read must not be mistaken for silence.
+      let durationKnown = true;
       for (const chunkPath of chunkPaths) {
         const stats = await fs.stat(chunkPath);
         totalBytes += stats.size;
-        totalDurationMs += (await this.probeFlacDurationMs(chunkPath)) ?? 0;
+        const chunkDurationMs = await this.probeFlacDurationMs(chunkPath);
+        if (chunkDurationMs === null) durationKnown = false;
+        else totalDurationMs += chunkDurationMs;
+      }
+
+      if (durationKnown && totalDurationMs < MIN_SPEECH_DURATION_MS) {
+        logger.info(
+          `Recording ${input.recordingId} (${input.label ?? 'unlabelled'}) kept only ` +
+            `${totalDurationMs}ms after silence removal; treating the track as silent`
+        );
+        await fs.rm(workDir, { recursive: true, force: true });
+        return { filePaths: [], durationMs: 0 };
       }
 
       logger.info(

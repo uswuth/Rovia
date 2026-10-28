@@ -7,7 +7,8 @@ import {
   listAllOrganizationsServerAdmin,
   getOrgDetailsServerAdmin,
   updateOrgServerAdmin,
-  deleteOrgServerAdmin
+  deleteOrgServerAdmin,
+  getAiUsage
 } from '../controllers/server-admin.controller.js';
 import { authenticateUser, authorizeRoles } from '../middlewares/auth.middleware.js';
 
@@ -51,6 +52,33 @@ router.get('/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHan
 router.post('/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
 router.get('/server-admin/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
 router.post('/server-admin/metrics', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getServerMetrics));
+
+/**
+ * @openapi
+ * /api/v1/server-admin/ai-usage:
+ *   get:
+ *     summary: AI Usage & Provider Quotas
+ *     description: >-
+ *       Aggregates the AI pipeline's real usage from the `transcripts` and
+ *       `summaries` collections (audio seconds processed, runs, failures and
+ *       per-organization breakdown) and reports it against the documented free
+ *       tiers of the configured providers. When an OpenRouter key is present,
+ *       the account's own `GET /api/v1/key` figures (credits used, remaining
+ *       free-model requests) are included; if that lookup fails the response
+ *       still succeeds and `providers.openRouter` is `null`.
+ *     tags:
+ *       - Server Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: AI usage, quotas, daily series, failures, and per-organization breakdown
+ *       401:
+ *         description: Missing or invalid access token
+ *       403:
+ *         description: Authenticated user is not a Server Admin
+ */
+router.get('/ai-usage', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(getAiUsage));
 
 router.get('/organizations', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(listAllOrganizationsServerAdmin));
 router.post('/organizations/list', authenticateUser, authorizeRoles('ServerAdmin'), asyncHandler(listAllOrganizationsServerAdmin));

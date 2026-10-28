@@ -73,6 +73,109 @@ export interface ServerMetricsResponse {
   metrics?: ServerMetricsData;
 }
 
+export interface AiUsageDailyPoint {
+  date: string;
+  transcripts: number;
+  summaries: number;
+  failures: number;
+  audioMinutes: number;
+}
+
+export interface AiUsageOrganizationRow {
+  organizationId: string;
+  organizationName: string;
+  transcripts: number;
+  summaries: number;
+  failures: number;
+  audioMinutes: number;
+}
+
+export interface OpenRouterKeyUsage {
+  label: string | null;
+  isFreeTier: boolean;
+  usageCredits: number | null;
+  usageDailyCredits: number | null;
+  usageMonthlyCredits: number | null;
+  keyLimit: number | null;
+  keyLimitRemaining: number | null;
+  freeRequestsUsed: number | null;
+  freeRequestsLimit: number | null;
+  freeRequestsRemaining: number | null;
+}
+
+export interface AiUsageData {
+  generatedAt: string;
+  providers: {
+    stt: {
+      name: string;
+      model: string;
+      configured: boolean;
+      requestsPerMinute: number;
+      requestsPerDay: number;
+      audioSecondsPerHour: number;
+      audioSecondsPerDay: number;
+    };
+    summary: {
+      name: string;
+      model: string;
+      fallbackModels: string[];
+      configured: boolean;
+      requestsPerMinute: number;
+      requestsPerDay: number;
+    };
+    openRouter: OpenRouterKeyUsage | null;
+    openRouterChecked: boolean;
+  };
+  totals: {
+    transcripts: number;
+    transcriptsReady: number;
+    transcriptsFailed: number;
+    transcriptsPending: number;
+    summaries: number;
+    summariesReady: number;
+    summariesFailed: number;
+    summariesPending: number;
+    audioSeconds: number;
+    speechMinutes: number;
+    inputTokensEstimate: number;
+    outputTokensEstimate: number;
+    organizationsUsingAi: number;
+  };
+  today: {
+    transcripts: number;
+    summaries: number;
+    failures: number;
+    audioSeconds: number;
+    audioMinutes: number;
+  };
+  quota: {
+    stt: {
+      usedAudioSeconds: number;
+      limitAudioSeconds: number;
+      percent: number;
+      remainingAudioSeconds: number;
+      remainingMinutes: number;
+      avgAudioSecondsPerTranscript: number | null;
+      estimatedTranscriptsRemaining: number | null;
+    };
+    summary: {
+      usedRequests: number;
+      limitRequests: number;
+      percent: number;
+      remainingRequests: number;
+      limitSource: 'openrouter' | 'documented-default';
+    };
+  };
+  daily: AiUsageDailyPoint[];
+  byOrganization: AiUsageOrganizationRow[];
+  errors: {
+    transcriptsFailed: number;
+    summariesFailed: number;
+    lastTranscriptFailureAt: string | null;
+    lastSummaryFailureAt: string | null;
+  };
+}
+
 // Server Admin Login - uses v1 API version
 // All endpoints use /api/v1/server-admin/...
 export const loginServerAdminApi = async (payload: ServerAdminLoginPayload) => {
@@ -82,6 +185,10 @@ export const loginServerAdminApi = async (payload: ServerAdminLoginPayload) => {
 // v1: Public-facing endpoints (no special auth beyond bearerAuth)
 export const getServerMetricsApi = async () => {
   return await api.get('/server-admin/metrics');
+};
+
+export const getAiUsageApi = async () => {
+  return await api.get<{ success: boolean; message: string; data: AiUsageData }>('/server-admin/ai-usage');
 };
 
 export const getAllOrganizationsServerAdminApi = async () => {
