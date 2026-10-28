@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, UserPlus } from 'lucide-react';
+import { ArrowLeft, Check, Copy, UserPlus } from 'lucide-react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
 import { PasswordInput } from '@/components/ui/password-input';
 import { FormField } from '@/components/ui/form-field';
 import {
@@ -49,12 +50,27 @@ const STATUS_OPTIONS = [
 ];
 
 const generateRandomPassword = (): string => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-  let pass = '';
-  for (let i = 0; i < 12; i++) {
-    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  // Same policy as the server (>=8 chars, upper + lower + digit + @$!%*?&).
+  // crypto.getRandomValues, not Math.random: this value becomes a real credential.
+  const lower = 'abcdefghijkmnpqrstuvwxyz';
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '23456789';
+  const symbols = '@$!%*?&';
+  const all = lower + upper + digits + symbols;
+  const pick = (set: string): string => {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return set[buf[0] % set.length];
+  };
+  const chars = [pick(lower), pick(upper), pick(digits), pick(symbols)];
+  while (chars.length < 16) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    const j = buf[0] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
   }
-  return pass;
+  return chars.join('');
 };
 
 export const CreateOrgMember: React.FC = () => {
@@ -71,6 +87,8 @@ export const CreateOrgMember: React.FC = () => {
   const [loading, setLoading] = useState(isEditMode);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [provisioned, setProvisioned] = useState<{ email: string; password: string } | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const organizationId = typeof user?.organizationId === 'object'
     ? ((user.organizationId as unknown as Record<string, unknown>)?._id as string) || ((user.organizationId as unknown as Record<string, unknown>)?.organizationId as string) || ''
@@ -167,7 +185,7 @@ export const CreateOrgMember: React.FC = () => {
           organizationId: organizationId || undefined,
         });
       } else {
-        await provisionUserApi({
+        const res = await provisionUserApi({
           userName: values.userName.trim(),
           userEmail: values.userEmail.trim(),
           password: values.password?.trim() || undefined,
@@ -176,6 +194,15 @@ export const CreateOrgMember: React.FC = () => {
           userStatus: values.userStatus,
           jobTitle: values.jobTitle?.trim() || undefined,
         });
+        const created = res.data.data;
+        if (created?.initialPassword) {
+          // Shown once: the server does not keep a copy the admin can retrieve later.
+          setProvisioned({
+            email: created.userEmail || values.userEmail.trim(),
+            password: created.initialPassword,
+          });
+          return;
+        }
       }
       navigate('/organization/members');
     } catch (err) {
@@ -184,6 +211,17 @@ export const CreateOrgMember: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const copyToClipboard = (text: string, key: string) => {
+    void navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const closeProvisioned = () => {
+    setProvisioned(null);
+    navigate('/organization/members');
   };
 
   if (loading) {
@@ -239,7 +277,12 @@ export const CreateOrgMember: React.FC = () => {
           </FormField>
 
           {!isEditMode && (
-            <FormField label="Password" htmlFor="user-password" error={errors.password?.message}>
+            <FormField
+              label="Password"
+              htmlFor="user-password"
+              error={errors.password?.message}
+              hint={isEditMode ? undefined : 'Leave blank and the server generates a random password, shown once after the member is created.'}
+            >
               <Controller
                 control={control}
                 name="password"
@@ -394,6 +437,56 @@ export const CreateOrgMember: React.FC = () => {
           </div>
         </form>
       </div>
+
+      <Modal
+        open={Boolean(provisioned)}
+        onClose={closeProvisioned}
+        title="Member created"
+        description="Copy the initial password now — it is shown once and cannot be retrieved later. The member can change it after signing in."
+        footer={
+          <Button type="button" onClick={closeProvisioned} className="w-full sm:w-auto">
+            Done
+          </Button>
+        }
+      >
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3 rounded-sm border border-border/80 bg-muted/30 px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Email
+              </p>
+              <p className="truncate font-mono text-xs text-foreground">{provisioned?.email}</p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => provisioned && copyToClipboard(provisioned.email, 'email')}
+              title="Copy email"
+            >
+              {copiedKey === 'email' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-sm border border-border/80 bg-muted/30 px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Initial password
+              </p>
+              <p className="truncate font-mono text-xs text-foreground">{provisioned?.password}</p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => provisioned && copyToClipboard(provisioned.password, 'pass')}
+              title="Copy password"
+            >
+              {copiedKey === 'pass' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

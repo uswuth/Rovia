@@ -101,7 +101,7 @@ router.get('/', authenticateUser, authorizeRoles('SuperAdmin'), asyncHandler(get
  *               password:
  *                 type: string
  *                 format: password
- *                 description: Optional. Generated server-side when omitted.
+ *                 description: Optional. Must be at least 8 characters with upper case, lower case, a digit and one of `@$!%*?&`. When omitted the server generates a random password and returns it once as `initialPassword` — there is no shared default and it is not retrievable later.
  *               userRole:
  *                 type: string
  *                 example: Member
