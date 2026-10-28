@@ -17,7 +17,7 @@ import { GroupedAvatars } from '@/components/members/GroupedAvatars';
 import type { Column } from '@/components/ui/data-table';
 import type { TaskStatusType } from '@/api/tasks/tasks.api';
 import type { BadgeTone } from '@/components/ui/badge-variants';
-import type { Member } from '@/types/member.types';
+import type { Member, MemberRole } from '@/types/member.types';
 import { normalizeMemberList } from '@/components/members/member-utils';
 import { formatDateOnly } from '@/lib/format-date';
 
@@ -41,12 +41,16 @@ export interface TaskColumnsOptions {
   canManage: boolean;
   onDelete: (taskId: string) => void;
   onOpenAssigneesModal?: (taskTitle: string, members: Member[]) => void;
+  orgMembers?: Member[];
+  currentUser?: { userId?: string; userName?: string; userEmail?: string; userRole?: string; avatarUrl?: string } | null;
 }
 
 export const getTaskColumns = ({
   navigate,
   canManage,
   onOpenAssigneesModal,
+  orgMembers,
+  currentUser,
 }: TaskColumnsOptions): Column<Record<string, unknown>>[] => {
   return [
     {
@@ -172,7 +176,20 @@ export const getTaskColumns = ({
       minWidth: '130px',
       cell: (t) => {
         const assignedArr = (t.assignedMembers || []) as (Member | string)[];
-        const mappedMembers = normalizeMemberList(assignedArr);
+        const normalized = normalizeMemberList(assignedArr);
+        const mappedMembers: Member[] = normalized.map((mem) => {
+          const uid = mem.userId;
+          const orgMatch = orgMembers?.find((om) => om.userId === uid || (om.userName && om.userName === mem.userName));
+          const isCurrent = Boolean(currentUser && currentUser.userId === uid);
+          return {
+            ...mem,
+            userName: orgMatch?.userName || (isCurrent && currentUser ? currentUser.userName : '') || mem.userName,
+            userEmail: orgMatch?.userEmail || (isCurrent && currentUser ? currentUser.userEmail : '') || mem.userEmail,
+            avatarUrl: orgMatch?.avatarUrl || (isCurrent && currentUser ? currentUser.avatarUrl : '') || mem.avatarUrl,
+            userRole: (orgMatch?.userRole || (isCurrent && currentUser ? currentUser.userRole : '') || mem.userRole || 'Member') as MemberRole,
+            userStatus: orgMatch?.userStatus || mem.userStatus,
+          };
+        });
 
         const taskTitleStr = (t.taskTitle as string) || 'Task';
 

@@ -4,6 +4,7 @@ import { Modal } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import type { Member } from '@/types/member.types';
 import { getMemberId, getRoleCategory, normalizeMemberList } from './member-utils';
@@ -57,9 +58,12 @@ export const RosterDetailModal: React.FC<RosterDetailModalProps> = ({
         const email = m.userEmail || '';
         return (
           <div className="flex items-center gap-2.5 min-w-[180px]">
-            <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0 border border-primary/30">
-              {name.charAt(0).toUpperCase()}
-            </div>
+            <Avatar className="w-8 h-8 shrink-0">
+              {m.avatarUrl && <AvatarImage src={m.avatarUrl} alt={name} />}
+              <AvatarFallback name={name} className="font-bold text-xs">
+                {name.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-foreground truncate">{name}</p>
               {email && <p className="text-[11px] text-muted-foreground truncate">{email}</p>}
