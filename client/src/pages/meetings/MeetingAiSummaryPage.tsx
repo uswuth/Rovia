@@ -35,6 +35,7 @@ import { getProjectId, getProjectName, getProjectCode } from '@/types/project.ty
 import { formatDurationHuman } from '@/utils/duration';
 import { MemberRoster } from '@/components/members/MemberRoster';
 import { MeetingAiSummaryCard } from '@/components/meetings/MeetingAiSummaryCard';
+import { MeetingTranscriptPanel } from '@/components/meetings/MeetingTranscriptPanel';
 import type { RecorderStage } from '@/hooks/useMeetingRecorder';
 
 export const MeetingAiSummaryPage: React.FC = () => {
@@ -322,7 +323,7 @@ export const MeetingAiSummaryPage: React.FC = () => {
                 AI Meeting Summary
               </h1>
               <p className="text-[11px] text-muted-foreground">
-                Executive notes, key points, action items and participant roster
+                Raw transcript, executive notes, key points, action items and participant roster
               </p>
             </div>
           </div>
@@ -420,36 +421,40 @@ export const MeetingAiSummaryPage: React.FC = () => {
           </Button>
         </div>
       ) : (
-        /* Main Two-Column Layout */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* LEFT COLUMN: Meeting AI Summary (Prebuilt MeetingAiSummaryCard) */}
-          <div className="lg:col-span-7 xl:col-span-8 space-y-4">
-            {/* Page / Section Header info */}
-            <div className="print:hidden space-y-1">
-              <div className="flex items-center gap-2">
-                <Badge tone="neutral" className="gap-1 text-[11px] font-mono">
-                  <Hash size={11} className="text-primary" />
-                  <span>{meeting.meetingJoinCode}</span>
+        <div className="space-y-6">
+          {/* Page / Section Header info */}
+          <div className="print:hidden space-y-1">
+            <div className="flex items-center gap-2">
+              <Badge tone="neutral" className="gap-1 text-[11px] font-mono">
+                <Hash size={11} className="text-primary" />
+                <span>{meeting.meetingJoinCode}</span>
+              </Badge>
+              {meeting.meetingStatus && (
+                <Badge tone={getMeetingStatusTone(meeting.meetingStatus)} className="text-[10px]">
+                  {meeting.meetingStatus}
                 </Badge>
-                {meeting.meetingStatus && (
-                  <Badge tone={getMeetingStatusTone(meeting.meetingStatus)} className="text-[10px]">
-                    {meeting.meetingStatus}
-                  </Badge>
-                )}
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
-                {meeting.meetingTitle}
-              </h2>
-              {meeting.meetingDescription && (
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {meeting.meetingDescription}
-                </p>
               )}
             </div>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+              {meeting.meetingTitle}
+            </h2>
+            {meeting.meetingDescription && (
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {meeting.meetingDescription}
+              </p>
+            )}
+          </div>
 
-            {/* Prebuilt AI Summary Card */}
+          {/* Raw speech-to-text beside the executive summary. */}
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+            <MeetingTranscriptPanel
+              transcript={transcriptData}
+              isLoading={isTranscriptLoading}
+              className="order-2 lg:order-1"
+            />
+
             {!activeRecording ? (
-              <Card className="w-full rounded-sm border-dashed border-border/80 bg-muted/20 shadow-none">
+              <Card className="order-1 w-full rounded-sm border-dashed border-border/80 bg-muted/20 shadow-none lg:order-2">
                 <CardContent className="p-8 text-center space-y-3">
                   <div className="size-10 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center">
                     <Sparkles size={20} />
@@ -469,16 +474,17 @@ export const MeetingAiSummaryPage: React.FC = () => {
                 error={summaryErrorMessage}
                 summary={summaryData}
                 transcript={transcriptData}
+                showTranscript={false}
                 title="AI Meeting Executive Summary"
-                className="w-full rounded-sm border-border bg-card shadow-xs"
+                className="order-1 w-full rounded-sm border-border bg-card shadow-xs lg:order-2"
               />
             )}
           </div>
 
-          {/* RIGHT COLUMN: Top Card (Meeting Details) + Bottom Card (Member Roster Component) */}
-          <div className="lg:col-span-5 xl:col-span-4 space-y-6">
+          {/* Meeting details and participant roster. */}
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
             {/* TOP CARD: Meeting Overview Card */}
-            <Card className="rounded-sm border-border bg-card shadow-xs">
+            <Card className="rounded-sm border-border bg-card shadow-xs lg:col-span-2">
               <CardHeader className="pb-3 border-b border-border/40">
                 <CardTitle className="text-sm font-bold flex items-center justify-between">
                   <span>Meeting Session Details</span>

@@ -15,6 +15,8 @@ interface MeetingAiSummaryCardProps {
   rawAudioUrls?: Array<{ speakerId: string; speakerName: string; url: string }>;
   onCopyTranscript?: () => void;
   onClose?: () => void;
+  /** Set false when the page renders the transcript in its own panel. */
+  showTranscript?: boolean;
   title?: string;
   className?: string;
 }
@@ -28,6 +30,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
   rawAudioUrls,
   onCopyTranscript,
   onClose,
+  showTranscript = true,
   title = 'Meeting AI Summary',
   className = 'w-full max-w-3xl',
 }) => {
@@ -175,7 +178,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
           </section>
         )}
 
-        {transcript?.transcriptText && (
+        {showTranscript && transcript?.transcriptText && (
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
