@@ -13,6 +13,7 @@ Rules you must follow:
 - If nothing was decided or assigned, return empty arrays. An empty array is correct and better than a guess.
 - actionItems are only things someone agreed to do. Put a person name in "assignee" only if the transcript names them.
 - Keep the summary factual and under 120 words.
+- Write the summary, key points and action items in English, even if the transcript is not in English.
 ${recordingTitle ? `- The meeting is titled: "${recordingTitle}". Treat it as context, not as fact.` : ''}
 
 Transcript:

@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Building2,
   Activity,
+  Sparkles,
   LogOut,
   Sun,
   Moon,
@@ -73,6 +74,7 @@ export const ServerAdminLayout: React.FC = () => {
     if (path.match(/\/organizations\/[a-zA-Z0-9_-]+/)) return 'Organizations / Details';
     if (path.includes('/organizations')) return 'Organizations';
     if (path.includes('/telemetry')) return 'Telemetry & Health';
+    if (path.includes('/ai-usage')) return 'AI Usage';
     return 'Dashboard';
   };
 
@@ -133,6 +135,19 @@ export const ServerAdminLayout: React.FC = () => {
             >
               <Activity size={16} />
               <span>Telemetry & Health</span>
+            </NavLink>
+
+            <NavLink
+              to="/server-admin/ai-usage"
+              className={({ isActive }) =>
+                `w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-sm transition-colors ${isActive
+                  ? 'bg-primary/10 text-primary font-bold'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                }`
+              }
+            >
+              <Sparkles size={16} />
+              <span>AI Usage</span>
             </NavLink>
           </nav>
         </div>

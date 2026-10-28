@@ -10,6 +10,7 @@ import {
   verifyServerAdminIdentityService
 } from '../services/server-admin.service.js';
 import { getAllOrganizationsAdminService } from '../services/organization.service.js';
+import { getAiUsageService } from '../services/ai-usage.service.js';
 
 export const loginServerAdmin = async (req: Request, res: Response): Promise<Response> => {
   const { username, password } = req.body;
@@ -24,6 +25,14 @@ export const getServerMetrics = async (req: Request, res: Response): Promise<Res
   }
   const result = await getServerAdminMetricsService();
   return ApiResponse.success(res, 'Server metrics retrieved successfully', result, 200);
+};
+
+export const getAiUsage = async (req: Request, res: Response): Promise<Response> => {
+  if (req.user?.id) {
+    await verifyServerAdminIdentityService(req.user.id);
+  }
+  const result = await getAiUsageService();
+  return ApiResponse.success(res, 'AI usage retrieved successfully', result, 200);
 };
 
 export const createOrgWithCredentials = async (req: Request, res: Response): Promise<Response> => {

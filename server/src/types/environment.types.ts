@@ -20,6 +20,7 @@ export interface EnvConfig {
   GROQ_API_KEY?: string;
   GROQ_BASE_URL?: string;
   GROQ_TRANSCRIBE_MODEL?: string;
+  GROQ_TRANSCRIBE_LANGUAGE?: string;
   GROQ_TIMEOUT_MS?: number;
   OPENROUTER_API_KEY?: string;
   OPENROUTER_BASE_URL?: string;

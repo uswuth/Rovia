@@ -33,6 +33,7 @@ const ServerAdminOrganizations = lazy(() => import('@/pages/admin/ServerAdminOrg
 const ServerAdminOrgView = lazy(() => import('@/pages/admin/ServerAdminOrgView').then((m) => ({ default: m.ServerAdminOrgView })));
 const CreateServerAdminOrg = lazy(() => import('@/pages/admin/CreateServerAdminOrg').then((m) => ({ default: m.CreateServerAdminOrg })));
 const ServerAdminTelemetry = lazy(() => import('@/pages/admin/ServerAdminTelemetry').then((m) => ({ default: m.ServerAdminTelemetry })));
+const ServerAdminAiUsage = lazy(() => import('@/pages/admin/ServerAdminAiUsage').then((m) => ({ default: m.ServerAdminAiUsage })));
 const NotFoundPage = lazy(() => import('@/pages/not-found/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 const OrgMembers = lazy(() => import('@/pages/organization/OrgMembers').then((m) => ({ default: m.OrgMembers })));
 const CreateOrgMember = lazy(() => import('@/pages/organization/CreateOrgMember').then((m) => ({ default: m.CreateOrgMember })));
@@ -144,6 +145,7 @@ const App = () => {
                         <Route path="/server-admin/organizations/:id" element={<ServerAdminOrgView />} />
                         <Route path="/server-admin/create-org" element={<Navigate to="/server-admin/organizations/new" replace />} />
                         <Route path="/server-admin/telemetry" element={<ServerAdminTelemetry />} />
+                        <Route path="/server-admin/ai-usage" element={<ServerAdminAiUsage />} />
                       </Route>
 
                       <Route element={<ProtectedRoute />}>

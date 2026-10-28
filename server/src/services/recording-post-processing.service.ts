@@ -49,6 +49,13 @@ export class RecordingPostProcessingService {
     const transcript = await this.transcribe(recording, organizationId);
     if (!transcript) return;
 
+    // A meeting where nobody spoke has nothing to summarise. Sending an empty
+    // transcript to the model is how a summary invents an entire meeting.
+    if (!transcript.hasText) {
+      logger.info(`Skipping summarisation for recording ${recordingId}: transcript has no speech`);
+      return;
+    }
+
     await this.summarize(transcript.transcriptId, recordingId, organizationId, userId);
   }
 
@@ -61,7 +68,8 @@ export class RecordingPostProcessingService {
    *
    * A track that fails does not sink the whole recording. A participant who
    * never spoke, or whose track was unreadable, is recorded as silent and the
-   * rest of the meeting still produces a summary.
+   * rest of the meeting still produces a summary. A meeting in which nobody
+   * spoke at all is a valid READY transcript with no text, not a failure.
    */
   private async transcribe(
     recording: {
@@ -76,7 +84,7 @@ export class RecordingPostProcessingService {
       }>;
     },
     organizationId: string
-  ) {
+  ): Promise<{ transcriptId: string; hasText: boolean } | null> {
     const recordingId = String((recording as { _id: { toString(): string } })._id);
     const transcript = await startTranscriptService(recordingId, organizationId);
     const speakers = recording.recording_speakers ?? [];
@@ -91,25 +99,41 @@ export class RecordingPostProcessingService {
     let combinedText = '';
     let totalDurationMs = 0;
     let anySucceeded = false;
+    let failedTracks = 0;
 
     for (const speaker of speakers) {
-      const label = speaker.speakerName || `speaker ${speaker.speakerIndex}`;
+      // The raw speakerId is a database id and must never reach a reader.
+      const displayName = speaker.speakerName || `Speaker ${speaker.speakerIndex + 1}`;
       let workDir: string | null = null;
       try {
         const extracted = await this.audioExtractor.extract({
           storageKey: speaker.storageKey,
           recordingMimeType: speaker.mimeType,
           recordingId,
-          label
+          label: displayName
         });
         workDir = extracted.filePaths.length > 0 ? path.dirname(extracted.filePaths[0]) : null;
 
+        if (extracted.filePaths.length === 0) {
+          // The extractor already deleted its temp directory. Nothing above the
+          // silence threshold means this participant simply never spoke.
+          results.push({
+            speakerId: speaker.speakerId,
+            speakerName: displayName,
+            speakerText: '',
+            speakerDurationMs: 0,
+            spoke: false
+          });
+          logger.info(`No speech above the threshold for ${displayName} on recording ${recordingId}`);
+          continue;
+        }
+
         // The extractor always emits FLAC chunks, so that is the type to declare.
-      const result = await this.transcribeChunks(extracted.filePaths, recordingId, label, 'audio/flac');
+        const result = await this.transcribeChunks(extracted.filePaths, recordingId, displayName, 'audio/flac');
         totalDurationMs += result.durationMs ?? 0;
         results.push({
           speakerId: speaker.speakerId,
-          speakerName: speaker.speakerName || speaker.speakerId,
+          speakerName: displayName,
           speakerText: result.text,
           speakerDurationMs: result.durationMs ?? 0,
           spoke: result.text.length > 0
@@ -117,15 +141,16 @@ export class RecordingPostProcessingService {
         if (result.text) {
           anySucceeded = true;
           // The flat text is kept for search and the copy-to-clipboard button.
-          combinedText += combinedText ? `\n\n${speaker.speakerName || 'Speaker'}: ${result.text}` : result.text;
+          combinedText += combinedText ? `\n\n${displayName}: ${result.text}` : result.text;
         }
-        logger.info(`Transcribed ${label} for recording ${recordingId} (${result.text.length} chars)`);
+        logger.info(`Transcribed ${displayName} for recording ${recordingId} (${result.text.length} chars)`);
       } catch (error) {
         // One unreadable track must not discard everyone's speech.
-        logger.error(`Transcription failed for ${label} on recording ${recordingId}: ${(error as Error).message}`);
+        failedTracks += 1;
+        logger.error(`Transcription failed for ${displayName} on recording ${recordingId}: ${(error as Error).message}`);
         results.push({
           speakerId: speaker.speakerId,
-          speakerName: speaker.speakerName || speaker.speakerId,
+          speakerName: displayName,
           speakerText: '',
           speakerDurationMs: 0,
           spoke: false
@@ -140,9 +165,26 @@ export class RecordingPostProcessingService {
     }
 
     if (!anySucceeded) {
-      logger.error(`Every speaker track failed for recording ${recordingId}`);
-      await failTranscriptService(transcript.transcriptId, organizationId).catch(() => undefined);
-      return null;
+      if (failedTracks === speakers.length) {
+        logger.error(`Every speaker track failed for recording ${recordingId}`);
+        await failTranscriptService(transcript.transcriptId, organizationId).catch(() => undefined);
+        return null;
+      }
+
+      // Every track was readable but silent. That is a valid outcome: complete
+      // the transcript so the client stops waiting, and leave summarisation out.
+      const empty = await completeTranscriptService(transcript.transcriptId, organizationId, {
+        text: '',
+        language: null,
+        durationMs: totalDurationMs || null,
+        segments: [],
+        speakers: results
+      });
+      logger.info(
+        `Transcript READY with no speech for recording ${recordingId} ` +
+          `(${results.length} track(s), ${failedTracks} unreadable)`
+      );
+      return { transcriptId: empty.transcriptId, hasText: false };
     }
 
     const ready = await completeTranscriptService(transcript.transcriptId, organizationId, {
@@ -155,7 +197,7 @@ export class RecordingPostProcessingService {
     logger.info(
       `Transcript READY for recording ${recordingId}: ${results.length} speaker(s), ${combinedText.length} chars`
     );
-    return ready;
+    return { transcriptId: ready.transcriptId, hasText: true };
   }
 
   /**
