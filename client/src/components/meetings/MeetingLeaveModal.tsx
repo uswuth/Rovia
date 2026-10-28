@@ -1,4 +1,5 @@
 import React from 'react';
+import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export interface MeetingLeaveModalProps {
@@ -9,6 +10,7 @@ export interface MeetingLeaveModalProps {
   onCancel: () => void;
   onConfirmLeave: () => void;
   onConfirmEndMeeting: () => void;
+  onViewSummary?: () => void;
 }
 
 /** Google Meet style dialog: the host may leave or end the call for everyone; attendees only leave. */
@@ -20,6 +22,7 @@ export const MeetingLeaveModal: React.FC<MeetingLeaveModalProps> = ({
   onCancel,
   onConfirmLeave,
   onConfirmEndMeeting,
+  onViewSummary,
 }) => {
   if (!open) return null;
 
@@ -74,25 +77,39 @@ export const MeetingLeaveModal: React.FC<MeetingLeaveModalProps> = ({
           </p>
         )}
 
-        <div className="flex justify-end gap-3 pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isLeaving || isEnding}
-            onClick={onCancel}
-          >
-            Cancel
-          </Button>
-          {!isCreatorOrHost && (
+        <div className="flex items-center justify-between gap-3 pt-2">
+          {onViewSummary ? (
             <Button
-              variant="destructive"
+              variant="ghost"
               size="sm"
-              disabled={isLeaving}
-              onClick={onConfirmLeave}
+              onClick={onViewSummary}
+              className="gap-1.5 text-xs text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
             >
-              {isLeaving ? 'Leaving…' : 'Leave Call'}
+              <Sparkles size={13} />
+              <span>View AI Summary</span>
             </Button>
-          )}
+          ) : <div />}
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLeaving || isEnding}
+              onClick={onCancel}
+            >
+              Cancel
+            </Button>
+            {!isCreatorOrHost && (
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={isLeaving}
+                onClick={onConfirmLeave}
+              >
+                {isLeaving ? 'Leaving…' : 'Leave Call'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

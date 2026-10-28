@@ -985,7 +985,6 @@ export const MeetingRoom: React.FC = () => {
         aiSummaryEnabled={aiSummaryEnabled}
         setAiSummaryEnabled={setAiSummaryEnabled}
         canManage={canManage}
-        meetingId={meeting.meetingId}
         micOn={micOn}
         onToggleMic={handleToggleMic}
         audioInputs={audioInputs}
@@ -1042,6 +1041,7 @@ export const MeetingRoom: React.FC = () => {
         onCancel={() => setShowLeaveModal(false)}
         onConfirmLeave={confirmLeave}
         onConfirmEndMeeting={confirmEndMeeting}
+        onViewSummary={() => navigate(`/meetings/${id}/summary`)}
       />
 
       <MeetingEndedModal

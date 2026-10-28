@@ -9,7 +9,6 @@ import {
   Building2,
   FolderGit2,
   FileDown,
-  AlertCircle,
   Loader2,
   Hash,
   Share2,
@@ -50,10 +49,7 @@ export const MeetingAiSummaryPage: React.FC = () => {
   const [copiedLink, setCopiedLink] = React.useState(false);
 
   // 1. Fetch all past/completed meetings if no direct ID is in the URL
-  const {
-    data: allMeetingsList,
-    isLoading: isMeetingsListLoading,
-  } = useQuery({
+  const { data: allMeetingsList } = useQuery({
     queryKey: ['meetings', 'all-for-summary'],
     queryFn: async () => {
       const res = await getMeetings({ limit: 50 });
@@ -63,10 +59,7 @@ export const MeetingAiSummaryPage: React.FC = () => {
   });
 
   // 2. Fetch all recordings to identify meetings with ready summaries
-  const {
-    data: allRecordingsData,
-    isLoading: isAllRecordingsLoading,
-  } = useQuery({
+  const { data: allRecordingsData } = useQuery({
     queryKey: ['recordings', 'all-for-summary'],
     queryFn: async () => {
       const res = await getRecordings({ limit: 50 });
