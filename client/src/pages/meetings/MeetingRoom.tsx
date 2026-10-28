@@ -44,7 +44,6 @@ import { MeetingControls, type PanelKey } from '@/components/meetings/MeetingCon
 import { MeetingSidebar } from '@/components/meetings/MeetingSidebar';
 import { MeetingLeaveModal } from '@/components/meetings/MeetingLeaveModal';
 import { MeetingEndedModal } from '@/components/meetings/MeetingEndedModal';
-import { MeetingAiSummaryCard } from '@/components/meetings/MeetingAiSummaryCard';
 import { ParticipantSettingsModal, type ParticipantPermissions } from '@/components/meetings/ParticipantSettingsModal';
 import { shareOrCopy } from '@/lib/share';
 import { cn } from '@/lib/utils';
@@ -986,6 +985,7 @@ export const MeetingRoom: React.FC = () => {
         aiSummaryEnabled={aiSummaryEnabled}
         setAiSummaryEnabled={setAiSummaryEnabled}
         canManage={canManage}
+        meetingId={meeting.meetingId}
         micOn={micOn}
         onToggleMic={handleToggleMic}
         audioInputs={audioInputs}
@@ -1048,6 +1048,7 @@ export const MeetingRoom: React.FC = () => {
         open={meetingEndedByHost}
         onReturnToMeetings={() => navigate('/meetings')}
         onGoToProjects={() => navigate('/projects')}
+        onViewSummary={() => navigate(`/meetings/${id}/summary`)}
       />
 
       {editing && (
@@ -1059,16 +1060,6 @@ export const MeetingRoom: React.FC = () => {
           onSave={async (participantId, permissions) => {
             await savePermissions.mutateAsync([participantId, permissions]);
           }}
-        />
-      )}
-
-      {(recorder.stage !== 'idle' || recorder.summary || recorder.transcript || (recorder.rawAudioUrls && recorder.rawAudioUrls.length > 0)) && (
-        <MeetingAiSummaryCard
-          stage={recorder.stage}
-          error={recorder.error}
-          summary={recorder.summary}
-          transcript={recorder.transcript}
-          rawAudioUrls={recorder.rawAudioUrls}
         />
       )}
     </div>

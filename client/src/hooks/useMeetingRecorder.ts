@@ -208,11 +208,9 @@ export const useMeetingRecorder = (options?: {
     }
   }, [queryClient, fail]);
 
-  const summaryQuery = useQuery<MeetingSummary>({
+  const summaryQuery = useQuery<MeetingSummary | null>({
     queryKey: queryKeys.recordings.summary(recordingId ?? 'none'),
     queryFn: () => getRecordingSummary(recordingId as string),
-    // 404 simply means the server has not finished. Retrying quietly is correct
-    // here, so the 404 is swallowed rather than surfaced as an error state.
     retry: false,
     enabled: Boolean(recordingId) && stage === 'processing',
     refetchInterval: (query) => {
@@ -222,7 +220,7 @@ export const useMeetingRecorder = (options?: {
     },
   });
 
-  const transcriptQuery = useQuery<Transcript>({
+  const transcriptQuery = useQuery<Transcript | null>({
     queryKey: queryKeys.recordings.transcript(recordingId ?? 'none'),
     queryFn: () => getRecordingTranscript(recordingId as string),
     retry: false,

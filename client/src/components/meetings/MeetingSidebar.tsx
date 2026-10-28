@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Sparkles } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { MeetingParticipants } from './MeetingParticipants';
@@ -103,23 +103,9 @@ export const MeetingSidebar: React.FC<MeetingSidebarProps> = ({
   return (
     <aside className="w-full h-full px-4 pt-4 pb-3 bg-card flex flex-col min-h-0 self-stretch overflow-hidden">
       <div className="flex items-center justify-between border-b border-border pb-2 mb-3 shrink-0">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            {PANELS.find((p) => p.key === panel)?.label || (panel === 'polls' ? 'Polls' : '')}
-          </h2>
-          {panel === 'chat' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => window.open(`/meetings/${meetingId}/summary`, '_blank')}
-              className="h-6 px-1.5 gap-1 text-[11px] font-semibold text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
-              title="Open AI Meeting Summary in new page"
-            >
-              <Sparkles size={12} />
-              <span>AI Summary</span>
-            </Button>
-          )}
-        </div>
+        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          {PANELS.find((p) => p.key === panel)?.label || (panel === 'polls' ? 'Polls' : '')}
+        </h2>
         {onClose && (
           <Button
             variant="ghost"

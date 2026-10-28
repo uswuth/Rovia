@@ -1,17 +1,19 @@
 import React from 'react';
-import { PhoneOff } from 'lucide-react';
+import { PhoneOff, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export interface MeetingEndedModalProps {
   open: boolean;
   onReturnToMeetings: () => void;
   onGoToProjects: () => void;
+  onViewSummary?: () => void;
 }
 
 export const MeetingEndedModal: React.FC<MeetingEndedModalProps> = ({
   open,
   onReturnToMeetings,
   onGoToProjects,
+  onViewSummary,
 }) => {
   if (!open) return null;
 
@@ -28,8 +30,19 @@ export const MeetingEndedModal: React.FC<MeetingEndedModalProps> = ({
           </p>
         </div>
         <div className="flex flex-col gap-2 pt-2">
+          {onViewSummary && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onViewSummary}
+              className="w-full gap-1.5 font-semibold cursor-pointer"
+            >
+              <Sparkles size={14} />
+              <span>View Meeting AI Summary</span>
+            </Button>
+          )}
           <Button
-            variant="default"
+            variant={onViewSummary ? 'outline' : 'default'}
             size="sm"
             onClick={onReturnToMeetings}
             className="w-full cursor-pointer"
@@ -37,7 +50,7 @@ export const MeetingEndedModal: React.FC<MeetingEndedModalProps> = ({
             Return to Meetings
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={onGoToProjects}
             className="w-full cursor-pointer"

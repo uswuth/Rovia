@@ -7,6 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
   Collapsible,
@@ -35,6 +36,8 @@ export function NavMain({
     items?: {
       title: string
       url: string
+      icon?: React.ReactNode
+      separator?: boolean
     }[]
   }[]
 }) {
@@ -93,6 +96,9 @@ export function NavMain({
     if (url === "/projects") {
       return location.pathname === "/projects" && (!location.search || !location.search.includes("status="))
     }
+    if (url === "/meetings/summary") {
+      return location.pathname.startsWith("/meetings/summary") || location.pathname.includes("/summary")
+    }
     if (url === "/meetings") {
       return location.pathname === "/meetings" && (!location.search || !location.search.includes("tab="))
     }
@@ -139,15 +145,19 @@ export function NavMain({
                     {item.items?.map((subItem) => {
                       const isSubActive = isCurrentActive(subItem.url)
                       return (
-                        <DropdownMenuItem key={subItem.title} render={
-                          <Link 
-                            to={subItem.url} 
-                            onClick={handleNavClick}
-                            className={`w-full cursor-pointer ${isSubActive ? 'bg-primary/10 text-primary font-medium' : ''}`}
-                          >
-                            {subItem.title}
-                          </Link>
-                        } />
+                        <React.Fragment key={subItem.title}>
+                          {subItem.separator && <DropdownMenuSeparator className="my-1 border-border/60" />}
+                          <DropdownMenuItem render={
+                            <Link 
+                              to={subItem.url} 
+                              onClick={handleNavClick}
+                              className={`w-full cursor-pointer flex items-center gap-2 ${isSubActive ? 'bg-primary/10 text-primary font-medium' : ''}`}
+                            >
+                              {subItem.icon}
+                              <span>{subItem.title}</span>
+                            </Link>
+                          } />
+                        </React.Fragment>
                       )
                     })}
                   </DropdownMenuContent>
@@ -184,16 +194,22 @@ export function NavMain({
                     {item.items?.map((subItem) => {
                       const isSubActive = isCurrentActive(subItem.url)
                       return (
-                        <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton
-                            isActive={isSubActive}
-                            render={
-                              <Link to={subItem.url} onClick={handleNavClick} className="flex w-full items-center">
-                                <span>{subItem.title}</span>
-                              </Link>
-                            }
-                          />
-                        </SidebarMenuSubItem>
+                        <React.Fragment key={subItem.title}>
+                          {subItem.separator && (
+                            <div className="my-1.5 mx-2 h-px bg-border/60" />
+                          )}
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton
+                              isActive={isSubActive}
+                              render={
+                                <Link to={subItem.url} onClick={handleNavClick} className="flex w-full items-center gap-1.5">
+                                  {subItem.icon}
+                                  <span>{subItem.title}</span>
+                                </Link>
+                              }
+                            />
+                          </SidebarMenuSubItem>
+                        </React.Fragment>
                       )
                     })}
                   </SidebarMenuSub>

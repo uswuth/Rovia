@@ -92,14 +92,34 @@ export const deleteRecording = async (recordingId: string): Promise<void> => {
  * than treat a 404 as a permanent failure: a recording created seconds ago has
  * no transcript yet.
  */
-export const getRecordingTranscript = async (recordingId: string): Promise<Transcript> => {
-  const { data } = await client.get<{ data: Transcript }>(`/recordings/${recordingId}/transcript`);
-  return data.data;
+export const getRecordingTranscript = async (recordingId: string): Promise<Transcript | null> => {
+  try {
+    const { data } = await client.get<{ data: Transcript }>(`/recordings/${recordingId}/transcript`);
+    return data.data;
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'response' in err) {
+      const axiosErr = err as { response?: { status?: number } };
+      if (axiosErr.response?.status === 404) {
+        return null;
+      }
+    }
+    throw err;
+  }
 };
 
-export const getRecordingSummary = async (recordingId: string): Promise<MeetingSummary> => {
-  const { data } = await client.get<{ data: MeetingSummary }>(`/recordings/${recordingId}/summary`);
-  return data.data;
+export const getRecordingSummary = async (recordingId: string): Promise<MeetingSummary | null> => {
+  try {
+    const { data } = await client.get<{ data: MeetingSummary }>(`/recordings/${recordingId}/summary`);
+    return data.data;
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'response' in err) {
+      const axiosErr = err as { response?: { status?: number } };
+      if (axiosErr.response?.status === 404) {
+        return null;
+      }
+    }
+    throw err;
+  }
 };
 
 /**

@@ -68,6 +68,7 @@ export interface MeetingControlsProps {
   aiSummaryEnabled: boolean;
   setAiSummaryEnabled: (enabled: boolean) => void;
   canManage: boolean;
+  meetingId?: string;
 
   // Audio / Mic
   micOn: boolean;
@@ -122,6 +123,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   aiSummaryEnabled,
   setAiSummaryEnabled,
   canManage,
+  meetingId,
   micOn,
   onToggleMic,
   audioInputs,

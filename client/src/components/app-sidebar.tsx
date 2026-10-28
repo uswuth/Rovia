@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { LayoutDashboard, FolderGit2, Video, CheckSquare, Building2, Users } from "lucide-react"
+import { LayoutDashboard, FolderGit2, Video, CheckSquare, Building2, Users, Sparkles } from "lucide-react"
 
 import { useAuth } from "@/context/AuthContext"
 import { maskEmail } from "@/utils/privacy"
@@ -95,6 +95,12 @@ export function AppSidebar({
         {
           title: "All Sessions",
           url: "/meetings?tab=all",
+        },
+        {
+          title: "Meeting Summary",
+          url: "/meetings/summary",
+          icon: <Sparkles size={14} className="text-primary shrink-0" />,
+          separator: true,
         },
       ],
     },

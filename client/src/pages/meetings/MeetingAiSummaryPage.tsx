@@ -14,9 +14,11 @@ import {
   Hash,
   Share2,
   Check,
-  Users
+  Users,
+  ExternalLink,
+  Video
 } from 'lucide-react';
-import { getMeetingById } from '@/api/meeting/meeting.api';
+import { getMeetings, getMeetingById } from '@/api/meeting/meeting.api';
 import { getRecordings, getRecordingSummary, getRecordingTranscript } from '@/api/recording/recording.api';
 import type { MeetingSummary, Transcript, RecordingWithAiStatus } from '@/api/recording/recording.types';
 import type { Meeting, MeetingParticipant } from '@/api/meeting/meeting.types';
@@ -47,35 +49,80 @@ export const MeetingAiSummaryPage: React.FC = () => {
 
   const [copiedLink, setCopiedLink] = React.useState(false);
 
-  // 1. Fetch Meeting Details
+  // 1. Fetch all past/completed meetings if no direct ID is in the URL
+  const {
+    data: allMeetingsList,
+    isLoading: isMeetingsListLoading,
+  } = useQuery({
+    queryKey: ['meetings', 'all-for-summary'],
+    queryFn: async () => {
+      const res = await getMeetings({ limit: 50 });
+      return res.data.data || [];
+    },
+    enabled: !id,
+  });
+
+  // 2. Fetch all recordings to identify meetings with ready summaries
+  const {
+    data: allRecordingsData,
+    isLoading: isAllRecordingsLoading,
+  } = useQuery({
+    queryKey: ['recordings', 'all-for-summary'],
+    queryFn: async () => {
+      const res = await getRecordings({ limit: 50 });
+      return res.recordings || [];
+    },
+    enabled: !id,
+  });
+
+  // Resolve target meeting ID (either route param or the latest meeting with a ready summary or latest past meeting)
+  const targetMeetingId = useMemo(() => {
+    if (id) return id;
+    if (allRecordingsData && allRecordingsData.length > 0) {
+      const recordingWithSummary = allRecordingsData.find(
+        (r) => r.meetingId && r.summaryStatus === 'READY'
+      );
+      if (recordingWithSummary?.meetingId) return recordingWithSummary.meetingId;
+      const anyRecordedMeeting = allRecordingsData.find((r) => r.meetingId);
+      if (anyRecordedMeeting?.meetingId) return anyRecordedMeeting.meetingId;
+    }
+    if (allMeetingsList && allMeetingsList.length > 0) {
+      const completed = allMeetingsList.find((m) => m.meetingStatus === 'ENDED');
+      if (completed?.meetingId) return completed.meetingId;
+      return allMeetingsList[0]?.meetingId;
+    }
+    return undefined;
+  }, [id, allRecordingsData, allMeetingsList]);
+
+  // 3. Fetch Specific Meeting Details
   const {
     data: meetingData,
     isLoading: isMeetingLoading,
     error: meetingError,
   } = useQuery({
-    queryKey: ['meeting', id],
+    queryKey: ['meeting', targetMeetingId],
     queryFn: async () => {
-      if (!id) throw new Error('Missing meeting ID');
-      const res = await getMeetingById(id);
+      if (!targetMeetingId) throw new Error('Missing meeting ID');
+      const res = await getMeetingById(targetMeetingId);
       return res.data.data;
     },
-    enabled: Boolean(id),
+    enabled: Boolean(targetMeetingId),
   });
 
   const meeting: Meeting | undefined = meetingData;
 
-  // 2. Fetch Recordings for this meeting to find the latest completed recording with AI summary
+  // 4. Fetch Recordings for this meeting to find the latest completed recording with AI summary
   const {
     data: recordingsData,
     isLoading: isRecordingsLoading,
   } = useQuery({
-    queryKey: ['recordings', 'meeting', id],
+    queryKey: ['recordings', 'meeting', targetMeetingId],
     queryFn: async () => {
-      if (!id) return [];
-      const res = await getRecordings({ meetingId: id });
+      if (!targetMeetingId) return [];
+      const res = await getRecordings({ meetingId: targetMeetingId });
       return res.recordings || [];
     },
-    enabled: Boolean(id),
+    enabled: Boolean(targetMeetingId),
   });
 
   const activeRecording: RecordingWithAiStatus | undefined = useMemo(() => {
@@ -89,28 +136,38 @@ export const MeetingAiSummaryPage: React.FC = () => {
     data: summaryData,
     isLoading: isSummaryLoading,
     error: summaryError,
-  } = useQuery<MeetingSummary>({
+  } = useQuery<MeetingSummary | null>({
     queryKey: ['recording-summary', activeRecording?.recordingId],
     queryFn: async () => {
-      if (!activeRecording?.recordingId) throw new Error('No recording available');
+      if (!activeRecording?.recordingId) return null;
       return await getRecordingSummary(activeRecording.recordingId);
     },
     enabled: Boolean(activeRecording?.recordingId),
     retry: 1,
+    refetchInterval: (query) => {
+      const status = query.state.data?.summaryStatus;
+      if (status === 'READY' || status === 'FAILED') return false;
+      return 5_000;
+    },
   });
 
   // 4. Fetch Transcript if recording exists
   const {
     data: transcriptData,
     isLoading: isTranscriptLoading,
-  } = useQuery<Transcript>({
+  } = useQuery<Transcript | null>({
     queryKey: ['recording-transcript', activeRecording?.recordingId],
     queryFn: async () => {
-      if (!activeRecording?.recordingId) throw new Error('No recording available');
+      if (!activeRecording?.recordingId) return null;
       return await getRecordingTranscript(activeRecording.recordingId);
     },
     enabled: Boolean(activeRecording?.recordingId),
     retry: 1,
+    refetchInterval: (query) => {
+      const status = query.state.data?.transcriptStatus;
+      if (status === 'READY' || status === 'FAILED') return false;
+      return 5_000;
+    },
   });
 
   // Resolve Project & Team details. The ids are read once so each memo depends
@@ -221,10 +278,10 @@ export const MeetingAiSummaryPage: React.FC = () => {
 
   // Derive recorder stage for MeetingAiSummaryCard
   const summaryStage: RecorderStage = useMemo(() => {
-    if (isSummaryLoading || isTranscriptLoading) return 'processing';
     if (activeRecording?.summaryStatus === 'READY' || summaryData?.summaryStatus === 'READY') return 'ready';
-    if (activeRecording?.summaryStatus === 'PROCESSING') return 'processing';
     if (activeRecording?.summaryStatus === 'FAILED' || summaryData?.summaryStatus === 'FAILED') return 'failed';
+    if (activeRecording?.summaryStatus === 'PROCESSING' || isSummaryLoading || isTranscriptLoading) return 'processing';
+    if (activeRecording && !summaryData) return 'processing';
     return 'idle';
   }, [isSummaryLoading, isTranscriptLoading, activeRecording, summaryData]);
 
@@ -265,6 +322,20 @@ export const MeetingAiSummaryPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {meeting?.meetingJoinCode && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/meetings/join/${meeting.meetingJoinCode}`)}
+              className="h-8 px-3 gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/10 cursor-pointer"
+              title="Jump to this meeting room"
+            >
+              <Video size={13} className="text-primary" />
+              <span>Jump to Meeting</span>
+              <ExternalLink size={11} className="opacity-70" />
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="sm"
@@ -327,14 +398,18 @@ export const MeetingAiSummaryPage: React.FC = () => {
           <span className="text-xs font-medium">Loading meeting data and AI summaries...</span>
         </div>
       ) : meetingError || !meeting ? (
-        <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-6 text-center space-y-2">
-          <AlertCircle size={24} className="mx-auto text-destructive" />
-          <h2 className="text-sm font-bold text-foreground">Meeting Not Found</h2>
-          <p className="text-xs text-muted-foreground max-w-md mx-auto">
-            The requested meeting could not be loaded or you do not have permission to view it.
+        <div className="rounded-sm border border-border/80 bg-muted/20 p-8 text-center space-y-3">
+          <div className="size-10 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center">
+            <Sparkles size={20} />
+          </div>
+          <h2 className="text-sm font-bold text-foreground">No Meeting Summary Available Yet</h2>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+            {id
+              ? 'The requested meeting could not be loaded or has not completed an AI summary.'
+              : 'No recorded meetings with completed AI summaries were found in your organization yet. Once a meeting ends with recording, its full summary will be featured here.'}
           </p>
-          <Button size="sm" variant="outline" onClick={() => navigate('/meetings')} className="mt-3 text-xs">
-            Return to Meetings
+          <Button size="sm" variant="outline" onClick={() => navigate('/meetings')} className="mt-3 text-xs cursor-pointer">
+            View All Meetings
           </Button>
         </div>
       ) : (

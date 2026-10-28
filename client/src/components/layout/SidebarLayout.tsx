@@ -113,6 +113,8 @@ export const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
       items.push({ name: 'Meetings', path: '/meetings' });
       if (path === '/meetings/new') {
         items.push({ name: 'Schedule Meeting', path: '/meetings/new' });
+      } else if (path.includes('/summary')) {
+        items.push({ name: 'Meeting Summary', path: '/meetings/summary' });
       }
     } else if (path.startsWith('/tasks')) {
       items.push({ name: 'Tasks', path: '/tasks' });

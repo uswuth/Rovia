@@ -164,6 +164,7 @@ const App = () => {
                         <Route path="/teams/:id/edit" element={<CreateTeam />} />
                         <Route path="/meetings" element={<Meetings />} />
                         <Route path="/meetings/new" element={<CreateMeeting />} />
+                        <Route path="/meetings/summary" element={<MeetingAiSummaryPage />} />
                         <Route path="/meetings/:id/summary" element={<MeetingAiSummaryPage />} />
                         <Route path="/tasks" element={<Tasks />} />
                         <Route path="/tasks/new" element={<CreateTask />} />

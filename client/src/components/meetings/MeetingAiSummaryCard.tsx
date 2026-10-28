@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, Copy, ListChecks, Loader2, Volume2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Copy, ListChecks, Loader2, Volume2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
@@ -10,10 +10,11 @@ import type { RecorderStage } from '@/hooks/useMeetingRecorder';
 interface MeetingAiSummaryCardProps {
   stage: RecorderStage;
   error: string | null;
-  summary?: MeetingSummary;
-  transcript?: Transcript;
+  summary?: MeetingSummary | null;
+  transcript?: Transcript | null;
   rawAudioUrls?: Array<{ speakerId: string; speakerName: string; url: string }>;
   onCopyTranscript?: () => void;
+  onClose?: () => void;
   title?: string;
   className?: string;
 }
@@ -26,6 +27,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
   transcript,
   rawAudioUrls,
   onCopyTranscript,
+  onClose,
   title = 'Meeting AI Summary',
   className = 'w-full max-w-3xl',
 }) => {
@@ -57,11 +59,22 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
 
   return (
     <Card className={className}>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           {title}
           {isWorking && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
         </CardTitle>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="size-7 text-muted-foreground hover:text-foreground cursor-pointer rounded-xs"
+            title="Close summary"
+          >
+            <X size={15} />
+          </Button>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">
