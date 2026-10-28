@@ -247,6 +247,8 @@ export const Tasks: React.FC = () => {
         isAdmin,
         canManage,
         onDelete: handleDelete,
+        orgMembers,
+        currentUser: user,
         onOpenAssigneesModal: (taskTitle, members) => {
           setRosterModal({
             open: true,
@@ -255,7 +257,7 @@ export const Tasks: React.FC = () => {
           });
         },
       }),
-    [navigate, isAdmin, canManage, handleDelete, setRosterModal]
+    [navigate, isAdmin, canManage, handleDelete, orgMembers, user, setRosterModal]
   );
 
   if (loading) {
