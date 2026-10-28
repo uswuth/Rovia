@@ -92,12 +92,15 @@ export interface DownloadUrlResponse {
   expiresIn?: number;
 }
 
+/** Mirrors `buildPaginatedResult` on the server: list payloads are `{ items, pagination }`. */
 export interface RecordingListResponse {
-  recordings?: RecordingWithAiStatus[];
+  items?: RecordingWithAiStatus[];
   pagination?: {
     page?: number;
     limit?: number;
     total?: number;
     totalPages?: number;
+    hasNextPage?: boolean;
+    hasPreviousPage?: boolean;
   };
 }
