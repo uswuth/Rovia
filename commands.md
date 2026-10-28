@@ -56,6 +56,17 @@ Secrets live in `server/secrets/` and are git-ignored. Upload each file under
 local development. There are no default secret values in code — a missing one
 stops the server with a named error.
 
+## Object storage
+
+| Command | What it does |
+| --- | --- |
+| `cd server && node scripts/_tmp_apply_cors.mjs` | Applies the Backblaze B2 CORS rule that browser uploads need; prompts for the account master key. |
+| `cd server && node scripts/_tmp_apply_cors.mjs --check` | Verifies the rule with the app key without changing the bucket. |
+
+The app key can upload and read files but cannot change bucket configuration,
+so the first command is the only one that needs the master key. It is read with
+echo off and never written to disk.
+
 ## Docker
 
 Docker is **not used for deployment.** Production builds from source: Vercel

@@ -42,7 +42,32 @@ Push the repo, then in Render: **New → Blueprint**, point at this repository.
 
 Render gives you a URL like `https://intellmeet-api.onrender.com`.
 
-### 3. Vercel
+### 3. Object storage CORS
+
+Recording uploads go straight from the browser to Backblaze B2 through a
+presigned PUT. B2 rejects the browser preflight (`OPTIONS`) with **403** until
+the bucket has a CORS rule, even though the signed upload itself is valid.
+
+The app key in `.env.local` is scoped to `readFiles`/`writeFiles`, so it cannot
+change bucket configuration. Apply the rule once with the account master key:
+
+```sh
+cd server && node scripts/_tmp_apply_cors.mjs
+```
+
+The script replaces the bucket's CORS rules with one rule for the production
+Vercel origin and local dev, then preflights a real presigned URL from each
+origin and performs a test upload. Re-run it whenever the client origin changes:
+
+```sh
+cd server && node scripts/_tmp_apply_cors.mjs -- https://your-new-origin.example
+```
+
+To verify without changing anything, run `node scripts/_tmp_apply_cors.mjs --check`.
+Set `B2_CORS_ORIGINS` (comma-separated) to keep extra origins in the environment
+instead of passing them on the command line.
+
+### 4. Vercel
 
 ```sh
 npm i -g vercel
