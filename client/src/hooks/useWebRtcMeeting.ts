@@ -494,6 +494,31 @@ export const useWebRtcMeeting = (
   const setTrackEnabled = useCallback(
     async (kind: 'audio' | 'video', on: boolean) => {
       let tracks = localRef.current?.getTracks().filter((t) => t.kind === kind) ?? [];
+      if (kind === 'audio' && on && tracks.length === 0) {
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: buildAudioConstraints() });
+          const newAudioTrack = audioStream.getAudioTracks()[0];
+          if (newAudioTrack) {
+            if (!localRef.current) {
+              localRef.current = new MediaStream();
+            }
+            localRef.current.addTrack(newAudioTrack);
+            for (const pc of Object.values(connections.current)) {
+              const sender = pc.getSenders().find((s) => s.track?.kind === 'audio');
+              if (sender) {
+                await sender.replaceTrack(newAudioTrack);
+              } else if (localRef.current) {
+                pc.addTrack(newAudioTrack, localRef.current);
+              }
+            }
+            setLocalStream(new MediaStream(localRef.current.getTracks()));
+            tracks = [newAudioTrack];
+            void renegotiateAll();
+          }
+        } catch (err) {
+          console.warn('Failed to dynamically acquire audio track:', err);
+        }
+      }
       if (kind === 'video' && on && tracks.length === 0) {
         try {
           const videoStream = await navigator.mediaDevices.getUserMedia({ video: buildCameraConstraints() });

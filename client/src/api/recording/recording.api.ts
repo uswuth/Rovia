@@ -38,6 +38,7 @@ export const createRecording = async (input: CreateRecordingInput): Promise<Reco
 export const getRecordings = async (params?: {
   status?: string;
   projectId?: string;
+  meetingId?: string;
   page?: number;
   limit?: number;
 }): Promise<RecordingListResponse> => {

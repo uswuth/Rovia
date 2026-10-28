@@ -23,6 +23,7 @@ const Meetings = lazy(() => import('@/pages/meetings/Meetings').then((m) => ({ d
 const MeetingRoom = lazy(() => import('@/pages/meetings/MeetingRoom').then((m) => ({ default: m.MeetingRoom })));
 const MeetingLobby = lazy(() => import('@/pages/meetings/MeetingLobby').then((m) => ({ default: m.MeetingLobby })));
 const CreateMeeting = lazy(() => import('@/pages/meetings/CreateMeeting').then((m) => ({ default: m.CreateMeeting })));
+const MeetingAiSummaryPage = lazy(() => import('@/pages/meetings/MeetingAiSummaryPage').then((m) => ({ default: m.MeetingAiSummaryPage })));
 const Tasks = lazy(() => import('@/pages/tasks/Tasks').then((m) => ({ default: m.Tasks })));
 const SettingsPage = lazy(() => import('@/pages/settings/Settings').then((m) => ({ default: m.SettingsPage })));
 const ServerAdminLogin = lazy(() => import('@/pages/admin/ServerAdminLogin').then((m) => ({ default: m.ServerAdminLogin })));
@@ -163,6 +164,7 @@ const App = () => {
                         <Route path="/teams/:id/edit" element={<CreateTeam />} />
                         <Route path="/meetings" element={<Meetings />} />
                         <Route path="/meetings/new" element={<CreateMeeting />} />
+                        <Route path="/meetings/:id/summary" element={<MeetingAiSummaryPage />} />
                         <Route path="/tasks" element={<Tasks />} />
                         <Route path="/tasks/new" element={<CreateTask />} />
                         <Route path="/tasks/:id" element={<TaskView />} />

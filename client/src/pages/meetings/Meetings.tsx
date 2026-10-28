@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Video, Calendar, Clock, Users, Play, Plus, FolderGit2, Search, X, Copy, Check, Share2, LayoutGrid, Table2, Building2 } from 'lucide-react';
+import { Video, Calendar, Clock, Users, Play, Plus, FolderGit2, Search, X, Copy, Check, Share2, LayoutGrid, Table2, Building2, Sparkles } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
@@ -397,6 +397,15 @@ export const Meetings: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => window.open(`/meetings/${m.meetingId}/summary`, '_blank')}
+                  className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
+                  title="View AI Meeting Summary"
+                >
+                  <Sparkles size={13} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => void handleShareLink(m.meetingJoinCode, m.meetingTitle)}
                   className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                   title="Share meeting link"
@@ -404,6 +413,18 @@ export const Meetings: React.FC = () => {
                   <Share2 size={13} />
                 </Button>
               </>
+            )}
+
+            {isEndedOrCancelled && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => window.open(`/meetings/${m.meetingId}/summary`, '_blank')}
+                className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
+                title="View AI Meeting Summary"
+              >
+                <Sparkles size={13} />
+              </Button>
             )}
 
             <Button
@@ -730,6 +751,15 @@ export const Meetings: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => window.open(`/meetings/${m.meetingId}/summary`, '_blank')}
+                            className="h-6 w-6 p-0 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
+                            title="View AI Meeting Summary"
+                          >
+                            <Sparkles size={12} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => void handleShareLink(m.meetingJoinCode, m.meetingTitle)}
                             className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
                             title="Share"
@@ -737,6 +767,18 @@ export const Meetings: React.FC = () => {
                             <Share2 size={12} />
                           </Button>
                         </div>
+                      )}
+
+                      {isEndedOrCancelled && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(`/meetings/${m.meetingId}/summary`, '_blank')}
+                          className="h-6 w-6 p-0 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
+                          title="View AI Meeting Summary"
+                        >
+                          <Sparkles size={12} />
+                        </Button>
                       )}
 
                       <Tooltip className="w-auto">

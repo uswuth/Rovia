@@ -363,5 +363,36 @@ body {
   @apply pointer-events-none absolute z-[-1] rounded-full;
 }
 
+/* --- Clean Print & PDF Export Formatting --- */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 1.2cm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  aside, nav, header, button, .no-print, [role="navigation"] {
+    display: none !important;
+  }
+
+  .card, [class*="bg-card"] {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  a[href]:after {
+    content: none !important;
+  }
+}
+
 
 

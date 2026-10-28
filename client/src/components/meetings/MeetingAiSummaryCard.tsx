@@ -1,7 +1,8 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, Copy, ListChecks, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Copy, ListChecks, Loader2, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { parseApiError } from '@/utils/apiError';
 import type { MeetingSummary, Transcript } from '@/api/recording/recording.types';
 import type { RecorderStage } from '@/hooks/useMeetingRecorder';
@@ -11,7 +12,10 @@ interface MeetingAiSummaryCardProps {
   error: string | null;
   summary?: MeetingSummary;
   transcript?: Transcript;
+  rawAudioUrls?: Array<{ speakerId: string; speakerName: string; url: string }>;
   onCopyTranscript?: () => void;
+  title?: string;
+  className?: string;
 }
 
 /** Transcript is shown in full and copyable so it can be pasted into any external AI tool. */
@@ -20,7 +24,10 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
   error,
   summary,
   transcript,
+  rawAudioUrls,
   onCopyTranscript,
+  title = 'Meeting AI Summary',
+  className = 'w-full max-w-3xl',
 }) => {
   const [copied, setCopied] = React.useState(false);
 
@@ -49,10 +56,10 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
   const transcriptStatus = transcript?.transcriptStatus;
 
   return (
-    <Card className="w-full max-w-3xl">
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          Meeting AI Summary
+          {title}
           {isWorking && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
         </CardTitle>
       </CardHeader>
@@ -83,13 +90,38 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
           </div>
         )}
 
+        {/* Captured Raw Audio Playback Section */}
+        {rawAudioUrls && rawAudioUrls.length > 0 && (
+          <section className="space-y-2 rounded-sm border border-border/80 bg-muted/30 p-3">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
+              <Volume2 className="size-3.5 text-primary" />
+              <span>Full Meeting Recorded Audio</span>
+            </h3>
+            <div className="space-y-2">
+              {rawAudioUrls.map((item, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="text-[11px] font-medium text-muted-foreground">
+                    {item.speakerName || `Track ${idx + 1}`}
+                  </div>
+                  <audio
+                    controls
+                    src={item.url}
+                    className="w-full h-8 rounded-xs"
+                    preload="metadata"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {summary?.summaryStatus === 'READY' && (
           <section className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="size-4 shrink-0" />
               <span>Summary ready</span>
             </div>
-            <p className="text-sm leading-relaxed text-foreground">{summary.summaryText}</p>
+            <MarkdownRenderer content={summary.summaryText || ''} />
 
             {summary.summaryKeyPoints && summary.summaryKeyPoints.length > 0 && (
               <div className="space-y-1.5">

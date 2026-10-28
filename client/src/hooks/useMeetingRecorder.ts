@@ -29,7 +29,13 @@ export interface SpeakerTrack {
 const ALLOWED_AUDIO_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'] as const;
 
 /** Records every participant on their own track, then runs the AI pipeline. Tracks are captured separately and never mixed. Simultaneous speech is what garbles a transcript, so mixing everyone into one stream is exactly what this avoids. The server transcribes each track on its own and attributes the words using the roster, then sends the attributed transcript to the summariser. Audio is captured mono at a low bitrate: speech only needs to be intelligible, and it keeps a full hour per participant inside the provider's upload limit without any server-side conversion step. */
-export const useMeetingRecorder = (options?: { meetingId?: string; projectId?: string }) => {
+export const useMeetingRecorder = (options?: {
+  meetingId?: string;
+  projectId?: string;
+  /** Called the moment a failure is recorded, so the caller can react in its own
+   * event path instead of watching `error` from an effect (which would render twice). */
+  onError?: (message: string) => void;
+}) => {
   const queryClient = useQueryClient();
 
   // Meeting and project ids are fixed for the lifetime of a room, so they are
@@ -47,34 +53,40 @@ export const useMeetingRecorder = (options?: { meetingId?: string; projectId?: s
   const [error, setError] = useState<string | null>(null);
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [rawAudioUrls, setRawAudioUrls] = useState<Array<{ speakerId: string; speakerName: string; url: string }>>([]);
+
+  const fail = useCallback((message: string) => {
+    setError(message);
+    optionsRef.current?.onError?.(message);
+  }, []);
 
   const startRecording = useCallback(async (tracks: SpeakerTrack[]) => {
     setError(null);
     const usable = tracks.filter((track) => track.stream.getAudioTracks().length > 0);
     if (usable.length === 0) {
       setStage('failed');
-      setError('No participant audio is available to record yet');
+      fail('No participant audio is available to record yet');
       return;
     }
 
-    const mimeType = ALLOWED_AUDIO_TYPES.find(
-      (type) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)
-    );
-    if (!mimeType) {
-      setStage('failed');
-      setError('This browser cannot record audio in a supported format');
-      return;
-    }
+    const supportedType = typeof MediaRecorder !== 'undefined'
+      ? ALLOWED_AUDIO_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) || ''
+      : '';
+    const mimeType = supportedType || undefined;
 
     const recorders: MediaRecorder[] = [];
     try {
       for (const track of usable) {
-        const recorder = new MediaRecorder(track.stream, {
-          mimeType,
-          // Speech-grade mono. A full hour at this rate stays well under the
-          // transcription API's per-file ceiling, so no chunking is needed.
-          audioBitsPerSecond: 24_000,
-        });
+        // Create an audio-only MediaStream containing only the active audio tracks
+        const audioTracks = track.stream.getAudioTracks().filter((t) => t.readyState === 'live');
+        const audioOnlyStream = new MediaStream(audioTracks);
+
+        const options: MediaRecorderOptions = {};
+        if (mimeType && MediaRecorder.isTypeSupported(mimeType)) {
+          options.mimeType = mimeType;
+        }
+
+        const recorder = new MediaRecorder(audioOnlyStream, options);
         const collected: Blob[] = [];
         chunksRef.current.set(track.speakerId, collected);
         recorder.ondataavailable = (event) => {
@@ -87,19 +99,33 @@ export const useMeetingRecorder = (options?: { meetingId?: string; projectId?: s
         if (recorder.state !== 'inactive') recorder.stop();
       });
       setStage('failed');
-      setError(err instanceof Error ? err.message : 'Could not start recording');
+      fail(err instanceof Error ? err.message : 'Could not start recording');
       return;
     }
 
     recordersRef.current = recorders;
-    chunksRef.current = new Map();
-    for (const track of usable) chunksRef.current.set(track.speakerId, []);
 
     startedAtRef.current = Date.now();
     setElapsedMs(0);
-    recorders.forEach((recorder) => recorder.start(1000));
-    setStage('recording');
-  }, []);
+    try {
+      recorders.forEach((recorder) => {
+        if (recorder.state === 'inactive') {
+          recorder.start(500); // deliver data every 500ms
+        }
+      });
+      setStage('recording');
+    } catch (err) {
+      recorders.forEach((recorder) => {
+        try {
+          if (recorder.state !== 'inactive') recorder.stop();
+        } catch {
+          // ignore
+        }
+      });
+      setStage('failed');
+      fail(err instanceof Error ? err.message : 'Failed to start media recorder');
+    }
+  }, [fail]);
 
   /** Stops every track and runs the upload chain. Each participant's audio goes to its own server-derived object; the recording is only reported successful once the server has verified them all. */
   const stopRecording = useCallback(async () => {
@@ -118,6 +144,11 @@ export const useMeetingRecorder = (options?: { meetingId?: string; projectId?: s
               return;
             }
             recorder.onstop = () => resolve();
+            try {
+              recorder.requestData();
+            } catch {
+              // ignore
+            }
             recorder.stop();
           })
       )
@@ -132,9 +163,17 @@ export const useMeetingRecorder = (options?: { meetingId?: string; projectId?: s
       }))
       .filter((speaker) => speaker.blob.size > 0);
 
+    // Create playable raw audio URLs
+    const audioUrls = speakers.map((s) => ({
+      speakerId: s.speakerId,
+      speakerName: s.speakerName,
+      url: URL.createObjectURL(s.blob),
+    }));
+    setRawAudioUrls(audioUrls);
+
     if (speakers.length === 0) {
       setStage('failed');
-      setError('No audio was captured');
+      fail('No audio was captured');
       return;
     }
 
@@ -165,9 +204,9 @@ export const useMeetingRecorder = (options?: { meetingId?: string; projectId?: s
       await queryClient.invalidateQueries({ queryKey: queryKeys.recordings.all });
     } catch (err) {
       setStage('failed');
-      setError(err instanceof Error ? err.message : 'Could not save the recording');
+      fail(err instanceof Error ? err.message : 'Could not save the recording');
     }
-  }, [queryClient]);
+  }, [queryClient, fail]);
 
   const summaryQuery = useQuery<MeetingSummary>({
     queryKey: queryKeys.recordings.summary(recordingId ?? 'none'),
@@ -213,6 +252,7 @@ export const useMeetingRecorder = (options?: { meetingId?: string; projectId?: s
     stopRecording,
     summary: summaryQuery.data,
     transcript: transcriptQuery.data,
+    rawAudioUrls,
     isSummaryReady: summaryQuery.data?.summaryStatus === 'READY',
     reset,
   };

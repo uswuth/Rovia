@@ -245,7 +245,12 @@ export const MeetingRoom: React.FC = () => {
     },
   });
 
-  const recorder = useMeetingRecorder({ meetingId: id });
+  const recorder = useMeetingRecorder({ meetingId: id, onError: showToast });
+
+  // Read once so the callback below depends on plain values, not the `user`
+  // object: the React Compiler cannot verify `user?.userId` as a dependency.
+  const currentUserId = user?.userId;
+  const currentUserName = user?.userName;
 
   // Remote audio only exists in the peer map, so tracks are assembled at capture start rather than once.
   const handleToggleRecording = useCallback(async () => {
@@ -255,13 +260,8 @@ export const MeetingRoom: React.FC = () => {
     }
 
     const tracks: SpeakerTrack[] = [];
-    if (rtc.localStream?.getAudioTracks().length) {
-      tracks.push({
-        speakerId: user?.userId ?? 'me',
-        speakerName: user?.userName || 'You',
-        stream: rtc.localStream,
-      });
-    }
+
+    // 1. Gather all other participants' audio tracks from WebRTC peers
     for (const [peerId, peer] of Object.entries(rtc.peers)) {
       if (peer.stream?.getAudioTracks().length) {
         tracks.push({
@@ -271,8 +271,68 @@ export const MeetingRoom: React.FC = () => {
         });
       }
     }
+
+    // 2. Always acquire or refresh live microphone audio track so physical mic speech is captured
+    let audioStream = rtc.localStream;
+    const hasLiveMic = audioStream?.getAudioTracks().some((t) => t.readyState === 'live');
+    if (!hasLiveMic) {
+      try {
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch {
+        // Fallback silently if user denied or hardware missing
+      }
+    }
+
+    if (audioStream?.getAudioTracks().length) {
+      tracks.push({
+        speakerId: currentUserId ?? 'me',
+        speakerName: currentUserName || 'You',
+        stream: audioStream,
+      });
+    } else {
+      // Try acquiring microphone stream
+      try {
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        if (audioStream?.getAudioTracks().length) {
+          tracks.push({
+            speakerId: currentUserId ?? 'me',
+            speakerName: currentUserName || 'You',
+            stream: audioStream,
+          });
+        }
+      } catch {
+        // If mic is denied or unavailable, create an AudioContext silent track so recording can proceed
+        try {
+          const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          const ctx = new AudioContextClass();
+          if (ctx.state === 'suspended') {
+            await ctx.resume();
+          }
+          const osc = ctx.createOscillator();
+          const dst = ctx.createMediaStreamDestination();
+          const gain = ctx.createGain();
+          gain.gain.value = 0.0001; // active minimal non-zero signal
+          osc.connect(gain);
+          gain.connect(dst);
+          osc.start();
+          tracks.push({
+            speakerId: currentUserId ?? 'me',
+            speakerName: currentUserName || 'You',
+            stream: dst.stream,
+          });
+        } catch {
+          // Ignore
+        }
+      }
+    }
+
+    if (tracks.length === 0) {
+      showToast('Could not initialize audio capture.');
+      return;
+    }
+
     await recorder.startRecording(tracks);
-  }, [recorder, rtc.localStream, rtc.peers, user?.userId, user?.userName, getParticipantDisplayName]);
+  }, [recorder, rtc.localStream, rtc.peers, currentUserId, currentUserName, getParticipantDisplayName, showToast]);
 
   // One-second tick, not per-frame: the display shows whole seconds only.
   const [recordingTick, setRecordingTick] = useState(0);
@@ -686,8 +746,11 @@ export const MeetingRoom: React.FC = () => {
     onSuccess: () => navigate('/meetings'),
   });
 
-  const confirmLeave = () => {
+  const confirmLeave = async () => {
     setShowLeaveModal(false);
+    if (recorder.isRecording) {
+      await recorder.stopRecording();
+    }
     leaving.mutate();
   };
 
@@ -698,6 +761,9 @@ export const MeetingRoom: React.FC = () => {
 
   const endingMeeting = useMutation<unknown, void>({
     mutationFn: async () => {
+      if (recorder.isRecording) {
+        await recorder.stopRecording();
+      }
       const res = await endMeeting(id);
       getMeetingSocket().emit('meeting:end', id);
       return res;
@@ -996,12 +1062,13 @@ export const MeetingRoom: React.FC = () => {
         />
       )}
 
-      {(recorder.stage !== 'idle' || recorder.summary || recorder.transcript) && (
+      {(recorder.stage !== 'idle' || recorder.summary || recorder.transcript || (recorder.rawAudioUrls && recorder.rawAudioUrls.length > 0)) && (
         <MeetingAiSummaryCard
           stage={recorder.stage}
           error={recorder.error}
           summary={recorder.summary}
           transcript={recorder.transcript}
+          rawAudioUrls={recorder.rawAudioUrls}
         />
       )}
     </div>
