@@ -25,6 +25,13 @@ export function parseApiError(err: unknown): ParsedApiError {
     };
   }
 
+  if (status === 413) {
+    return {
+      message: 'That upload is too large. Choose a smaller image and try again.',
+      fieldErrors: {},
+    };
+  }
+
   const fieldErrors: Record<string, string> = {};
   if (data?.errors && Array.isArray(data.errors)) {
     data.errors.forEach((item: FieldError) => {

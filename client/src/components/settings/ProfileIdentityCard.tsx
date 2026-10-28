@@ -10,6 +10,42 @@ import type { ToastTone } from '@/hooks/useToast';
 
 const MAX_SIZE_BYTES = 2 * 1024 * 1024;
 const MAX_DIMENSION = 2048;
+// Avatars render at 80px, so storing anything larger only inflates the request.
+// Re-encoding to this bound keeps the base64 payload far below the API body limit.
+const STORED_DIMENSION = 512;
+const STORED_QUALITY = 0.85;
+
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read the selected file'));
+    reader.readAsDataURL(file);
+  });
+
+const loadImage = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Unreadable image'));
+    image.src = src;
+  });
+
+/** Bounded JPEG rendition: keeps transparent pixels white instead of black. */
+const toStoredDataUrl = (image: HTMLImageElement): string => {
+  const scale = Math.min(1, STORED_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+  const context = canvas.getContext('2d');
+  if (!context) return image.src;
+
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', STORED_QUALITY);
+};
 
 interface ProfileIdentityCardProps {
   form: ProfileForm;
@@ -37,7 +73,8 @@ export const ProfileIdentityCard: React.FC<ProfileIdentityCardProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
 
     if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
@@ -49,20 +86,21 @@ export const ProfileIdentityCard: React.FC<ProfileIdentityCardProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      const img = new Image();
-      img.onload = () => {
-        if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
+    void (async () => {
+      try {
+        const image = await loadImage(await readFileAsDataUrl(file));
+        if (image.naturalWidth > MAX_DIMENSION || image.naturalHeight > MAX_DIMENSION) {
           showToast(`Image resolution must not exceed ${MAX_DIMENSION}x${MAX_DIMENSION}px.`, 'error');
           return;
         }
-        updateField('avatarUrl', dataUrl);
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
+        updateField('avatarUrl', toStoredDataUrl(image));
+      } catch {
+        showToast('That image could not be read. Try a different file.', 'error');
+      } finally {
+        // Allow re-selecting the same file after a failed attempt.
+        input.value = '';
+      }
+    })();
   };
 
   return (
