@@ -68,7 +68,7 @@ export class FfmpegAudioExtractor implements AudioExtractor {
           ':stop_periods=-1',
           `:stop_duration=${SILENCE_MIN_DURATION_SECONDS}`,
           `:stop_threshold=${SILENCE_THRESHOLD_DB}dB`,
-          'detection=rms',
+          ':detection=rms',
         ].join(''),
         '-ac', '1',
         '-ar', '16000',

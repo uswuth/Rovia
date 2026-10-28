@@ -63,7 +63,7 @@ export const MeetingAiSummaryPage: React.FC = () => {
     queryKey: ['recordings', 'all-for-summary'],
     queryFn: async () => {
       const res = await getRecordings({ limit: 50 });
-      return res.recordings || [];
+      return res.items || [];
     },
     enabled: !id,
   });
@@ -113,7 +113,7 @@ export const MeetingAiSummaryPage: React.FC = () => {
     queryFn: async () => {
       if (!targetMeetingId) return [];
       const res = await getRecordings({ meetingId: targetMeetingId });
-      return res.recordings || [];
+      return res.items || [];
     },
     enabled: Boolean(targetMeetingId),
   });
@@ -269,19 +269,33 @@ export const MeetingAiSummaryPage: React.FC = () => {
 
   const isLoadingOverall = isMeetingLoading || isRecordingsLoading;
 
+  // The transcript and summary endpoints answer 404 until their record exists.
+  // Post-processing runs inline before `complete()` returns, so once both
+  // queries settle empty no AI output will ever appear for this recording.
+  const hasNoAiOutput =
+    Boolean(activeRecording) &&
+    !isSummaryLoading &&
+    !isTranscriptLoading &&
+    !summaryData &&
+    !transcriptData &&
+    !summaryError;
+
   // Derive recorder stage for MeetingAiSummaryCard
   const summaryStage: RecorderStage = useMemo(() => {
     if (activeRecording?.summaryStatus === 'READY' || summaryData?.summaryStatus === 'READY') return 'ready';
     if (activeRecording?.summaryStatus === 'FAILED' || summaryData?.summaryStatus === 'FAILED') return 'failed';
+    if (transcriptData?.transcriptStatus === 'FAILED' || hasNoAiOutput) return 'failed';
     if (activeRecording?.summaryStatus === 'PROCESSING' || isSummaryLoading || isTranscriptLoading) return 'processing';
     if (activeRecording && !summaryData) return 'processing';
     return 'idle';
-  }, [isSummaryLoading, isTranscriptLoading, activeRecording, summaryData]);
+  }, [isSummaryLoading, isTranscriptLoading, activeRecording, summaryData, transcriptData, hasNoAiOutput]);
 
   const summaryErrorMessage = summaryError
     ? 'Unable to load summary for this recording.'
-    : !activeRecording
-    ? null
+    : transcriptData?.transcriptStatus === 'FAILED'
+    ? 'Transcription did not complete for this recording, so no summary was generated. Check the server logs for the AI provider error.'
+    : hasNoAiOutput
+    ? 'No transcript or summary was generated for this recording. Check the server logs for the AI provider error.'
     : null;
 
   return (
