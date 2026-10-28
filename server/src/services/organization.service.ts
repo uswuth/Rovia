@@ -6,6 +6,11 @@ import { assertObjectId } from '../utils/objectId.js';
 import { requireOrganizationId } from '../utils/scope.js';
 import { ORGANIZATION_OWNER_POPULATE, USER_LIST_SELECT } from '../utils/projections.js';
 import { generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
+import {
+  generateTemporaryPassword,
+  PASSWORD_POLICY,
+  PASSWORD_POLICY_MESSAGE
+} from '../utils/password.js';
 
 export const getMyOrganizationService = async (orgId: string) => {
   requireOrganizationId(orgId, 'view this organization');
@@ -187,7 +192,15 @@ export const provisionUserService = async (input: {
     throw ApiError.conflict('A user with this email address already exists');
   }
 
-  const defaultPassword = password && password.length >= 6 ? password : 'User@123456';
+  const suppliedPassword = typeof password === 'string' ? password.trim() : '';
+  if (suppliedPassword && !PASSWORD_POLICY.test(suppliedPassword)) {
+    throw ApiError.badRequest(PASSWORD_POLICY_MESSAGE, [
+      { field: 'password', message: 'Password does not meet complexity requirements' }
+    ]);
+  }
+
+  // A missing password is generated per user. Never fall back to a shared constant.
+  const initialPassword = suppliedPassword || generateTemporaryPassword();
   // Privilege Escalation Guard: Only 'Admin' or 'Member' can ever be provisioned
   const roleToAssign = userRole === 'Admin' ? 'Admin' : 'Member';
   const statusToAssign = (userStatus as 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED') || 'ACTIVE';
@@ -196,7 +209,7 @@ export const provisionUserService = async (input: {
   const newUser = await User.create({
     user_name: userName.trim(),
     user_email: userEmail.trim().toLowerCase(),
-    password: defaultPassword,
+    password: initialPassword,
     organization_id: org._id,
     user_role: roleToAssign,
     user_status: statusToAssign,
@@ -215,7 +228,7 @@ export const provisionUserService = async (input: {
     organizationName: org.organization_name,
     userCode: newUser.user_code,
     jobTitle: newUser.job_title,
-    initialPassword: defaultPassword
+    initialPassword
   };
 };
 
