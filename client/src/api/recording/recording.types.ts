@@ -33,6 +33,11 @@ export interface TranscriptSpeaker {
   speakerId?: string;
   speakerName?: string;
   speakerText?: string;
+  /**
+   * The same words with filler sounds, stutters and repeated words removed.
+   * Derived by the server on read; never stored separately.
+   */
+  speakerCleanText?: string;
   speakerDurationMs?: number;
   /** False when that participant's track held no speech. */
   spoke?: boolean;
@@ -42,6 +47,11 @@ export interface Transcript {
   transcriptId?: string;
   transcriptStatus?: AiStatus;
   transcriptText?: string;
+  /**
+   * The raw speech-to-text with filler sounds, stutters and repeated words
+   * removed. Nothing is paraphrased, so it still reads as what was said.
+   */
+  transcriptCleanText?: string;
   transcriptLanguage?: string | null;
   transcriptDurationMs?: number;
   transcriptSegmentCount?: number;

@@ -291,7 +291,11 @@ router.delete(
  *     description: >
  *       Tenant scoped. Returns 404 until a transcript exists. The stored
  *       transcript is always derived from the recording by the local STT
- *       service; browser speech recognition is never persisted.
+ *       service; browser speech recognition is never persisted. Each response
+ *       also carries `transcriptCleanText` and a per-speaker `speakerCleanText`:
+ *       the same words with filler sounds, stutters and repeated words removed.
+ *       Those fields are derived from the raw text on read, so the raw
+ *       transcript stays authoritative and the two cannot disagree.
  *     tags:
  *       - Recordings
  *     security:
