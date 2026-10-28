@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import type { Member } from '@/types/member.types';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
@@ -323,9 +324,12 @@ export const MemberRoster: React.FC<MemberRosterProps> = ({
                       >
                         {/* Member Avatar & Details */}
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-xs shrink-0 border border-primary/30">
-                            {displayName.charAt(0).toUpperCase()}
-                          </div>
+                          <Avatar className="w-8 h-8 shrink-0">
+                            {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={displayName} />}
+                            <AvatarFallback name={displayName} className="font-bold text-xs">
+                              {displayName.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 truncate">
                               <p className="text-xs font-semibold text-foreground truncate">{displayName}</p>
