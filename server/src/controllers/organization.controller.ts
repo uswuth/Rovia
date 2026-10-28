@@ -8,7 +8,7 @@ import {
   getOrganizationMembersService,
   getOrganizationMemberByIdService,
   createOrganizationByAdminService,
-  getAllOrganizationsAdminService,
+  getOwnOrganizationAdminService,
   provisionUserService,
   updateUserService,
   getAllUsersAdminService
@@ -70,8 +70,9 @@ export const createOrganization = async (req: Request, res: Response): Promise<R
   );
 };
 
-export const getAllOrganizations = async (_req: Request, res: Response): Promise<Response> => {
-  const result = await getAllOrganizationsAdminService();
+export const getAllOrganizations = async (req: Request, res: Response): Promise<Response> => {
+  const { organizationId } = getRequestScope(req);
+  const result = await getOwnOrganizationAdminService(organizationId);
 
   return ApiResponse.success(
     res,
@@ -82,26 +83,19 @@ export const getAllOrganizations = async (_req: Request, res: Response): Promise
 };
 
 export const provisionUser = async (req: Request, res: Response): Promise<Response> => {
-  const currentUser = req.user as IJwtPayload;
-  const isGlobalSuperAdmin = Boolean(
-    currentUser?.isSuperAdmin || currentUser?.userRole === 'SuperAdmin'
-  );
+  // The tenant always comes from the verified token. A body-supplied organizationId
+  // that points at another tenant is rejected rather than silently ignored.
+  const { organizationId } = getRequestScope(req);
+  const requestedOrgId =
+    typeof req.body?.organizationId === 'string' ? req.body.organizationId.trim() : '';
 
-  const userOrg = currentUser?.organizationId;
-  const userOrgId = userOrg ? String(userOrg) : undefined;
-
-  let targetOrgId = req.body.organizationId;
-  if (!targetOrgId || !isGlobalSuperAdmin) {
-    targetOrgId = targetOrgId || userOrgId;
-  }
-
-  if (!targetOrgId) {
-    throw ApiError.badRequest('Target Organization is required');
+  if (requestedOrgId && requestedOrgId !== organizationId) {
+    throw ApiError.forbidden('You can only provision users into your own organization');
   }
 
   const result = await provisionUserService({
     ...req.body,
-    organizationId: targetOrgId
+    organizationId
   });
 
   return ApiResponse.success(
@@ -114,7 +108,8 @@ export const provisionUser = async (req: Request, res: Response): Promise<Respon
 
 export const updateUserAdmin = async (req: Request, res: Response): Promise<Response> => {
   const { userId } = req.params;
-  const result = await updateUserService(userId, req.body);
+  const { organizationId } = getRequestScope(req);
+  const result = await updateUserService(userId, req.body, organizationId);
 
   return ApiResponse.success(
     res,
@@ -125,22 +120,10 @@ export const updateUserAdmin = async (req: Request, res: Response): Promise<Resp
 };
 
 export const getAllUsersAdmin = async (req: Request, res: Response): Promise<Response> => {
-  const currentUser = req.user as IJwtPayload;
-  const isGlobalSuperAdmin = Boolean(
-    currentUser?.isSuperAdmin || currentUser?.userRole === 'SuperAdmin'
-  );
-
-  const userOrg = currentUser?.organizationId;
-  const userOrgId = userOrg ? String(userOrg) : undefined;
-
-  let orgFilter: string | undefined = undefined;
-  if (!isGlobalSuperAdmin) {
-    orgFilter = userOrgId;
-  } else if (typeof req.query.organizationId === 'string' && req.query.organizationId) {
-    orgFilter = req.query.organizationId;
-  }
-
-  const result = await getAllUsersAdminService(orgFilter);
+  // Org owners carry isSuperAdmin by design, so neither the flag nor the role may
+  // widen this list. The tenant is always the caller's own organization.
+  const { organizationId } = getRequestScope(req);
+  const result = await getAllUsersAdminService(organizationId);
 
   return ApiResponse.success(
     res,

@@ -1,8 +1,8 @@
-import { Organization, OrganizationClass } from '../models/organization.model.js';
+import { Organization } from '../models/organization.model.js';
 import { User } from '../models/user.model.js';
 import { ApiError } from '../utils/apiError.js';
-import { Ref } from '@typegoose/typegoose';
 import { findPaginated } from '../utils/paginatedFind.js';
+import { assertObjectId } from '../utils/objectId.js';
 import { requireOrganizationId } from '../utils/scope.js';
 import { ORGANIZATION_OWNER_POPULATE, USER_LIST_SELECT } from '../utils/projections.js';
 import { generateSequentialCode, ENTITY_PREFIXES } from '../utils/codeGenerator.js';
@@ -138,6 +138,26 @@ export const getAllOrganizationsAdminService = async () => {
   return orgsWithCount;
 };
 
+/** Tenant-facing view: a SuperAdmin owner may only see their own organization. */
+export const getOwnOrganizationAdminService = async (organizationId: string) => {
+  requireOrganizationId(organizationId, 'view organizations');
+
+  const org = await Organization.findById(organizationId).populate(
+    'organization_owner_id',
+    'user_name user_email user_role'
+  );
+  if (!org) {
+    throw ApiError.notFound('Organization not found');
+  }
+
+  const memberCount = await User.countDocuments({
+    organization_id: org._id,
+    is_deleted: { $ne: true }
+  });
+
+  return [{ ...org.toJSON(), memberCount }];
+};
+
 export const provisionUserService = async (input: {
   userName: string;
   userEmail: string;
@@ -155,9 +175,7 @@ export const provisionUserService = async (input: {
   if (!userEmail || !userEmail.trim()) {
     throw ApiError.badRequest('User email is required');
   }
-  if (!organizationId) {
-    throw ApiError.badRequest('Target Organization is required');
-  }
+  requireOrganizationId(organizationId, 'provision users');
 
   const org = await Organization.findById(organizationId);
   if (!org) {
@@ -210,10 +228,19 @@ export const updateUserService = async (
     userStatus?: string;
     jobTitle?: string;
     organizationId?: string;
-  }
+  },
+  organizationId: string
 ) => {
-  const user = await User.findById(userId);
-  if (!user || user.is_deleted) {
+  requireOrganizationId(organizationId, 'update users');
+  assertObjectId(userId, 'userId');
+
+  // Scoped lookup: a user id from another tenant resolves to nothing and returns 404.
+  const user = await User.findOne({
+    _id: userId,
+    organization_id: organizationId,
+    is_deleted: { $ne: true }
+  });
+  if (!user) {
     throw ApiError.notFound('User not found');
   }
 
@@ -250,12 +277,9 @@ export const updateUserService = async (
     user.job_title = input.jobTitle.trim();
   }
 
-  if (input.organizationId !== undefined && input.organizationId.trim() !== '') {
-    const org = await Organization.findById(input.organizationId);
-    if (!org) {
-      throw ApiError.notFound('Specified Organization not found');
-    }
-    user.organization_id = org._id as Ref<OrganizationClass>;
+  // Moving a user between tenants is never allowed; the tenant is fixed at provisioning.
+  if (input.organizationId !== undefined && input.organizationId.trim() !== '' && input.organizationId !== organizationId) {
+    throw ApiError.forbidden('Users cannot be moved between organizations');
   }
 
   await user.save();
@@ -267,12 +291,10 @@ export const updateUserService = async (
   return populatedUser;
 };
 
-export const getAllUsersAdminService = async (orgIdFilter?: string) => {
-  const query: Record<string, unknown> = { is_deleted: { $ne: true } };
-  if (orgIdFilter) {
-    query.organization_id = orgIdFilter;
-  }
-  const users = await User.find(query)
+export const getAllUsersAdminService = async (organizationId: string) => {
+  requireOrganizationId(organizationId, 'view users');
+
+  const users = await User.find({ organization_id: organizationId, is_deleted: { $ne: true } })
     .populate('organization_id', 'organization_name organization_slug organization_location')
     .sort({ created_at: -1 })
     .select('-password -refresh_token');

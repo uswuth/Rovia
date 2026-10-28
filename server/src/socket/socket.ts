@@ -57,18 +57,16 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
         userId?: string;
         organizationId?: string;
         isSuperAdmin?: boolean;
+        isServerAdmin?: boolean;
         role?: string;
         userRole?: string;
       };
       const userId = decoded.id || decoded.userId;
       if (!userId) return null;
       const role = (decoded.userRole || decoded.role || '').toUpperCase();
-      const isSuperAdmin = Boolean(
-        decoded.isSuperAdmin === true ||
-        role === 'SUPERADMIN' ||
-        role === 'SUPER_ADMIN' ||
-        role === 'SERVERADMIN'
-      );
+      // Only a control-plane (ServerAdmin) token is platform-wide. Organization owners
+      // also carry isSuperAdmin, so the flag alone must never widen tenant scope.
+      const isSuperAdmin = Boolean(decoded.isServerAdmin === true && role === 'SERVERADMIN');
       return {
         userId,
         organizationId: decoded.organizationId ?? '',
