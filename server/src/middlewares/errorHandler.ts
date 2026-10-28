@@ -33,6 +33,9 @@ export const errorHandler = (
         const mongoDupError = err as MongoDuplicateKeyError;
     const field = Object.keys(mongoDupError.keyValue)[0];
     error = new ApiError(400, `An account with that ${field} already exists.`, [], err.stack);
+  } else if ('type' in err && (err as { type?: string }).type === 'entity.too.large') {
+    // body-parser rejection: the payload exceeded the limit for that route.
+    error = new ApiError(413, 'Request body is too large. Reduce the payload size and try again.', [], err.stack);
   } else if (err instanceof SyntaxError && 'status' in err && (err as unknown as { status: number }).status === 400 && 'body' in err) {
     // Express JSON syntax parser error (e.g. trailing commas)
     error = new ApiError(400, 'Invalid JSON payload. Please check for syntax errors such as trailing commas or malformed quotes.', [], err.stack);

@@ -40,12 +40,28 @@ app.use(cors(corsOptions));
 
 // In development we accept comments and trailing commas in JSON bodies so
 // credentials can be toggled in an API client without editing the payload.
-if (env.NODE_ENV === 'production') {
-  app.use(express.json({ limit: '16kb' }));
-} else {
-  app.use(tolerantJsonParser({ limit: '16kb' }));
-}
-app.use(express.urlencoded({ extended: true, limit: '16kb' }));
+const JSON_BODY_LIMIT = '16kb';
+// A profile update may carry an avatar as a base64 data URL. The client accepts
+// images up to 2 MB, which becomes ~2.7 MB once encoded, so that single route
+// gets a larger budget while every other body keeps the small limit.
+const AVATAR_JSON_BODY_LIMIT = '4mb';
+
+const buildJsonParser = (limit: string) =>
+  env.NODE_ENV === 'production'
+    ? express.json({ limit })
+    : tolerantJsonParser({ limit });
+
+const defaultJsonParser = buildJsonParser(JSON_BODY_LIMIT);
+const avatarJsonParser = buildJsonParser(AVATAR_JSON_BODY_LIMIT);
+
+const isProfileUpdate = (req: Request): boolean =>
+  req.method === 'PUT' && /^\/api\/v1\/user-details\/?$/.test(req.path);
+
+app.use((req: Request, res: Response, next) => {
+  const parser = isProfileUpdate(req) ? avatarJsonParser : defaultJsonParser;
+  parser(req, res, next);
+});
+app.use(express.urlencoded({ extended: true, limit: JSON_BODY_LIMIT }));
 app.use(cookieParser());
 
 // Quiet handler for automatic browser favicon requests
