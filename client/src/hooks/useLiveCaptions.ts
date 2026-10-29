@@ -82,9 +82,7 @@ export const useLiveCaptions = ({
   const retryTimerRef = useRef<number | null>(null);
 
   const activeUtteranceIdRef = useRef<string>('turn-initial');
-  const lastSpeakerIdRef = useRef<string>('');
-  const lastFinalTimestampRef = useRef<number>(0);
-  const accumulatedFinalRef = useRef<string>('');
+  const restartTimerRef = useRef<number | null>(null);
 
   const currentUserIdRef = useRef(currentUserId);
   const currentUserNameRef = useRef(currentUserName);
@@ -208,22 +206,24 @@ export const useLiveCaptions = ({
     const rec = recognition;
 
     rec.onresult = (event: SpeechRecognitionEvent) => {
+      let finalTranscript = '';
       let interimTranscript = '';
-      let isFinalEvent = false;
+      let hasFinal = false;
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const item = event.results[i];
-        const piece = item[0]?.transcript || '';
-        if (item.isFinal) {
-          accumulatedFinalRef.current = (accumulatedFinalRef.current ? `${accumulatedFinalRef.current} ` : '') + piece.trim();
-          isFinalEvent = true;
+      // Accurately parse the full results list from current speech session
+      for (let i = 0; i < event.results.length; ++i) {
+        const result = event.results[i];
+        const piece = result[0]?.transcript || '';
+        if (result.isFinal) {
+          finalTranscript += (finalTranscript ? ' ' : '') + piece.trim();
+          hasFinal = true;
         } else {
           interimTranscript += piece;
         }
       }
 
       const activeText = (
-        accumulatedFinalRef.current + (interimTranscript ? ` ${interimTranscript}` : '')
+        finalTranscript + (interimTranscript ? ` ${interimTranscript}` : '')
       ).trim();
 
       if (!activeText) return;
@@ -236,59 +236,36 @@ export const useLiveCaptions = ({
         speakerId,
         speakerName,
         text: activeText,
-        isFinal: isFinalEvent,
+        isFinal: hasFinal,
         timestamp: Date.now(),
       };
 
-      // Set locally
+      // Update active caption overlay immediately for real-time responsiveness
       setActiveCaption(captionItem);
 
-      if (isFinalEvent) {
-        const now = Date.now();
-        const sameSpeakerRecent =
-          lastSpeakerIdRef.current === speakerId &&
-          (now - lastFinalTimestampRef.current) < 4000;
+      // If a full phrase was finalized, push to history and reset utterance id
+      if (hasFinal && finalTranscript) {
+        const finalizedCaption: LiveCaptionItem = {
+          ...captionItem,
+          text: finalTranscript,
+          isFinal: true,
+        };
 
         setCaptionHistory((prev) => {
-          if (sameSpeakerRecent && prev.length > 0) {
-            const lastIndex = prev.length - 1;
-            const last = prev[lastIndex];
-            if (last && last.speakerId === speakerId) {
-              const mergedText = `${last.text.replace(/[.,!?]+$/, '')}. ${captionItem.text}`;
-              const merged: LiveCaptionItem = {
-                ...last,
-                id: captionItem.id,
-                text: mergedText,
-                timestamp: now,
-              };
-              const updated = [...prev.slice(0, lastIndex), merged];
-              try {
-                sessionStorage.setItem(`intellmeet_transcript_${meetingId}`, JSON.stringify(updated));
-              } catch {
-                // Ignore
-              }
-              return updated;
-            }
-          }
-
-          const updated = [...prev, captionItem];
+          const updated = [...prev, finalizedCaption];
           try {
             sessionStorage.setItem(`intellmeet_transcript_${meetingId}`, JSON.stringify(updated));
           } catch {
-            // Ignore
+            // Ignore quota errors
           }
           return updated;
         });
 
-        lastSpeakerIdRef.current = speakerId;
-        lastFinalTimestampRef.current = now;
-
-        // Reset buffer and cycle ID for next natural utterance
-        accumulatedFinalRef.current = '';
+        // Rotate turn id for next sentence
         activeUtteranceIdRef.current = `turn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
       }
 
-      // Broadcast to room
+      // Broadcast caption to all room participants via socket
       const socket = getMeetingSocket();
       socket.emit('meeting:caption', {
         meetingId,
@@ -300,7 +277,7 @@ export const useLiveCaptions = ({
       }
       clearTimerRef.current = window.setTimeout(() => {
         setActiveCaption((prev) => (prev?.id === captionItem.id ? null : prev));
-      }, isFinalEvent ? 4000 : 7000);
+      }, hasFinal ? 4000 : 7000);
     };
 
     rec.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -356,13 +333,23 @@ export const useLiveCaptions = ({
     };
 
     recognition.onend = () => {
-      // Auto-reconnect so long as meeting is active and listening is wanted and no fatal error occurred
+      // Clear any pending restart timer
+      if (restartTimerRef.current) {
+        window.clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = null;
+      }
+
+      // Auto-reconnect with a slight debounce (Chrome requires an asynchronous gap after stopping)
       if (shouldListenRef.current && !isFatalErrorRef.current) {
-        try {
-          recognition.start();
-        } catch {
-          // Ignore rapid restart collisions
-        }
+        restartTimerRef.current = window.setTimeout(() => {
+          if (shouldListenRef.current && !isFatalErrorRef.current && micOnRef.current) {
+            try {
+              recognition.start();
+            } catch {
+              // Ignore rapid restart collisions
+            }
+          }
+        }, 150);
       }
     };
 
@@ -377,6 +364,10 @@ export const useLiveCaptions = ({
 
     return () => {
       shouldListenRef.current = false;
+      if (restartTimerRef.current) {
+        window.clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = null;
+      }
       if (retryTimerRef.current) {
         window.clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;

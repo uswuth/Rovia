@@ -18,10 +18,16 @@ export const getMeetingSocket = (visitorId?: string): MeetingSocket => {
   }
 
   const token = getAccessToken();
-  const socketUrl = (import.meta.env.VITE_API_BASE_URL as string).replace(/\/+$/, '');
-  socket = io(socketUrl, {
+  // Strip trailing '/api/v1' or '/api' if present so socket.io connects to the server root
+  const rawUrl = (import.meta.env.VITE_API_BASE_URL as string || '').replace(/\/+$/, '');
+  const socketUrl = rawUrl.replace(/\/api(\/v\d+)?$/i, '');
+
+  socket = io(socketUrl || window.location.origin, {
     auth: token ? { token } : { visitorId },
-    transports: ['polling', 'websocket']
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
   });
   return socket;
 };
