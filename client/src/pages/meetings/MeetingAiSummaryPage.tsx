@@ -304,8 +304,7 @@ export const MeetingAiSummaryPage: React.FC = () => {
   const isLoadingOverall = isMeetingLoading || isRecordingsLoading;
 
   // The transcript and summary endpoints answer 404 until their record exists.
-  // Post-processing runs inline before `complete()` returns, so once both
-  // queries settle empty no AI output will ever appear for this recording.
+  // When activeRecording exists but neither transcript nor summary was generated:
   const hasNoAiOutput =
     Boolean(activeRecording) &&
     !isSummaryLoading &&
@@ -318,6 +317,8 @@ export const MeetingAiSummaryPage: React.FC = () => {
   const summaryStage: RecorderStage = useMemo(() => {
     if (activeRecording?.summaryStatus === 'READY' || summaryData?.summaryStatus === 'READY') return 'ready';
     if (activeRecording?.summaryStatus === 'FAILED' || summaryData?.summaryStatus === 'FAILED') return 'failed';
+    // If transcript succeeded or exists, don't mark as permanently failed just because summary is absent
+    if (transcriptData?.transcriptStatus === 'READY' || transcriptData?.transcriptText) return 'ready';
     if (transcriptData?.transcriptStatus === 'FAILED' || hasNoAiOutput) return 'failed';
     if (activeRecording?.summaryStatus === 'PROCESSING' || isSummaryLoading || isTranscriptLoading) return 'processing';
     if (activeRecording && !summaryData) return 'processing';
@@ -330,7 +331,9 @@ export const MeetingAiSummaryPage: React.FC = () => {
       ? 'Transcription did not complete for this recording, so no summary was generated. Check the server logs for the AI provider error.'
       : hasNoAiOutput
         ? 'No transcript or summary was generated for this recording. Check the server logs for the AI provider error.'
-        : null;
+        : !summaryData && transcriptData?.transcriptText
+          ? null
+          : null;
 
   return (
     <div className="w-full bg-background text-foreground min-h-screen p-4 sm:p-6 lg:p-8 space-y-6">
@@ -457,7 +460,7 @@ export const MeetingAiSummaryPage: React.FC = () => {
         /* Main Two-Column Layout */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* LEFT COLUMN: Meeting AI Summary (Prebuilt MeetingAiSummaryCard) */}
-          <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+          <div className="lg:col-span-8 xl:col-span-8 space-y-4">
             {/* Page / Section Header info */}
             <div className="print:hidden space-y-1">
               <div className="flex items-center gap-2">
@@ -509,10 +512,10 @@ export const MeetingAiSummaryPage: React.FC = () => {
             )}
           </div>
 
-          {/* Meeting details and participant roster. */}
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+          {/* RIGHT COLUMN: Meeting details and participant roster */}
+          <div className="lg:col-span-4 xl:col-span-4 space-y-6">
             {/* TOP CARD: Meeting Overview Card */}
-            <Card className="rounded-sm border-border bg-card shadow-xs lg:col-span-2">
+            <Card className="rounded-sm border-border bg-card shadow-xs">
               <CardHeader className="pb-3 border-b border-border/40">
                 <CardTitle className="text-sm font-bold flex items-center justify-between">
                   <span>Meeting Session Details</span>
