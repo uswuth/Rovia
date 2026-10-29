@@ -271,12 +271,29 @@ export const MeetingRoom: React.FC = () => {
       }
     }
 
-    // 2. Always acquire or refresh live microphone audio track so physical mic speech is captured
+    // 2. When recording with AI summary or general recording, hardcode microphone active
+    if (aiSummaryEnabled || !micOn) {
+      setMicOn(true);
+      void rtc.setAudioEnabled(true);
+    }
+
     let audioStream = rtc.localStream;
-    const hasLiveMic = audioStream?.getAudioTracks().some((t) => t.readyState === 'live');
+    // Unmute every track in localStream so speech is guaranteed to be captured
+    audioStream?.getAudioTracks().forEach((t) => {
+      t.enabled = true;
+    });
+
+    const hasLiveMic = audioStream?.getAudioTracks().some((t) => t.readyState === 'live' && t.enabled);
     if (!hasLiveMic) {
       try {
-        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        const freshStream = await navigator.mediaDevices.getUserMedia({
+          audio: selectedMic ? { deviceId: { exact: selectedMic } } : true,
+          video: false,
+        });
+        audioStream = freshStream;
+        freshStream.getAudioTracks().forEach((t) => {
+          t.enabled = true;
+        });
       } catch {
         // Fallback silently if user denied or hardware missing
       }
@@ -983,7 +1000,14 @@ export const MeetingRoom: React.FC = () => {
         showRecordModal={showRecordModal}
         setShowRecordModal={setShowRecordModal}
         aiSummaryEnabled={aiSummaryEnabled}
-        setAiSummaryEnabled={setAiSummaryEnabled}
+        setAiSummaryEnabled={(enabled) => {
+          setAiSummaryEnabled(enabled);
+          if (enabled) {
+            setMicOn(true);
+            void rtc.setAudioEnabled(true);
+            showToast('Microphone enabled for AI Summary');
+          }
+        }}
         canManage={canManage}
         micOn={micOn}
         onToggleMic={handleToggleMic}
