@@ -97,13 +97,19 @@ export const getRecordingUploadUrl = async (req: Request, res: Response): Promis
 export const completeRecording = async (req: Request, res: Response): Promise<Response> => {
   const { organizationId, userId } = getRequestScope(req);
   const { id } = req.params;
-  const { durationMs } = req.body as { durationMs?: number };
+  const { durationMs, aiSummaryEnabled } = req.body as { durationMs?: number; aiSummaryEnabled?: boolean };
 
   if (durationMs !== undefined && (typeof durationMs !== 'number' || !Number.isFinite(durationMs))) {
     throw ApiError.badRequest('durationMs must be a number');
   }
 
-  const recording = await completeRecordingService(id, organizationId, durationMs ?? 0, userId);
+  const recording = await completeRecordingService(
+    id,
+    organizationId,
+    durationMs ?? 0,
+    userId,
+    Boolean(aiSummaryEnabled ?? true)
+  );
 
   return ApiResponse.success(res, 'Recording completed successfully', recording, 200);
 };
