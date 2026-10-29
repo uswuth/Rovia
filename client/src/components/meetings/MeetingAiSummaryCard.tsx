@@ -178,7 +178,7 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
           </section>
         )}
 
-        {showTranscript && transcript?.transcriptText && (
+        {showTranscript && (
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -187,45 +187,55 @@ export const MeetingAiSummaryCard: React.FC<MeetingAiSummaryCardProps> = ({
                   <span className="ml-2 font-normal normal-case">processing…</span>
                 )}
               </h3>
-              <Button variant="outline" size="sm" onClick={handleCopy} disabled={copied}>
-                <Copy className="mr-1.5 size-3.5" />
-                {copied ? 'Copied' : 'Copy transcript'}
-              </Button>
+              {transcript?.transcriptText ? (
+                <Button variant="outline" size="sm" onClick={handleCopy} disabled={copied}>
+                  <Copy className="mr-1.5 size-3.5" />
+                  {copied ? 'Copied' : 'Copy transcript'}
+                </Button>
+              ) : null}
             </div>
 
-            {/* Each participant was recorded on their own track, so their words are shown separately. */}
-            {speakers.length > 0 ? (
-              <div className="space-y-2">
-                {speakers.map((speaker) => (
-                  <div
-                    key={speaker.speakerId ?? speaker.speakerName}
-                    className="rounded-sm border border-border bg-muted/40 p-3"
-                  >
-                    <div className="mb-1 flex items-center gap-2">
-                      <span className="text-xs font-semibold text-foreground">
-                        {speaker.speakerName || 'Participant'}
-                      </span>
-                      {!speaker.spoke && (
-                        <span className="rounded-xs bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                          no speech detected
+            {transcript?.transcriptText ? (
+              speakers.length > 0 ? (
+                <div className="space-y-2">
+                  {speakers.map((speaker) => (
+                    <div
+                      key={speaker.speakerId ?? speaker.speakerName}
+                      className="rounded-sm border border-border bg-muted/40 p-3"
+                    >
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="text-xs font-semibold text-foreground">
+                          {speaker.speakerName || 'Participant'}
                         </span>
-                      )}
+                        {!speaker.spoke && (
+                          <span className="rounded-xs bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            no speech detected
+                          </span>
+                        )}
+                      </div>
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
+                        {speaker.spoke ? speaker.speakerText : ''}
+                      </p>
                     </div>
-                    <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-                      {speaker.spoke ? speaker.speakerText : ''}
-                    </p>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              ) : (
+                <textarea
+                  readOnly
+                  aria-label="Raw meeting transcript"
+                  value={transcript.transcriptText}
+                  rows={8}
+                  className="w-full resize-y rounded-sm border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              )
+            ) : transcriptStatus === 'READY' ? (
+              <div className="rounded-xs border border-border/80 bg-muted/20 p-5 text-center space-y-1">
+                <p className="text-xs font-medium text-foreground">No speech detected</p>
+                <p className="text-[11px] text-muted-foreground">
+                  No dialogue or voice activity was captured during this session.
+                </p>
               </div>
-            ) : (
-              <textarea
-                readOnly
-                aria-label="Raw meeting transcript"
-                value={transcript.transcriptText}
-                rows={8}
-                className="w-full resize-y rounded-sm border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            )}
+            ) : null}
           </section>
         )}
 

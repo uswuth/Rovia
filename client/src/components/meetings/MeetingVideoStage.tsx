@@ -4,6 +4,12 @@ import { OverflowTile } from './OverflowTile';
 import { cn } from '@/lib/utils';
 import { useTimeFormat } from '@/context/TimeFormatContext';
 import type { MeetingParticipant } from '@/api/meeting/meeting.types';
+import type { LiveCaptionItem } from '@/hooks/useLiveCaptions';
+import {
+  LiveCaptionOverlay,
+  type CaptionFontSize,
+  type CaptionOpacity,
+} from '@/components/ui/live-caption-overlay';
 
 export interface MeetingVideoStageProps {
   title?: string;
@@ -20,6 +26,11 @@ export interface MeetingVideoStageProps {
   localCameraOn?: boolean;
   localMicOn?: boolean;
   onOpenParticipants?: () => void;
+  activeCaption?: LiveCaptionItem | null;
+  captionHistory?: LiveCaptionItem[];
+  captionsEnabled?: boolean;
+  captionFontSize?: CaptionFontSize;
+  captionOpacity?: CaptionOpacity;
 }
 
 export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
@@ -37,6 +48,11 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
   localCameraOn,
   localMicOn,
   onOpenParticipants,
+  activeCaption,
+  captionHistory = [],
+  captionsEnabled = true,
+  captionFontSize = 'md',
+  captionOpacity = 80,
 }) => {
   const { formatTimeStr } = useTimeFormat();
   const [currentTime, setCurrentTime] = React.useState<Date>(() => new Date());
@@ -331,118 +347,142 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
 
   if (activePresenter && activePresenter.stream) {
     return (
-      <main className="flex min-h-0 flex-1 flex-col lg:flex-row items-center justify-center p-3 lg:p-4 gap-3 bg-transparent overflow-hidden w-full h-full transition-all duration-300 ease-in-out">
-        {/* Spotlight Presentation: Fills available container cleanly, centered with natural margin, no extra letterboxing */}
-        <div
-          ref={spotlightContainerRef}
-          className={cn(
-            "flex-1 min-w-0 min-h-0 h-full w-full flex items-center justify-center rounded-xs overflow-hidden bg-transparent relative",
-            isScreenFullscreen && "fixed inset-0 w-screen h-screen z-50 rounded-none border-none p-0 m-0 bg-black flex items-center justify-center overflow-hidden"
+      <main className="flex min-h-0 flex-1 flex-col p-3 lg:p-4 pb-0 lg:pb-0 px-0 lg:px-0 gap-2 bg-transparent overflow-hidden w-full h-full transition-all duration-300 ease-in-out">
+        {/* Main Stage Row: Spotlight Screen Share + Filmstrip */}
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row items-center justify-center gap-3 w-full overflow-hidden px-3 lg:px-4">
+          {/* Spotlight Presentation: Fills available container cleanly, centered with natural margin, no extra letterboxing or edge cropping */}
+          <div
+            ref={spotlightContainerRef}
+            className={cn(
+              "flex-1 min-w-0 min-h-0 h-full w-full flex items-center justify-center rounded-sm overflow-hidden bg-black/40 border border-border/40 relative shadow-md p-1 sm:p-2",
+              isScreenFullscreen && "fixed inset-0 w-screen h-screen z-50 rounded-none border-none p-0 m-0 bg-black flex items-center justify-center overflow-hidden"
+            )}
+          >
+            <VideoTile
+              key={`presentation-${activePresenter.userId}`}
+              name={activePresenter.name}
+              isYou={activePresenter.isYou}
+              host={false}
+              muted={true}
+              cameraOn={true}
+              stream={activePresenter.stream}
+              speakerMuted={false}
+              selectedSpeaker={selectedSpeaker}
+              isSpeaking={false}
+              isScreenShare={true}
+              fillContainer={true}
+              isFullscreen={isScreenFullscreen}
+              onToggleFullscreen={toggleScreenFullscreen}
+              meetingTitle={title}
+              meetingTime={formatTimeStr(currentTime)}
+            />
+          </div>
+
+          {/* Right-aligned Participant Filmstrip: Centered vertically so tiles don't stick awkwardly to the top */}
+          {!isScreenFullscreen && (
+            <div className="w-full lg:w-72 xl:w-80 h-48 lg:h-full shrink-0 flex flex-row lg:flex-col items-center justify-center gap-3 overflow-x-auto lg:overflow-y-auto py-auto pr-1">
+              {orderedParticipants.map((p) => (
+                <div key={p.userId} className="w-64 lg:w-full aspect-video shrink-0 max-h-[220px]">
+                  {renderTile(p)}
+                </div>
+              ))}
+            </div>
           )}
-        >
-          <VideoTile
-            key={`presentation-${activePresenter.userId}`}
-            name={activePresenter.name}
-            isYou={activePresenter.isYou}
-            host={false}
-            muted={true}
-            cameraOn={true}
-            stream={activePresenter.stream}
-            speakerMuted={false}
-            selectedSpeaker={selectedSpeaker}
-            isSpeaking={false}
-            isScreenShare={true}
-            fillContainer={true}
-            isFullscreen={isScreenFullscreen}
-            onToggleFullscreen={toggleScreenFullscreen}
-            meetingTitle={title}
-            meetingTime={formatTimeStr(currentTime)}
-          />
         </div>
 
-        {/* Right-aligned Participant Filmstrip: Centered vertically so tiles don't stick awkwardly to the top */}
-        {!isScreenFullscreen && (
-          <div className="w-full lg:w-72 xl:w-80 h-48 lg:h-full shrink-0 flex flex-row lg:flex-col items-center justify-center gap-3 overflow-x-auto lg:overflow-y-auto py-auto pr-1">
-            {orderedParticipants.map((p) => (
-              <div key={p.userId} className="w-64 lg:w-full aspect-video shrink-0 max-h-[220px]">
-                {renderTile(p)}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Real-time Subtitles / Closed Captions Space: Dedicated below stage above bottom bar so it never blocks presenter badge or fullscreen button */}
+        <LiveCaptionOverlay
+          enabled={captionsEnabled}
+          activeCaption={activeCaption}
+          history={captionHistory}
+          fontSize={captionFontSize}
+          opacity={captionOpacity}
+        />
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col items-center justify-center p-4 lg:p-6 bg-transparent overflow-y-auto w-full h-full transition-all duration-300 ease-in-out">
-      {/* 1 Participant: Single Large Center Tile */}
-      {count === 1 && (
-        <div className="w-full max-w-3xl aspect-video mx-auto my-auto">
-          {renderTile(gridVisibleParticipants[0])}
-        </div>
-      )}
-
-      {/* 2 Participants: 1 Row, 2 Columns */}
-      {count === 2 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto my-auto">
-          {gridVisibleParticipants.map(renderTile)}
-        </div>
-      )}
-
-      {/* 3 Participants (Top-Right Diagram): 2 on Top Row, 1 Centered on Bottom Row */}
-      {count === 3 && (
-        <div className="flex flex-col gap-4 w-full max-w-5xl mx-auto my-auto items-center">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+    <main className="relative flex min-h-0 flex-1 flex-col p-4 lg:p-6 pb-0 lg:pb-0 px-0 lg:px-0 bg-transparent w-full h-full transition-all duration-300 ease-in-out">
+      {/* Grid stage container */}
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center overflow-y-auto w-full px-4 lg:px-6">
+        {/* 1 Participant: Single Large Center Tile */}
+        {count === 1 && (
+          <div className="w-full max-w-3xl aspect-video mx-auto my-auto">
             {renderTile(gridVisibleParticipants[0])}
-            {renderTile(gridVisibleParticipants[1])}
           </div>
-          <div className="w-full sm:w-[calc(50%-8px)]">
-            {renderTile(gridVisibleParticipants[2])}
+        )}
+
+        {/* 2 Participants: 1 Row, 2 Columns */}
+        {count === 2 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto my-auto">
+            {gridVisibleParticipants.map(renderTile)}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 4 Participants (Top-Left Diagram): 2x2 Grid */}
-      {count === 4 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto my-auto">
-          {gridVisibleParticipants.map(renderTile)}
-        </div>
-      )}
+        {/* 3 Participants (Top-Right Diagram): 2 on Top Row, 1 Centered on Bottom Row */}
+        {count === 3 && (
+          <div className="flex flex-col gap-4 w-full max-w-5xl mx-auto my-auto items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+              {renderTile(gridVisibleParticipants[0])}
+              {renderTile(gridVisibleParticipants[1])}
+            </div>
+            <div className="w-full sm:w-[calc(50%-8px)]">
+              {renderTile(gridVisibleParticipants[2])}
+            </div>
+          </div>
+        )}
 
-      {/* 5 or 6 Participants: 3 Columns x 2 Rows */}
-      {count > 4 && count <= 6 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 w-full max-w-6xl mx-auto my-auto">
-          {gridVisibleParticipants.map(renderTile)}
-        </div>
-      )}
+        {/* 4 Participants (Top-Left Diagram): 2x2 Grid */}
+        {count === 4 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto my-auto">
+            {gridVisibleParticipants.map(renderTile)}
+          </div>
+        )}
 
-      {/* 7 to 9 Participants: 3 Columns x 3 Rows */}
-      {count > 6 && count <= 9 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-6xl mx-auto my-auto">
-          {gridVisibleParticipants.map(renderTile)}
-        </div>
-      )}
+        {/* 5 or 6 Participants: 3 Columns x 2 Rows */}
+        {count > 4 && count <= 6 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 w-full max-w-6xl mx-auto my-auto">
+            {gridVisibleParticipants.map(renderTile)}
+          </div>
+        )}
 
-      {/* 10 to 16 Participants: 4 Columns */}
-      {count > 9 && count <= 16 && !isGridOverflow && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 w-full max-w-7xl mx-auto my-auto">
-          {gridVisibleParticipants.map(renderTile)}
-        </div>
-      )}
+        {/* 7 to 9 Participants: 3 Columns x 3 Rows */}
+        {count > 6 && count <= 9 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-6xl mx-auto my-auto">
+            {gridVisibleParticipants.map(renderTile)}
+          </div>
+        )}
 
-      {/* 17+ Participants (Bottom-Left Diagram): Dense Grid with +N more Overflow Tile */}
-      {(count > 16 || isGridOverflow) && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 w-full max-w-7xl mx-auto my-auto">
-          {gridVisibleParticipants.map(renderTile)}
-          {gridOverflowCount > 0 && (
-            <OverflowTile
-              count={gridOverflowCount}
-              onClick={onOpenParticipants}
-            />
-          )}
-        </div>
-      )}
+        {/* 10 to 16 Participants: 4 Columns */}
+        {count > 9 && count <= 16 && !isGridOverflow && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 w-full max-w-7xl mx-auto my-auto">
+            {gridVisibleParticipants.map(renderTile)}
+          </div>
+        )}
+
+        {/* 17+ Participants (Bottom-Left Diagram): Dense Grid with +N more Overflow Tile */}
+        {(count > 16 || isGridOverflow) && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 w-full max-w-7xl mx-auto my-auto">
+            {gridVisibleParticipants.map(renderTile)}
+            {gridOverflowCount > 0 && (
+              <OverflowTile
+                count={gridOverflowCount}
+                onClick={onOpenParticipants}
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Real-time Subtitles / Closed Captions: Dedicated space below tiles above bottom bar */}
+      <LiveCaptionOverlay
+        enabled={captionsEnabled}
+        activeCaption={activeCaption}
+        history={captionHistory}
+        fontSize={captionFontSize}
+        opacity={captionOpacity}
+      />
     </main>
   );
 };

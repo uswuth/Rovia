@@ -13,6 +13,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (dto: LoginDTO) => Promise<void>;
   signup: (dto: SignupDTO) => Promise<void>;
+  syncClerkSession: (token: string, email?: string) => Promise<void>;
   logout: () => Promise<void>;
   /** Re-reads the current profile, e.g. after the organization changed. */
   refreshProfile: () => Promise<void>;
@@ -81,6 +82,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [queryClient]
   );
 
+  const syncClerkSession = useCallback(
+    async (token: string, email?: string) => {
+      const { data } = await authApi.syncClerkSessionApi(token, email);
+      setAccessToken(data.data.accessToken);
+      queryClient.removeQueries({ queryKey: queryKeys.auth.me });
+      queryClient.setQueryData(queryKeys.auth.me, data.data.user);
+      setHasToken(true);
+    },
+    [queryClient]
+  );
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -97,10 +109,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isAuthenticated: !!user,
       login,
       signup,
+      syncClerkSession,
       logout,
       refreshProfile,
     }),
-    [user, loading, login, signup, logout, refreshProfile]
+    [user, loading, login, signup, syncClerkSession, logout, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

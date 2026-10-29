@@ -33,7 +33,7 @@ import {
   type MeetingPoll,
 } from '@/api/meeting/meeting-poll.api';
 import { useWebRtcMeeting } from '@/hooks/useWebRtcMeeting';
-import { useMeetingRecorder, type SpeakerTrack } from '@/hooks/useMeetingRecorder';
+import { useLiveCaptions } from '@/hooks/useLiveCaptions';
 import type { Meeting, MeetingParticipant, MeetingParticipantRaw, MeetingPreview } from '@/api/meeting/meeting.types';
 import { normalizeParticipants } from '@/api/meeting/meeting.types';
 import type { MeetingChatMessage, RaisedHand } from '@/api/meeting/webrtc.types';
@@ -69,19 +69,6 @@ export const MeetingRoom: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<MeetingChatMessage[]>([]);
 
-  const [micOn, setMicOn] = useState(() => (location.state as { initialMic?: boolean } | null)?.initialMic ?? true);
-  const [cameraOn, setCameraOn] = useState(() => (location.state as { initialCamera?: boolean } | null)?.initialCamera ?? true);
-  const [raisedHands, setRaisedHands] = useState<RaisedHand[]>([]);
-  const isMyHandRaised = raisedHands.some((h) => h.userId === user?.userId);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [showRecordModal, setShowRecordModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [meetingEndedByHost, setMeetingEndedByHost] = useState(false);
-
-  const [aiSummaryEnabled, setAiSummaryEnabled] = useState(false);
-
   const locationState = location.state as {
     fromLobby?: boolean;
     initialCamera?: boolean;
@@ -92,6 +79,18 @@ export const MeetingRoom: React.FC = () => {
     preview?: MeetingPreview;
   } | null;
 
+  const [micOn, setMicOn] = useState(() => locationState?.initialMic ?? false);
+  const [cameraOn, setCameraOn] = useState(() => locationState?.initialCamera ?? true);
+  const [raisedHands, setRaisedHands] = useState<RaisedHand[]>([]);
+  const isMyHandRaised = raisedHands.some((h) => h.userId === user?.userId);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [captionFontSize, setCaptionFontSize] = useState<'sm' | 'md' | 'lg'>('md');
+  const [captionOpacity, setCaptionOpacity] = useState<20 | 40 | 60 | 80 | 100>(80);
+  const [meetingEndedByHost, setMeetingEndedByHost] = useState(false);
+
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
@@ -99,6 +98,7 @@ export const MeetingRoom: React.FC = () => {
   const [selectedSpeaker, setSelectedSpeaker] = useState<string>(() => locationState?.selectedSpeaker || '');
   const [selectedCamera, setSelectedCamera] = useState<string>(() => locationState?.selectedCamera || '');
   const [speakerOn, setSpeakerOn] = useState<boolean>(true);
+  const [aiSummaryEnabled, setAiSummaryEnabled] = useState<boolean>(false);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -244,120 +244,25 @@ export const MeetingRoom: React.FC = () => {
     },
   });
 
-  const recorder = useMeetingRecorder({ meetingId: id, onError: showToast, aiSummaryEnabled });
+  // Real-time live speech-to-text and captions
+  const captions = useLiveCaptions({
+    meetingId: id,
+    currentUserId: user?.userId,
+    currentUserName: user?.userName,
+    micOn,
+  });
 
-  // Read once so the callback below depends on plain values, not the `user`
-  // object: the React Compiler cannot verify `user?.userId` as a dependency.
-  const currentUserId = user?.userId;
-  const currentUserName = user?.userName;
-
-  // Remote audio only exists in the peer map, so tracks are assembled at capture start rather than once.
-  const handleToggleRecording = useCallback(async () => {
-    if (recorder.isRecording) {
-      await recorder.stopRecording();
-      return;
-    }
-
-    const tracks: SpeakerTrack[] = [];
-
-    // 1. Gather all other participants' audio tracks from WebRTC peers
-    for (const [peerId, peer] of Object.entries(rtc.peers)) {
-      if (peer.stream?.getAudioTracks().length) {
-        tracks.push({
-          speakerId: peerId,
-          speakerName: getParticipantDisplayName({ userId: peerId }),
-          stream: peer.stream,
-        });
-      }
-    }
-
-    // 2. When recording with AI summary or general recording, hardcode microphone active
-    if (aiSummaryEnabled || !micOn) {
-      setMicOn(true);
-      void rtc.setAudioEnabled(true);
-    }
-
-    let audioStream = rtc.localStream;
-    // Unmute every track in localStream so speech is guaranteed to be captured
-    audioStream?.getAudioTracks().forEach((t) => {
-      t.enabled = true;
-    });
-
-    const hasLiveMic = audioStream?.getAudioTracks().some((t) => t.readyState === 'live' && t.enabled);
-    if (!hasLiveMic) {
-      try {
-        const freshStream = await navigator.mediaDevices.getUserMedia({
-          audio: selectedMic ? { deviceId: { exact: selectedMic } } : true,
-          video: false,
-        });
-        audioStream = freshStream;
-        freshStream.getAudioTracks().forEach((t) => {
-          t.enabled = true;
-        });
-      } catch {
-        // Fallback silently if user denied or hardware missing
-      }
-    }
-
-    if (audioStream?.getAudioTracks().length) {
-      tracks.push({
-        speakerId: currentUserId ?? 'me',
-        speakerName: currentUserName || 'You',
-        stream: audioStream,
-      });
-    } else {
-      // Try acquiring microphone stream
-      try {
-        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        if (audioStream?.getAudioTracks().length) {
-          tracks.push({
-            speakerId: currentUserId ?? 'me',
-            speakerName: currentUserName || 'You',
-            stream: audioStream,
-          });
-        }
-      } catch {
-        // If mic is denied or unavailable, create an AudioContext silent track so recording can proceed
-        try {
-          const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-          const ctx = new AudioContextClass();
-          if (ctx.state === 'suspended') {
-            await ctx.resume();
-          }
-          const osc = ctx.createOscillator();
-          const dst = ctx.createMediaStreamDestination();
-          const gain = ctx.createGain();
-          gain.gain.value = 0.0001; // active minimal non-zero signal
-          osc.connect(gain);
-          gain.connect(dst);
-          osc.start();
-          tracks.push({
-            speakerId: currentUserId ?? 'me',
-            speakerName: currentUserName || 'You',
-            stream: dst.stream,
-          });
-        } catch {
-          // Ignore
-        }
-      }
-    }
-
-    if (tracks.length === 0) {
-      showToast('Could not initialize audio capture.');
-      return;
-    }
-
-    await recorder.startRecording(tracks);
-  }, [recorder, rtc.localStream, rtc.peers, currentUserId, currentUserName, getParticipantDisplayName, showToast]);
-
-  // One-second tick, not per-frame: the display shows whole seconds only.
-  const [recordingTick, setRecordingTick] = useState(0);
+  // Surface SpeechRecognition errors to the user (e.g. network issues, blocked by ad blocker)
   useEffect(() => {
-    if (!recorder.isRecording) return undefined;
-    const timer = window.setInterval(() => setRecordingTick((value) => value + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [recorder.isRecording]);
-  const recordingElapsedMs = recorder.isRecording ? recordingTick * 1000 : 0;
+    if (captions.recognitionError) {
+      const isRecoverable = captions.recognitionError === 'network';
+      const msg = isRecoverable
+        ? `Captions paused: ${captions.recognitionError}. Retrying…`
+        : `Captions unavailable: ${captions.recognitionError}. Check permissions.`;
+      const t = setTimeout(() => showToast(msg), 0);
+      return () => clearTimeout(t);
+    }
+  }, [captions.recognitionError, showToast]);
 
   useEffect(() => {
     const handleUnload = () => {
@@ -764,9 +669,6 @@ export const MeetingRoom: React.FC = () => {
 
   const confirmLeave = async () => {
     setShowLeaveModal(false);
-    if (recorder.isRecording) {
-      await recorder.stopRecording();
-    }
     leaving.mutate();
   };
 
@@ -777,11 +679,8 @@ export const MeetingRoom: React.FC = () => {
 
   const endingMeeting = useMutation<unknown, void>({
     mutationFn: async () => {
-      if (recorder.isRecording) {
-        await recorder.stopRecording();
-      }
-      const res = await endMeeting(id);
-      getMeetingSocket().emit('meeting:end', id);
+      const res = await endMeeting(id, { aiSummaryEnabled });
+      getMeetingSocket().emit('meeting:end', { meetingId: id, aiSummaryEnabled });
       return res;
     },
     onSuccess: () => {
@@ -905,6 +804,11 @@ export const MeetingRoom: React.FC = () => {
             localCameraOn={cameraOn}
             localMicOn={micOn}
             onOpenParticipants={toggleParticipantsPanel}
+            activeCaption={captions.activeCaption}
+            captionHistory={captions.captionHistory}
+            captionsEnabled={captions.captionsEnabled}
+            captionFontSize={captionFontSize}
+            captionOpacity={captionOpacity}
           />
         </div>
 
@@ -993,22 +897,6 @@ export const MeetingRoom: React.FC = () => {
 
       <MeetingControls
         localStream={rtc.localStream}
-        isRecording={recorder.isRecording}
-        onToggleRecording={handleToggleRecording}
-        recordingStage={recorder.stage}
-        recordingElapsedMs={recordingElapsedMs}
-        showRecordModal={showRecordModal}
-        setShowRecordModal={setShowRecordModal}
-        aiSummaryEnabled={aiSummaryEnabled}
-        setAiSummaryEnabled={(enabled) => {
-          setAiSummaryEnabled(enabled);
-          if (enabled) {
-            setMicOn(true);
-            void rtc.setAudioEnabled(true);
-            showToast('Microphone enabled for AI Summary');
-          }
-        }}
-        canManage={canManage}
         micOn={micOn}
         onToggleMic={handleToggleMic}
         audioInputs={audioInputs}
@@ -1048,6 +936,20 @@ export const MeetingRoom: React.FC = () => {
         onToggleScreenShare={rtc.toggleScreenShare}
         handRaised={isMyHandRaised}
         onToggleHandRaise={handleToggleHandRaise}
+        captionsEnabled={captions.captionsEnabled}
+        captionsSupported={captions.isSupported}
+        onToggleCaptions={captions.toggleCaptions}
+        captionFontSize={captionFontSize}
+        onSelectCaptionFontSize={setCaptionFontSize}
+        captionOpacity={captionOpacity}
+        onSelectCaptionOpacity={setCaptionOpacity}
+        isHost={isHost || isCreatorOrHost}
+        aiSummaryEnabled={aiSummaryEnabled}
+        onToggleAiSummary={() => {
+          const next = !aiSummaryEnabled;
+          setAiSummaryEnabled(next);
+          showToast(next ? 'AI Summary enabled for this meeting' : 'AI Summary disabled for this meeting');
+        }}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
         onLeaveClick={() => setShowLeaveModal(true)}

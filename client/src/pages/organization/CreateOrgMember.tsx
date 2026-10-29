@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/api/queryClient';
 import {
   provisionUserApi,
   updateUserApi,
@@ -78,6 +80,7 @@ export const CreateOrgMember: React.FC = () => {
   const isEditMode = Boolean(id);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const isSuperAdmin = Boolean(user?.userRole === 'SuperAdmin' || user?.isSuperAdmin);
   const isAdmin = Boolean(isSuperAdmin || user?.userRole === 'Admin');
@@ -184,6 +187,7 @@ export const CreateOrgMember: React.FC = () => {
           jobTitle: values.jobTitle?.trim() || undefined,
           organizationId: organizationId || undefined,
         });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.organization.members });
       } else {
         const res = await provisionUserApi({
           userName: values.userName.trim(),
@@ -204,6 +208,7 @@ export const CreateOrgMember: React.FC = () => {
           return;
         }
       }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.organization.members });
       navigate('/organization/members');
     } catch (err) {
       const { message } = parseApiError(err);

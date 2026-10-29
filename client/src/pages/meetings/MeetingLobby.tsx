@@ -48,10 +48,10 @@ export const MeetingLobby: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
 
-  // Media states
+  // Media states: By default in lobby, microphone is muted
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraEnabled, setCameraEnabled] = useState(true);
-  const [micEnabled, setMicEnabled] = useState(true);
+  const [micEnabled, setMicEnabled] = useState(false);
   const [mediaPermissionDenied, setMediaPermissionDenied] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
 
@@ -163,6 +163,12 @@ export const MeetingLobby: React.FC = () => {
         video: videoConstraint,
         audio: audioConstraint,
       });
+
+      // Synchronize audio track state with micEnabled (muted by default)
+      const audioTrack = userMedia.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = micEnabled;
+      }
 
       setStream(userMedia);
       if (videoRef.current) {

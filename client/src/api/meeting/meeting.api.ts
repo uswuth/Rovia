@@ -44,4 +44,8 @@ export const updateParticipantSettings = (
 
 export const startMeeting = (id: string) => client.post<{ data: Meeting }>(`/meetings/${id}/start`);
 
-export const endMeeting = (id: string) => client.post<{ data: Meeting }>(`/meetings/${id}/end`);
+export const endMeeting = (id: string, payload?: { aiSummaryEnabled?: boolean }) =>
+  client.post<{ data: Meeting }>(`/meetings/${id}/end`, payload ?? {});
+
+export const summarizeMeeting = (id: string) =>
+  client.post<{ data: unknown }>(`/meetings/${id}/summarize`);

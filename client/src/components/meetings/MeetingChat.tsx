@@ -229,7 +229,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
               className="flex items-center gap-1.5 font-medium text-foreground min-w-0 flex-1 cursor-pointer select-none"
               onClick={() => setPinnedExpanded((v) => !v)}
             >
-              <Pin size={13} className="shrink-0 text-emerald-500 rotate-45" />
+              <Pin size={13} className="shrink-0 text-primary rotate-45" />
               <span className="truncate text-xs font-semibold">{activePoll.pollQuestion}</span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0 ml-2">
@@ -275,21 +275,21 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                           className={cn(
                             'relative w-full overflow-hidden rounded-xs border p-2 text-left text-xs transition-all cursor-pointer',
                             hasVoted
-                              ? 'border-emerald-500/50 bg-emerald-500/5 font-medium'
+                              ? 'border-primary/50 bg-primary/10 font-medium'
                               : 'border-border/60 bg-muted/20 hover:border-border hover:bg-muted/40'
                           )}
                         >
                           <div
                             className={cn(
                               'absolute inset-y-0 left-0 transition-all duration-300 rounded-xs pointer-events-none',
-                              isLeader && 'bg-emerald-500/20 border-r border-emerald-400/60',
-                              isTrailing && 'bg-zinc-500/25 dark:bg-zinc-700/50 border-r border-zinc-400/50 dark:border-zinc-500/60'
+                              isLeader && 'bg-primary/20 border-r border-primary/60',
+                              isTrailing && 'bg-muted/40 border-r border-border'
                             )}
                             style={{ width: `${pct}%` }}
                           />
                           <div className="relative flex items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 truncate text-xs text-foreground">
-                              {hasVoted && <Check size={12} className="text-emerald-500 shrink-0" />}
+                              {hasVoted && <Check size={12} className="text-primary shrink-0" />}
                               <span className="truncate">{opt.optionText}</span>
                             </span>
                             <span className="text-[10px] text-muted-foreground shrink-0 font-medium">
@@ -448,10 +448,10 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
                 <button
                   type="button"
                   onClick={onOpenPolls}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-xs border border-border bg-card text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-colors cursor-pointer shadow-xs active:scale-95"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-xs border border-border bg-card text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/10 transition-colors cursor-pointer shadow-xs active:scale-95"
                   title="Create or Manage In-Meeting Polls"
                 >
-                  <BarChart3 size={16} className="text-emerald-500" />
+                  <BarChart3 size={16} className="text-primary" />
                 </button>
               )}
 
@@ -469,7 +469,7 @@ export const MeetingChat: React.FC<MeetingChatProps> = ({
               <button
                 type="submit"
                 disabled={sending || !draft.trim()}
-                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer active:scale-95 disabled:opacity-25 disabled:pointer-events-none transition-all"
+                className="flex size-9 shrink-0 items-center justify-center rounded-xs bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs cursor-pointer active:scale-95 disabled:opacity-25 disabled:pointer-events-none transition-all"
                 title="Send Message"
               >
                 <SendHorizontal size={15} className="translate-x-[0.5px]" />

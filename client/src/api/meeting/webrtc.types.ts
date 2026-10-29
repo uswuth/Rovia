@@ -39,16 +39,24 @@ export interface ServerToClientEvents {
   'meeting:peer-left': (data: { userId: string }) => void;
   'meeting:state': (data: { userId: string; state: Record<string, boolean | string> }) => void;
   'meeting:message': (data: MeetingChatMessage) => void;
-  'meeting:ended'?: (data: { meetingId: string }) => void;
-  'meeting:typing'?: (data: { userId: string; userName: string; isTyping: boolean }) => void;
-  'meeting:poll-updated'?: (data: { meetingId: string }) => void;
-  'meeting:question-updated'?: (data: { meetingId: string }) => void;
-  'meeting:participant-updated'?: (data: {
+  'meeting:ended': (data: { meetingId: string }) => void;
+  'meeting:caption': (data: {
+    id: string;
+    speakerId: string;
+    speakerName: string;
+    text: string;
+    isFinal: boolean;
+    timestamp: number;
+  }) => void;
+  'meeting:typing': (data: { userId: string; userName: string; isTyping: boolean }) => void;
+  'meeting:poll-updated': (data: { meetingId: string }) => void;
+  'meeting:question-updated': (data: { meetingId: string }) => void;
+  'meeting:participant-updated': (data: {
     meetingId: string;
     participantId: string;
     permissions?: Record<string, boolean>;
   }) => void;
-  'meeting:hands-updated'?: (data: { hands: RaisedHand[] }) => void;
+  'meeting:hands-updated': (data: { hands: RaisedHand[] }) => void;
   'webrtc:offer': (data: MeetingSignalPayload) => void;
   'webrtc:answer': (data: MeetingSignalPayload) => void;
   'webrtc:ice': (data: MeetingSignalPayload) => void;
@@ -61,7 +69,16 @@ export interface ClientToServerEvents {
     ack?: (result: { ok: boolean; peers?: string[]; error?: string }) => void
   ) => void;
   'meeting:leave': (meetingId: string) => void;
-  'meeting:end'?: (meetingId: string) => void;
+  'meeting:end': (payload: string | { meetingId: string; aiSummaryEnabled?: boolean }) => void;
+  'meeting:caption': (payload: {
+    meetingId: string;
+    id: string;
+    speakerId: string;
+    speakerName: string;
+    text: string;
+    isFinal: boolean;
+    timestamp: number;
+  }) => void;
   'meeting:state': (payload: { meetingId: string; state: Record<string, boolean | string> }) => void;
   'meeting:hand-raise'?: (payload: { meetingId: string; raised: boolean; userName?: string }) => void;
   'meeting:hand-lower'?: (payload: { meetingId: string; userId?: string }) => void;

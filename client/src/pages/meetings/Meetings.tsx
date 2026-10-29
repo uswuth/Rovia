@@ -82,6 +82,19 @@ export const Meetings: React.FC = () => {
 
   const currentTab = searchParams.get('tab') || 'upcoming';
   const filterProjectId = searchParams.get('projectId') || selectedProject?.id || '';
+  const filterTeamId = searchParams.get('teamId') || '';
+  const filterCreatedById = searchParams.get('createdBy') || '';
+  const timeFilter = searchParams.get('timeFilter') || 'all';
+
+  const timeFilterOptions = useMemo<SearchableSelectOption[]>(() => {
+    return [
+      { value: 'all', label: 'All' },
+      { value: 'live', label: 'Live Now' },
+      { value: '1h', label: 'In 1 hour' },
+      { value: '7h', label: 'In 7 hours' },
+      { value: '24h', label: 'In 24 hours' },
+    ];
+  }, []);
 
   const activeProject = projects.find((p) => getProjectId(p) === filterProjectId);
   const activeProjectName = activeProject ? getProjectName(activeProject) : (selectedProject ? getProjectName(selectedProject) : '');
@@ -100,11 +113,54 @@ export const Meetings: React.FC = () => {
     ];
   }, [projects]);
 
+  const teamFilterOptions = useMemo<SearchableSelectOption[]>(() => {
+    const filteredTeams = (teams ?? []).filter((t) => {
+      if (!filterProjectId) return true;
+      const pObj = typeof t.projectId === 'object' && t.projectId !== null ? (t.projectId as Record<string, unknown>) : null;
+      const parentPId = pObj ? ((pObj.projectId || pObj._id) as string) : (t.projectId as string);
+      return !parentPId || parentPId === filterProjectId;
+    });
+
+    return [
+      { value: '', label: 'All Teams' },
+      ...filteredTeams.map((t) => {
+        const tmId = (t.teamId || t._id) as string;
+        const tmName = (t.teamName as string) || (t.name as string) || 'Unnamed Team';
+        return {
+          value: tmId,
+          label: tmName,
+        };
+      }),
+    ];
+  }, [teams, filterProjectId]);
+
   const { data: meetings, loading } = useQuery<Meeting[]>(
     queryKeys.meetings.list(filterProjectId || undefined),
     () => getMeetings(filterProjectId ? { projectId: filterProjectId } : undefined),
     { enabled: isAuthenticated, list: true }
   );
+
+  const createdByFilterOptions = useMemo<SearchableSelectOption[]>(() => {
+    const creatorMap = new Map<string, string>();
+    (meetings ?? []).forEach((m) => {
+      if (m.createdBy) {
+        const creatorId = m.createdBy;
+        const orgMatch = (orgMembers || []).find((om) => om.userId === creatorId);
+        const resolvedName = orgMatch?.userName || (user?.userId === creatorId ? user.userName : null) || 'Unknown Host';
+        if (!creatorMap.has(creatorId)) {
+          creatorMap.set(creatorId, resolvedName);
+        }
+      }
+    });
+
+    return [
+      { value: '', label: 'All Creators' },
+      ...Array.from(creatorMap.entries()).map(([id, name]) => ({
+        value: id,
+        label: name,
+      })),
+    ];
+  }, [meetings, orgMembers, user]);
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -142,6 +198,14 @@ export const Meetings: React.FC = () => {
         if (!titleMatch && !descMatch && !codeMatch) return false;
       }
 
+      if (filterTeamId && m.teamId !== filterTeamId) {
+        return false;
+      }
+
+      if (filterCreatedById && m.createdBy !== filterCreatedById) {
+        return false;
+      }
+
       const scheduledMs = new Date(m.meetingScheduledAt).getTime();
       const durationMinutes = m.meetingDurationMinutes || 30;
       const endMs = !isNaN(scheduledMs) ? scheduledMs + durationMinutes * 60 * 1000 : Infinity;
@@ -149,14 +213,33 @@ export const Meetings: React.FC = () => {
       const isEnded = m.meetingStatus === 'ENDED' || m.meetingStatus === 'CANCELLED' || (m.meetingStatus !== 'LIVE' && isPastDuration);
 
       if (currentTab === 'upcoming') {
-        return !isEnded;
+        if (isEnded) return false;
+
+        // Apply time-based filter for upcoming meetings
+        if (timeFilter === 'live') {
+          return m.meetingStatus === 'LIVE';
+        }
+        if (timeFilter === '1h') {
+          const diffMs = scheduledMs - now;
+          return m.meetingStatus === 'LIVE' || (diffMs >= 0 && diffMs <= 60 * 60 * 1000);
+        }
+        if (timeFilter === '7h') {
+          const diffMs = scheduledMs - now;
+          return m.meetingStatus === 'LIVE' || (diffMs >= 0 && diffMs <= 7 * 60 * 60 * 1000);
+        }
+        if (timeFilter === '24h') {
+          const diffMs = scheduledMs - now;
+          return m.meetingStatus === 'LIVE' || (diffMs >= 0 && diffMs <= 24 * 60 * 60 * 1000);
+        }
+
+        return true;
       }
       if (currentTab === 'past' || currentTab === 'ended') {
         return isEnded;
       }
       return true;
     });
-  }, [sortedMeetings, debouncedSearch, currentTab, now]);
+  }, [sortedMeetings, debouncedSearch, currentTab, filterTeamId, filterCreatedById, timeFilter, now]);
 
   const [meetingPage, setMeetingPage] = useState(1);
   const [meetingPageSize, setMeetingPageSize] = useState(5);
@@ -484,58 +567,86 @@ export const Meetings: React.FC = () => {
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
-        <div className="flex items-center gap-2 flex-1 max-w-md">
-          <div className="relative flex-1">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <Input
-              type="text"
-              value={searchInput}
-              onChange={(e) => {
-                setSearchInput(e.target.value);
-                setMeetingPage(1);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  setMeetingPage(1);
-                }
-              }}
-              placeholder="Search meetings by title or description..."
-              className="pl-8 pr-8 h-9 text-xs"
-            />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchInput('');
-                  setMeetingPage(1);
-                }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-0.5 rounded-xs"
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
+        <div className="relative flex-1 max-w-md">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            type="text"
+            value={searchInput}
+            onChange={(e) => {
+              setSearchInput(e.target.value);
               setMeetingPage(1);
             }}
-            className="h-9 px-3 gap-1.5 text-xs cursor-pointer shrink-0 border border-border"
-          >
-            <Search size={14} />
-            <span>Search</span>
-          </Button>
+            placeholder="Search meetings by title or description..."
+            className="pl-8 pr-8 h-9 text-xs"
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchInput('');
+                setMeetingPage(1);
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-0.5 rounded-xs"
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
 
-        {projects.length > 0 && (
-          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto min-w-[220px]">
-            <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium shrink-0">
-              <FolderGit2 size={13} />
-              Project:
-            </span>
-            <div className="w-48">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {currentTab === 'upcoming' && (
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto min-w-[170px]">
+              <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium shrink-0">
+                <Clock size={13} className="text-primary" />
+                Time:
+              </span>
+              <div className="w-36">
+                <SearchableSelect
+                  value={timeFilter}
+                  onChange={(val) => {
+                    const newParams = new URLSearchParams(searchParams);
+                    if (val && val !== 'all') {
+                      newParams.set('timeFilter', val);
+                    } else {
+                      newParams.delete('timeFilter');
+                    }
+                    setSearchParams(newParams);
+                    setMeetingPage(1);
+                  }}
+                  options={timeFilterOptions}
+                  placeholder="All"
+                  searchPlaceholder="Filter time..."
+                  className="w-full text-xs"
+                />
+              </div>
+            </div>
+          )}
+
+          {createdByFilterOptions.length > 1 && (
+            <div className="w-40 shrink-0">
+              <SearchableSelect
+                value={filterCreatedById}
+                onChange={(val) => {
+                  const newParams = new URLSearchParams(searchParams);
+                  if (val) {
+                    newParams.set('createdBy', val);
+                  } else {
+                    newParams.delete('createdBy');
+                  }
+                  setSearchParams(newParams);
+                  setMeetingPage(1);
+                }}
+                options={createdByFilterOptions}
+                placeholder="All Creators"
+                searchPlaceholder="Search creator..."
+                className="w-full text-xs"
+                align="right"
+              />
+            </div>
+          )}
+
+          {projects.length > 0 && (
+            <div className="w-44 shrink-0">
               <SearchableSelect
                 value={filterProjectId}
                 onChange={(val) => {
@@ -544,6 +655,16 @@ export const Meetings: React.FC = () => {
                     newParams.set('projectId', val);
                   } else {
                     newParams.delete('projectId');
+                  }
+                  if (filterTeamId) {
+                    const matchedTeam = (teams ?? []).find((t) => ((t.teamId || t._id) as string) === filterTeamId);
+                    if (matchedTeam) {
+                      const pObj = typeof matchedTeam.projectId === 'object' && matchedTeam.projectId !== null ? (matchedTeam.projectId as Record<string, unknown>) : null;
+                      const parentPId = pObj ? ((pObj.projectId || pObj._id) as string) : (matchedTeam.projectId as string);
+                      if (parentPId && val && parentPId !== val) {
+                        newParams.delete('teamId');
+                      }
+                    }
                   }
                   setSearchParams(newParams);
                   setMeetingPage(1);
@@ -554,8 +675,39 @@ export const Meetings: React.FC = () => {
                 className="w-full text-xs"
               />
             </div>
-          </div>
-        )}
+          )}
+
+          {teams.length > 0 && (
+            <div className="w-40 shrink-0">
+              <SearchableSelect
+                value={filterTeamId}
+                onChange={(val) => {
+                  const newParams = new URLSearchParams(searchParams);
+                  if (val) {
+                    newParams.set('teamId', val);
+                    const matchedTeam = (teams ?? []).find((t) => ((t.teamId || t._id) as string) === val);
+                    if (matchedTeam) {
+                      const pObj = typeof matchedTeam.projectId === 'object' && matchedTeam.projectId !== null ? (matchedTeam.projectId as Record<string, unknown>) : null;
+                      const parentPId = pObj ? ((pObj.projectId || pObj._id) as string) : (matchedTeam.projectId as string);
+                      if (parentPId) {
+                        newParams.set('projectId', parentPId);
+                      }
+                    }
+                  } else {
+                    newParams.delete('teamId');
+                  }
+                  setSearchParams(newParams);
+                  setMeetingPage(1);
+                }}
+                options={teamFilterOptions}
+                placeholder="All Teams"
+                searchPlaceholder="Search teams..."
+                className="w-full text-xs"
+                align="right"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (

@@ -286,3 +286,49 @@ export const changePasswordService = async (
   user.password = newPassword;
   await user.save();
 };
+
+export const verifyClerkUserService = async (
+  clerkEmail: string
+): Promise<IAuthTokensResponse & { refreshToken: string }> => {
+  if (!clerkEmail) {
+    throw ApiError.unauthorized('No verified email found for this Clerk account');
+  }
+
+  const normalizedEmail = clerkEmail.toLowerCase().trim();
+  const user = await User.findOne({
+    user_email: normalizedEmail,
+    is_deleted: { $ne: true }
+  }).select('+refreshToken');
+
+  if (!user) {
+    throw ApiError.forbidden(
+      'Access restricted to registered organization members. Please contact your organization administrator.'
+    );
+  }
+
+  if (user.user_status && user.user_status.toUpperCase() === 'SUSPENDED') {
+    throw ApiError.forbidden('Your account is currently suspended. Please contact your administrator.');
+  }
+
+  if (user.organization_id) {
+    const org = await Organization.findById(user.organization_id).select('organization_owner_id');
+    if (org?.organization_owner_id && org.organization_owner_id.toString() === user._id.toString()) {
+      user.user_role = 'SuperAdmin';
+      user.is_super_admin = true;
+    }
+  }
+
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+
+  user.refreshToken = refreshToken;
+  await user.save();
+
+  const populatedUser = await User.findById(user._id).populate('organization_id', ORGANIZATION_POPULATE);
+
+  return {
+    user: populatedUser!.toJSON() as unknown as IAuthTokensResponse['user'],
+    accessToken,
+    refreshToken
+  };
+};

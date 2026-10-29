@@ -93,10 +93,6 @@ export function AppSidebar({
           url: "/meetings?tab=past",
         },
         {
-          title: "All Sessions",
-          url: "/meetings?tab=all",
-        },
-        {
           title: "Meeting Summary",
           url: "/meetings/summary",
           icon: <Sparkles size={14} className="text-primary shrink-0" />,

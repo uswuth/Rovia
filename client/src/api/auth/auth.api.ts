@@ -18,3 +18,10 @@ export const getMe = () =>
 
 export const changePasswordApi = (payload: { currentPassword: string; newPassword: string }) =>
   client.post('/auth/change-password', payload);
+
+export const syncClerkSessionApi = (token: string, email?: string) =>
+  client.post<AuthResponse>(
+    '/auth/clerk-sync',
+    { email },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );

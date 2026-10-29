@@ -125,5 +125,7 @@ export const env: Readonly<EnvConfig> = Object.freeze({
     .split(',')
     .map((model) => model.trim())
     .filter((model) => model.length > 0),
-  OPENROUTER_TIMEOUT_MS: parseInt(process.env.OPENROUTER_TIMEOUT_MS || '180000', 10)
+  OPENROUTER_TIMEOUT_MS: parseInt(process.env.OPENROUTER_TIMEOUT_MS || '180000', 10),
+  CLERK_SECRET_KEY: resolveSecret('CLERK_SECRET_KEY'),
+  CLERK_PUBLISHABLE_KEY: resolveSecret('CLERK_PUBLISHABLE_KEY')
 });

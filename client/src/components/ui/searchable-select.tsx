@@ -23,6 +23,7 @@ export interface SearchableSelectProps {
   className?: string;
   allowClear?: boolean;
   clearLabel?: string;
+  align?: 'left' | 'right';
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -37,6 +38,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   className,
   allowClear = false,
   clearLabel = 'None',
+  align = 'left',
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -135,7 +137,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[220px] rounded-xs border border-border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 overflow-hidden">
+        <div
+          className={cn(
+            "absolute top-full z-50 mt-1 w-full min-w-[220px] rounded-xs border border-border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 overflow-hidden",
+            align === 'right' ? 'right-0' : 'left-0'
+          )}
+        >
           <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border/60 bg-muted/20">
             <Search size={13} className="text-muted-foreground shrink-0" />
             <input

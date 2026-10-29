@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', '@mui/material', '@emotion/react', '@emotion/styled'],
+    include: ['react', 'react-dom', '@clerk/react', '@mui/material', '@emotion/react', '@emotion/styled'],
   },
   build: {
     rollupOptions: {

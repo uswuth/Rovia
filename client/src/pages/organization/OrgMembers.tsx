@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, RefreshCw, UserPlus } from 'lucide-react';
 import { getOrganizationMembers } from '@/api/organization/organization.api';
 import { useAuth } from '@/context/AuthContext';
+import { useOrganization } from '@/context/OrganizationContext';
 import { extractApiItems } from '@/utils/apiResponse';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { getOrgMemberColumns } from './Org.TanCol';
 export const OrgMembers: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { refresh: refreshOrgContext } = useOrganization();
   const isSuperAdmin = Boolean(user?.userRole === 'SuperAdmin' || user?.isSuperAdmin);
   const canManage = isSuperAdmin || user?.userRole === 'Admin';
 
@@ -22,24 +24,46 @@ export const OrgMembers: React.FC = () => {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
 
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     try {
       setLoading(true);
       const res = await getOrganizationMembers();
       setMembers(extractApiItems<Member>(res));
+      void refreshOrgContext();
     } catch (err) {
       console.error(err);
       setMembers([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [refreshOrgContext]);
 
   useEffect(() => {
-    void (async () => {
-      await loadMembers();
-    })();
-  }, []);
+    let ignore = false;
+    const fetchMembers = async () => {
+      try {
+        setLoading(true);
+        const res = await getOrganizationMembers();
+        if (!ignore) {
+          setMembers(extractApiItems<Member>(res));
+          void refreshOrgContext();
+        }
+      } catch (err) {
+        if (!ignore) {
+          console.error(err);
+          setMembers([]);
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+    void fetchMembers();
+    return () => {
+      ignore = true;
+    };
+  }, [refreshOrgContext]);
 
   const filteredMembers = useMemo(() => {
     if (!debouncedSearch.trim()) return members;

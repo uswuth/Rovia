@@ -82,8 +82,8 @@ export function IntellMeetTabs({
         className={cn(
           'flex items-center gap-1 p-1 outline-none',
           isPrimary
-            ? 'rounded-none border border-card/80 bg-card/40'
-            : 'rounded-full border border-card/80 bg-card/40'
+            ? 'rounded-xs border border-border bg-card/60'
+            : 'rounded-full border border-border bg-card/60'
         )}
       >
         {tabs.map((tab) => (
@@ -93,13 +93,14 @@ export function IntellMeetTabs({
               // Sizing
               sizeClassMap[size ?? 'xs'],
               // Base
-              'relative flex items-center justify-center gap-2 px-4 font-semibold transition-all duration-150 ease-out outline-none whitespace-nowrap rounded-none',
-              // Primary variant: filled pill (sharp corners)
-              isPrimary && 'data-[selected]:bg-card data-[selected]:text-card-foreground data-[hovered]:bg-accent data-[hovered]:text-card-foreground',
-              // Secondary variant: underline style
-              !isPrimary && 'data-[selected]:border-b-2 data-[selected]:border-primary data-[selected]:bg-card data-[selected]:text-card-foreground data-[hovered]:bg-transparent data-[hovered]:text-muted-foreground',
-              // Static tabs (no switching) — only for secondary variant
-              'cursor-default',
+              'relative flex items-center justify-center gap-2 px-4 font-semibold transition-all duration-150 ease-out outline-none whitespace-nowrap rounded-xs',
+              // Primary variant: filled accent tab using CSS token
+              isPrimary &&
+                'data-[selected]:bg-accent data-[selected]:text-accent-foreground data-[hovered]:bg-muted/60 data-[hovered]:text-foreground text-muted-foreground',
+              // Secondary variant: underline style using CSS token
+              !isPrimary &&
+                'data-[selected]:border-b-2 data-[selected]:border-primary data-[selected]:text-primary data-[selected]:bg-transparent data-[hovered]:bg-muted/40 data-[hovered]:text-foreground text-muted-foreground',
+              'cursor-pointer',
               'whitespace-nowrap'
             )}
           >

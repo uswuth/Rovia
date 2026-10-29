@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { Transcript, TranscriptDocument } from '../models/transcript.model.js';
 import { Recording } from '../models/recording.model.js';
 import { ApiError } from '../utils/apiError.js';
@@ -18,8 +19,13 @@ export const findScopedTranscript = async (
   return transcript;
 };
 
-const findByRecording = async (recordingId: string, organizationId: string): Promise<TranscriptDocument | null> =>
-  Transcript.findOne({ recording_id: recordingId, organization_id: organizationId });
+const findByRecording = async (recordingId: string, organizationId: string): Promise<TranscriptDocument | null> => {
+  const ids: Array<string | Types.ObjectId> = [recordingId];
+  if (Types.ObjectId.isValid(recordingId)) {
+    ids.push(new Types.ObjectId(recordingId));
+  }
+  return Transcript.findOne({ recording_id: { $in: ids }, organization_id: organizationId });
+};
 
 /** Idempotency: one transcript per recording. A retry reuses the existing record and moves it back to PROCESSING rather than creating a second one. */
 export const startTranscriptService = async (
