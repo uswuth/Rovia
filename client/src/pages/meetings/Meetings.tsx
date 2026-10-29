@@ -397,7 +397,7 @@ export const Meetings: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => window.open(`/meetings/${m.meetingId}/summary`, '_blank')}
+                  onClick={() => navigate(`/meetings/${m.meetingId}/summary`)}
                   className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
                   title="View AI Meeting Summary"
                 >
@@ -419,7 +419,7 @@ export const Meetings: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => window.open(`/meetings/${m.meetingId}/summary`, '_blank')}
+                onClick={() => navigate(`/meetings/${m.meetingId}/summary`)}
                 className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
                 title="View AI Meeting Summary"
               >
@@ -751,7 +751,7 @@ export const Meetings: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(`/meetings/${m.meetingId}/summary`, '_blank')}
+                            onClick={() => navigate(`/meetings/${m.meetingId}/summary`)}
                             className="h-6 w-6 p-0 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
                             title="View AI Meeting Summary"
                           >
@@ -773,7 +773,7 @@ export const Meetings: React.FC = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(`/meetings/${m.meetingId}/summary`, '_blank')}
+                          onClick={() => navigate(`/meetings/${m.meetingId}/summary`)}
                           className="h-6 w-6 p-0 text-primary hover:text-primary hover:bg-primary/10 cursor-pointer"
                           title="View AI Meeting Summary"
                         >
