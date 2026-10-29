@@ -128,6 +128,14 @@ export const startMeeting = async (req: Request, res: Response): Promise<Respons
 
 export const endMeeting = async (req: Request, res: Response): Promise<Response> => {
   const { organizationId, userId } = getRequestScope(req);
-  const meeting = await endMeetingService(req.params.id, organizationId, userId, req.user?.role);
+  const aiSummaryEnabled = Boolean(req.body?.aiSummaryEnabled);
+  const meeting = await endMeetingService(req.params.id, organizationId, userId, req.user?.role, aiSummaryEnabled);
   return ApiResponse.success(res, 'Meeting ended successfully', meeting, 200);
+};
+
+export const summarizeMeetingOnDemand = async (req: Request, res: Response): Promise<Response> => {
+  const { organizationId, userId } = getRequestScope(req);
+  const { generateMeetingAiSummaryOnDemand } = await import('../services/meeting-caption-summary.service.js');
+  const summary = await generateMeetingAiSummaryOnDemand(req.params.id, organizationId, userId);
+  return ApiResponse.success(res, 'Summary generated successfully', summary, 200);
 };

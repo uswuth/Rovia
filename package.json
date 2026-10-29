@@ -1,6 +1,7 @@
 {
   "name": "intellmeet",
   "private": true,
+  "license": "BSL-1.1",
   "version": "1.0.0",
   "description": "IntellMeet monorepo - API server and web client",
   "scripts": {

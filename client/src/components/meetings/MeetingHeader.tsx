@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getAvatarColorByName } from '@/components/ui/avatar-colors';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useTimeFormat } from '@/context/TimeFormatContext';
 import type { RaisedHand } from '@/api/meeting/webrtc.types';
 
 export interface MeetingHeaderProps {
@@ -38,7 +39,15 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
   const [networkQuality, setNetworkQuality] = useState<'high' | 'low' | 'zero'>('high');
   const [pingMs, setPingMs] = useState<number | null>(null);
   const [showRaisedHands, setShowRaisedHands] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  const { formatTimeStr } = useTimeFormat();
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -117,6 +126,9 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
   return (
     <header className="shrink-0 flex items-center justify-between border-b border-border/80 px-6 h-14 bg-card shadow-xs">
       <div className="flex items-center gap-3 min-w-0">
+        <span className="text-xs font-bold text-foreground font-mono shrink-0">
+          {formatTimeStr(currentTime)}
+        </span>
         <h1 className="truncate text-base font-bold text-foreground">{title}</h1>
         <Tooltip content={copied ? 'Link Shared / Copied!' : 'Share Meeting Link'} side="bottom">
           <Button

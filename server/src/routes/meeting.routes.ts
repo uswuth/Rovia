@@ -12,7 +12,8 @@ import {
   addMeetingParticipants,
   updateMeetingParticipantSettings,
   startMeeting,
-  endMeeting
+  endMeeting,
+  summarizeMeetingOnDemand
 } from '../controllers/meeting.controller.js';
 
 const router: Router = Router();
@@ -422,6 +423,14 @@ router.post(
   asyncHandler(async (req, res) => {
     const meeting = await endMeeting(req, res);
     return meeting;
+  })
+);
+
+router.post(
+  '/:id/summarize',
+  asyncHandler(async (req, res) => {
+    const summary = await summarizeMeetingOnDemand(req, res);
+    return summary;
   })
 );
 

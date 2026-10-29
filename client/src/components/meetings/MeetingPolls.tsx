@@ -73,23 +73,23 @@ const PollItem: React.FC<{
                     onClick={() => onVote(poll.pollId, [option.optionId])}
                     className={cn(
                       'relative w-full overflow-hidden rounded-xs border text-left p-2.5 transition-all',
-                      poll.pollStatus === 'OPEN' ? 'cursor-pointer hover:border-emerald-500/60' : 'cursor-default opacity-90',
+                      poll.pollStatus === 'OPEN' ? 'cursor-pointer hover:border-primary/60' : 'cursor-default opacity-90',
                       hasVotedThis
-                        ? 'border-emerald-500 bg-emerald-500/10 font-semibold text-emerald-600 dark:text-emerald-300'
+                        ? 'border-primary bg-primary/10 font-semibold text-primary'
                         : 'border-border bg-muted/30 text-foreground'
                     )}
                   >
                     <div
                       className={cn(
                         'absolute inset-y-0 left-0 transition-all duration-300 rounded-xs pointer-events-none',
-                        isLeader && 'bg-emerald-500/20 border-r border-emerald-400/60',
-                        isTrailing && 'bg-zinc-500/25 dark:bg-zinc-700/50 border-r border-zinc-400/50 dark:border-zinc-500/60'
+                        isLeader && 'bg-primary/20 border-r border-primary/60',
+                        isTrailing && 'bg-muted/40 border-r border-border'
                       )}
                       style={{ width: `${pct}%` }}
                     />
                     <div className="relative z-10 flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 truncate">
-                        {hasVotedThis && <Check size={13} className="text-emerald-500 shrink-0" />}
+                        {hasVotedThis && <Check size={13} className="text-primary shrink-0" />}
                         <span className="truncate">{option.optionText}</span>
                       </span>
                       <span className="tabular-nums text-[11px] font-bold text-muted-foreground ml-2 shrink-0">
@@ -260,7 +260,7 @@ export const MeetingPolls: React.FC<MeetingPollsProps> = ({
         <Button
           size="xs"
           onClick={() => setComposing(true)}
-          className="cursor-pointer gap-1.5 rounded-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs h-7 px-2.5 shadow-xs transition-colors"
+          className="cursor-pointer gap-1.5 rounded-xs bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs h-7 px-2.5 shadow-xs transition-colors"
         >
           <Plus size={13} strokeWidth={2.5} />
           <span>New poll</span>
@@ -393,7 +393,7 @@ export const MeetingPolls: React.FC<MeetingPollsProps> = ({
                 size="sm"
                 onClick={submit}
                 disabled={pending}
-                className="cursor-pointer rounded-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs shadow-xs transition-colors"
+                className="cursor-pointer rounded-xs bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs shadow-xs transition-colors"
               >
                 {pending ? 'Creating…' : 'Create poll'}
               </Button>

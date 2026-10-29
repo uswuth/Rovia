@@ -102,6 +102,8 @@ export const Tasks: React.FC = () => {
   const debouncedSearch = useDebounce(search, 300);
   const [projectFilter, setProjectFilter] = useState('ALL');
   const [teamFilter, setTeamFilter] = useState('ALL');
+  const [timeFilter, setTimeFilter] = useState<'ALL' | '1h' | '7h' | '1d' | '7d'>('ALL');
+  const [assignedByFilter, setAssignedByFilter] = useState('ALL');
 
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<TaskStatusType | null>(null);
@@ -156,11 +158,12 @@ export const Tasks: React.FC = () => {
     const previousStatus = currentTask.taskStatus as TaskStatusType;
 
     // 1. Optimistically update local tasks state immediately (0ms UI re-render, zero extra fetches)
+    const nowIso = new Date().toISOString();
     setTasks((prevTasks) =>
       prevTasks.map((t) => {
         const idStr = (t.taskId || t._id) as string;
         if (idStr === taskId) {
-          return { ...t, taskStatus: newStatus };
+          return { ...t, taskStatus: newStatus, updatedAt: nowIso, updated_at: nowIso };
         }
         return t;
       })
@@ -184,8 +187,15 @@ export const Tasks: React.FC = () => {
     }
   };
 
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const filteredTasks = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase();
+
     return tasks
       .filter((t) => {
         const titleStr = (t.taskTitle as string) || '';
@@ -203,14 +213,46 @@ export const Tasks: React.FC = () => {
         const tmId = teamObj ? ((teamObj.teamId || teamObj._id) as string) : (t.teamId as string);
         const matchesTeam = teamFilter === 'ALL' || tmId === teamFilter;
 
-        return matchesSearch && matchesProj && matchesTeam;
+        // Assigned By filter
+        let matchesAssignedBy = true;
+        if (assignedByFilter !== 'ALL') {
+          const cObj = typeof t.createdBy === 'object' && t.createdBy !== null ? (t.createdBy as Record<string, unknown>) : null;
+          const creatorId = cObj ? ((cObj.userId || cObj._id) as string) : (typeof t.createdBy === 'string' ? t.createdBy : '');
+          matchesAssignedBy = creatorId === assignedByFilter;
+        }
+
+        // Time filter: based on updatedAt if available (e.g. status changes), otherwise createdAt
+        let matchesTime = true;
+        if (timeFilter !== 'ALL') {
+          const rawTime = (t.updatedAt || t.updated_at || t.createdAt || t.created_at || 0) as string | number;
+          const taskTime = new Date(rawTime).getTime();
+          if (isNaN(taskTime) || taskTime === 0) {
+            matchesTime = false;
+          } else {
+            const diffMs = now - taskTime;
+            if (timeFilter === '1h') {
+              matchesTime = diffMs >= 0 && diffMs <= 60 * 60 * 1000;
+            } else if (timeFilter === '7h') {
+              matchesTime = diffMs >= 0 && diffMs <= 7 * 60 * 60 * 1000;
+            } else if (timeFilter === '1d') {
+              matchesTime = diffMs >= 0 && diffMs <= 24 * 60 * 60 * 1000;
+            } else if (timeFilter === '7d') {
+              matchesTime = diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
+            }
+          }
+        }
+
+        return matchesSearch && matchesProj && matchesTeam && matchesAssignedBy && matchesTime;
       })
       .sort((a, b) => {
-        const timeA = new Date((a.createdAt || a.created_at || 0) as string).getTime() || 0;
-        const timeB = new Date((b.createdAt || b.created_at || 0) as string).getTime() || 0;
+        // Sort by most recently updated/created first
+        const rawTimeA = (a.updatedAt || a.updated_at || a.createdAt || a.created_at || 0) as string | number;
+        const rawTimeB = (b.updatedAt || b.updated_at || b.createdAt || b.created_at || 0) as string | number;
+        const timeA = new Date(rawTimeA).getTime() || 0;
+        const timeB = new Date(rawTimeB).getTime() || 0;
         return timeB - timeA;
       });
-  }, [tasks, debouncedSearch, projectFilter, teamFilter]);
+  }, [tasks, debouncedSearch, projectFilter, teamFilter, assignedByFilter, timeFilter, now]);
 
   const projectFilterOptions = useMemo<SearchableSelectOption[]>(() => {
     return [
@@ -240,6 +282,40 @@ export const Tasks: React.FC = () => {
     ];
   }, [teams]);
 
+  const timeFilterOptions = useMemo<SearchableSelectOption[]>(() => {
+    return [
+      { value: 'ALL', label: 'All Time' },
+      { value: '1h', label: 'Past 1 hour' },
+      { value: '7h', label: 'Past 7 hours' },
+      { value: '1d', label: 'Past 24 hours' },
+      { value: '7d', label: 'Past 7 days' },
+    ];
+  }, []);
+
+  const assignedByFilterOptions = useMemo<SearchableSelectOption[]>(() => {
+    const creatorMap = new Map<string, string>();
+    tasks.forEach((t) => {
+      const cObj = typeof t.createdBy === 'object' && t.createdBy !== null ? (t.createdBy as Record<string, unknown>) : null;
+      const creatorId = cObj ? ((cObj.userId || cObj._id) as string) : (typeof t.createdBy === 'string' ? t.createdBy : '');
+      if (creatorId) {
+        const name = cObj ? ((cObj.userName || cObj.name || cObj.userEmail) as string) : null;
+        const orgMatch = orgMembers?.find((m) => m.userId === creatorId);
+        const resolvedName = orgMatch?.userName || name || (user?.userId === creatorId ? user.userName : null) || 'Unknown Creator';
+        if (!creatorMap.has(creatorId)) {
+          creatorMap.set(creatorId, resolvedName);
+        }
+      }
+    });
+
+    return [
+      { value: 'ALL', label: 'All Assigners' },
+      ...Array.from(creatorMap.entries()).map(([id, name]) => ({
+        value: id,
+        label: name,
+      })),
+    ];
+  }, [tasks, orgMembers, user]);
+
   const columns = useMemo(
     () =>
       getTaskColumns({
@@ -247,8 +323,6 @@ export const Tasks: React.FC = () => {
         isAdmin,
         canManage,
         onDelete: handleDelete,
-        orgMembers,
-        currentUser: user,
         onOpenAssigneesModal: (taskTitle, members) => {
           setRosterModal({
             open: true,
@@ -257,7 +331,7 @@ export const Tasks: React.FC = () => {
           });
         },
       }),
-    [navigate, isAdmin, canManage, handleDelete, orgMembers, user, setRosterModal]
+    [navigate, isAdmin, canManage, handleDelete, setRosterModal]
   );
 
   if (loading) {
@@ -358,6 +432,35 @@ export const Tasks: React.FC = () => {
               className="w-full text-xs"
             />
           </div>
+
+          <div className="w-full sm:w-40">
+            <SearchableSelect
+              value={timeFilter}
+              onChange={(val) => {
+                setTimeFilter((val as 'ALL' | '1h' | '7h' | '1d' | '7d') || 'ALL');
+                setCurrentPage(1);
+              }}
+              options={timeFilterOptions}
+              placeholder="All Time"
+              searchPlaceholder="Filter time..."
+              className="w-full text-xs"
+            />
+          </div>
+
+          <div className="w-full sm:w-48">
+            <SearchableSelect
+              value={assignedByFilter}
+              onChange={(val) => {
+                setAssignedByFilter(val || 'ALL');
+                setCurrentPage(1);
+              }}
+              options={assignedByFilterOptions}
+              placeholder="All Assigners"
+              searchPlaceholder="Search assigner..."
+              className="w-full text-xs"
+              align="right"
+            />
+          </div>
         </div>
       </div>
 
@@ -367,12 +470,12 @@ export const Tasks: React.FC = () => {
           icon={CheckSquare}
           title="No tasks found"
           description={
-            search || projectFilter !== 'ALL' || teamFilter !== 'ALL'
+            search || projectFilter !== 'ALL' || teamFilter !== 'ALL' || timeFilter !== 'ALL' || assignedByFilter !== 'ALL'
               ? 'Try adjusting your search query or filters.'
               : 'Get started by creating a new task to organize deliverables.'
           }
-          actionLabel={canManage && projectFilter === 'ALL' && teamFilter === 'ALL' && !search ? 'Create Task' : undefined}
-          onAction={canManage && projectFilter === 'ALL' && teamFilter === 'ALL' && !search ? () => navigate('/tasks/new') : undefined}
+          actionLabel={canManage && projectFilter === 'ALL' && teamFilter === 'ALL' && timeFilter === 'ALL' && assignedByFilter === 'ALL' && !search ? 'Create Task' : undefined}
+          onAction={canManage && projectFilter === 'ALL' && teamFilter === 'ALL' && timeFilter === 'ALL' && assignedByFilter === 'ALL' && !search ? () => navigate('/tasks/new') : undefined}
         />
       ) : viewMode === 'kanban' ? (
         /* KANBAN BOARD VIEW WITH INTERACTIVE DRAG & DROP */

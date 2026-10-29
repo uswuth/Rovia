@@ -36,6 +36,15 @@ const MAX_CHAT_MESSAGE_CHARS = 2000;
 let io: TypedSocketServer | null = null;
 const meetingRaisedHands = new Map<string, RaisedHand[]>();
 
+export interface LiveCaptionTurn {
+  speakerId: string;
+  speakerName: string;
+  text: string;
+  timestamp: number;
+}
+
+export const meetingLiveTranscripts = new Map<string, LiveCaptionTurn[]>();
+
 export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
   io = new SocketIOServer<
     ClientToServerEvents,
@@ -231,12 +240,15 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       }
     });
 
-    socket.on('meeting:end', async (meetingId: string) => {
+    socket.on('meeting:end', async (payload: string | { meetingId: string; aiSummaryEnabled?: boolean }) => {
+      const meetingId = typeof payload === 'string' ? payload : payload?.meetingId;
       const targetId = socket.data.meetingId || meetingId;
       if (!targetId) return;
 
       const userId = socket.data.userId;
       if (!userId) return;
+
+      const aiSummaryEnabled = typeof payload === 'object' && payload !== null ? Boolean(payload.aiSummaryEnabled) : false;
 
       try {
         const meeting = targetId.match(/^[0-9a-fA-F]{24}$/)
@@ -257,6 +269,13 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
 
         meetingRaisedHands.delete(targetId);
         io?.to(`meeting:${targetId}`).emit('meeting:ended', { meetingId: targetId });
+
+        // Also trigger caption compilation if ended via socket directly
+        import('../services/meeting-caption-summary.service.js')
+          .then((m) => m.processMeetingEndCaptions(meeting._id.toString(), meeting.organization_id.toString(), userId, aiSummaryEnabled))
+          .catch((err) => {
+            logger.error(`Error processing end captions via socket: ${(err as Error).message}`);
+          });
       } catch (err) {
         logger.error(`Error ending meeting via socket: ${(err as Error).message}`);
       }
@@ -422,6 +441,50 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
         }
       }
     );
+
+    socket.on('meeting:caption', (payload: {
+      meetingId: string;
+      id: string;
+      speakerId: string;
+      speakerName: string;
+      text: string;
+      isFinal: boolean;
+      timestamp: number;
+    }) => {
+      const targetId = socket.data.meetingId || payload?.meetingId;
+      if (!targetId || !payload?.text) return;
+
+      // Broadcast real-time closed captions to all other participants in the meeting room
+      socket.to(`meeting:${targetId}`).emit('meeting:caption', {
+        id: payload.id,
+        speakerId: payload.speakerId || socket.data.userId || 'participant',
+        speakerName: payload.speakerName || 'Participant',
+        text: payload.text,
+        isFinal: Boolean(payload.isFinal),
+        timestamp: payload.timestamp || Date.now()
+      });
+
+      // Maintain live transcript buffer: update the in-flight utterance turn or append new turn
+      const turns = meetingLiveTranscripts.get(targetId) || [];
+      const speakerId = payload.speakerId || socket.data.userId || 'participant';
+      const speakerName = payload.speakerName || 'Participant';
+      const lastTurn = turns[turns.length - 1];
+
+      if (lastTurn && lastTurn.speakerId === speakerId && !payload.isFinal) {
+        // Update in-progress turn text
+        lastTurn.text = payload.text.trim();
+        lastTurn.timestamp = payload.timestamp || Date.now();
+      } else {
+        // Utterance finalized or new speaker started
+        turns.push({
+          speakerId,
+          speakerName,
+          text: payload.text.trim(),
+          timestamp: payload.timestamp || Date.now()
+        });
+      }
+      meetingLiveTranscripts.set(targetId, turns);
+    });
 
     socket.on('meeting:typing', (payload: { meetingId: string; isTyping: boolean; userName?: string }) => {
       const targetId = socket.data.meetingId || payload?.meetingId;

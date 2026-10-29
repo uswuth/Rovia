@@ -201,7 +201,7 @@ const QuestionList = ({
                   <button
                     type="button"
                     onClick={() => toggleExpand(question.questionId)}
-                    className="flex items-center gap-1.5 pt-0.5 text-xs font-semibold text-emerald-500 hover:text-emerald-400 cursor-pointer transition-colors"
+                    className="flex items-center gap-1.5 pt-0.5 text-xs font-semibold text-primary hover:text-primary/80 cursor-pointer transition-colors"
                   >
                     {isExpanded ? (
                       <>
@@ -244,14 +244,14 @@ const QuestionList = ({
                         id={`answer-${question.questionId}`}
                         placeholder="Write your answer..."
                         {...answerForm.register('answerText')}
-                        className="h-8 flex-1 min-w-0 px-2.5 text-xs rounded-xs border-border bg-card focus:outline-none focus:border-emerald-500 focus-visible:outline-none focus-visible:border-emerald-500 focus-visible:ring-0"
+                        className="h-8 flex-1 min-w-0 px-2.5 text-xs rounded-xs border-border bg-card focus:outline-none focus:border-primary focus-visible:outline-none focus-visible:border-primary focus-visible:ring-0"
                         disabled={posting || cooldown > 0}
                         autoFocus
                       />
                       <Button
                         type="submit"
                         size="xs"
-                        className="h-8 px-3 rounded-xs bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer active:scale-95 shrink-0"
+                        className="h-8 px-3 rounded-xs bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer active:scale-95 shrink-0"
                         disabled={posting || cooldown > 0 || !answerDraft?.trim()}
                       >
                         {cooldown > 0 ? `Wait ${cooldown}s` : 'Post'}
@@ -419,13 +419,13 @@ export const MeetingQuestions = ({
                 placeholder="Ask a question for the meeting..."
                 {...askForm.register('questionText')}
                 disabled={posting}
-                className="flex-1 min-w-0 h-9 px-3.5 text-xs rounded-xs border-border bg-card focus:outline-none focus:border-emerald-500 focus-visible:outline-none focus-visible:border-emerald-500 focus-visible:ring-0"
+                className="flex-1 min-w-0 h-9 px-3.5 text-xs rounded-xs border-border bg-card focus:outline-none focus:border-primary focus-visible:outline-none focus-visible:border-primary focus-visible:ring-0"
                 aria-label="Question text"
               />
               <button
                 type="submit"
                 disabled={posting || !questionText?.trim()}
-                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer active:scale-95 disabled:opacity-25 disabled:pointer-events-none transition-all"
+                className="flex size-9 shrink-0 items-center justify-center rounded-xs bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs cursor-pointer active:scale-95 disabled:opacity-25 disabled:pointer-events-none transition-all"
                 title="Send Question"
               >
                 <SendHorizontal size={15} className="translate-x-[0.5px]" />

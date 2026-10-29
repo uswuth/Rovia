@@ -277,7 +277,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
 
       {!isScreenShare && (
         <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-30">
-          <div className="flex items-center gap-1.5 rounded-sm px-2 py-1 text-[11px] font-medium text-white bg-black/60 backdrop-blur-xs shadow-xs">
+          <div className="flex items-center justify-center size-[22px] rounded-sm text-[11px] font-medium text-white bg-black/60 backdrop-blur-xs shadow-xs">
             {speakerMuted ? (
               <Tooltip content="Speaker Output Muted" side="top" align="end">
                 <span className="flex items-center text-red-400">
@@ -291,7 +291,9 @@ export const VideoTile: React.FC<VideoTileProps> = ({
                 </span>
               </Tooltip>
             )}
+          </div>
 
+          <div className="flex items-center justify-center size-[22px] rounded-sm text-[11px] font-medium text-white bg-black/60 backdrop-blur-xs shadow-xs">
             <Tooltip content={muted ? "Microphone Muted" : "Microphone Active"} side="top" align="end">
               <span className="flex items-center">
                 {muted ? (

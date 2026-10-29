@@ -501,6 +501,8 @@ export const CreateMeeting: React.FC = () => {
                             options={projectOptions}
                             placeholder="Select project (Optional)"
                             searchPlaceholder="Search projects..."
+                            allowClear={true}
+                            clearLabel="No Specific Project"
                             onChange={(val) => {
                               field.onChange(val);
                               if (watchedTeamId) {

@@ -27,4 +27,6 @@ export interface EnvConfig {
   OPENROUTER_SUMMARY_MODEL?: string;
   OPENROUTER_FALLBACK_MODELS?: string[];
   OPENROUTER_TIMEOUT_MS?: number;
+  CLERK_SECRET_KEY?: string;
+  CLERK_PUBLISHABLE_KEY?: string;
 }

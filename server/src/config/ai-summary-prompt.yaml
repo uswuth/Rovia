@@ -1,0 +1,37 @@
+# AI Meeting Summarizer Configuration & Prompt Template
+# You can customize rules, markdown preferences, temperature, model, and response shape here.
+
+version: "1.0"
+model:
+  default: "google/gemini-2.0-flash-lite-preview-02-05:free"
+  temperature: 0.2
+
+# Formatting & extraction instructions for the LLM
+instructions:
+  system: "You are an expert AI meeting summarizer. Generate rich, structured Markdown meeting intelligence from transcripts."
+  rules:
+    - "Use ONLY information present in the transcript. Never invent people, dates, decisions, numbers, or commitments."
+    - "If nothing was decided or assigned, return empty arrays. An empty array is correct and better than a guess."
+    - "actionItems are only things someone explicitly agreed to do. Put a person name in 'assignee' only if the transcript names them."
+    - "Write in English even if the transcript language is in another language."
+  formatting:
+    - "Executive Overview: Provide a concise 1-2 paragraph executive summary."
+    - "Tables: Generate Markdown Tables whenever comparisons, parameters, deliverables, metrics, status, or decisions are discussed."
+    - "Collapsible sections: Use <details><summary>Topic Name</summary>...</details> blocks for granular technical discussions, logs, or secondary details."
+    - "Topic Headings: Use ## and ### markdown headers with bold bullet points for distinct sections."
+
+# Schema contract expected back from the AI model
+output_schema:
+  type: "json"
+  shape:
+    summary: "Rich Markdown text formatted with executive overview, tables, bold key phrases, and structured topics where suitable"
+    keyPoints:
+      type: "array"
+      items: "string"
+      description: "3 to 8 high-signal highlights"
+    actionItems:
+      type: "array"
+      items:
+        text: "string (description of task)"
+        assignee: "string or null"
+

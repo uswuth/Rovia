@@ -27,6 +27,7 @@ const MeetingAiSummaryPage = lazy(() => import('@/pages/meetings/MeetingAiSummar
 const Tasks = lazy(() => import('@/pages/tasks/Tasks').then((m) => ({ default: m.Tasks })));
 const SettingsPage = lazy(() => import('@/pages/settings/Settings').then((m) => ({ default: m.SettingsPage })));
 const ServerAdminLogin = lazy(() => import('@/pages/admin/ServerAdminLogin').then((m) => ({ default: m.ServerAdminLogin })));
+const UnauthorizedAccess = lazy(() => import('@/pages/auth/UnauthorizedAccess').then((m) => ({ default: m.UnauthorizedAccess })));
 const ServerAdminLayout = lazy(() => import('@/components/layout/ServerAdminLayout').then((m) => ({ default: m.ServerAdminLayout })));
 const ServerAdminDashboard = lazy(() => import('@/pages/admin/ServerAdminDashboard').then((m) => ({ default: m.ServerAdminDashboard })));
 const ServerAdminOrganizations = lazy(() => import('@/pages/admin/ServerAdminOrganizations').then((m) => ({ default: m.ServerAdminOrganizations })));
@@ -129,6 +130,7 @@ const App = () => {
                           </GuestRoute>
                         }
                       />
+                      <Route path="/unauthorized" element={<UnauthorizedAccess />} />
 
                       <Route path="/meetings/join/:code" element={<MeetingLobby />} />
 

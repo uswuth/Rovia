@@ -1,21 +1,46 @@
-MIT License
+Business Source License 1.1
 
-Copyright (c) 2026 IntellMeet
+Parameters:
+
+Licensor:                   IntellMeet
+Licensed Work:              The IntellMeet software, including client and server source code,
+                            associated documentation, and materials ("Work").
+Non-Commercial Use:         Free for personal, non-commercial, and evaluation purposes only.
+Change Date:                At Licensor's discretion or four years from release.
+Change License:             MIT License or GNU General Public License v3.0 (GPL-3.0)
+
+--------------------------------------------------------------------------------
+
+Notice:
+
+Copyright (c) 2026 IntellMeet. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+of this software and associated documentation files (the "Work"), to deal
+in the Work without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, and distribute copies of the Work,
+SUBJECT TO THE FOLLOWING RESTRICTIONS:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. COMMERCIAL USE RESTRICTION:
+   You may NOT sell, resell, sublicense, commercialize, or host the Work as a paid 
+   service (Software-as-a-Service, hosted platform, managed service, or any paid offering) 
+   without express prior written commercial license granted by Licensor (IntellMeet).
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+2. NON-COMMERCIAL USE:
+   You may use, copy, modify, and test the Work solely for personal, educational, 
+   internal evaluation, and non-commercial purposes.
+
+3. ATTRIBUTION:
+   The above copyright notice and this permission notice must be included in all
+   copies or substantial portions of the Work.
+
+4. CHANGE DATE:
+   Effective on the Change Date specified above, the Licensor grants you license
+   to the Work under the Change License (GPL-3.0-or-later), superseding this license.
+
+THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE WORK OR THE USE OR OTHER DEALINGS IN THE WORK.

@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { Summary, SummaryDocument } from '../models/summary.model.js';
 import { Recording } from '../models/recording.model.js';
 import { ApiError } from '../utils/apiError.js';
@@ -77,7 +78,12 @@ export const getSummaryByRecordingService = async (
   requireOrganizationId(organizationId, 'view a summary');
   assertObjectId(recordingId, 'recordingId');
 
-  const summary = await Summary.findOne({ recording_id: recordingId, organization_id: organizationId });
+  const ids: Array<string | Types.ObjectId> = [recordingId];
+  if (Types.ObjectId.isValid(recordingId)) {
+    ids.push(new Types.ObjectId(recordingId));
+  }
+
+  const summary = await Summary.findOne({ recording_id: { $in: ids }, organization_id: organizationId });
   if (!summary) {
     throw ApiError.notFound('Summary not found');
   }
@@ -88,7 +94,11 @@ export const getSummaryStatusService = async (
   recordingId: string,
   organizationId: string
 ): Promise<'PENDING' | 'PROCESSING' | 'READY' | 'FAILED' | null> => {
-  const summary = await Summary.findOne({ recording_id: recordingId, organization_id: organizationId });
+  const ids: Array<string | Types.ObjectId> = [recordingId];
+  if (Types.ObjectId.isValid(recordingId)) {
+    ids.push(new Types.ObjectId(recordingId));
+  }
+  const summary = await Summary.findOne({ recording_id: { $in: ids }, organization_id: organizationId });
   return summary ? summary.summary_status : null;
 };
 

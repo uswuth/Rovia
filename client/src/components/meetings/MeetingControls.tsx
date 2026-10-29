@@ -13,8 +13,6 @@ import {
   Settings,
   ChevronUp,
   ChevronDown,
-  Radio,
-  Sparkles,
   Maximize2,
   Minimize2,
   Play,
@@ -25,6 +23,9 @@ import {
   Monitor,
   ScreenShare,
   ScreenShareOff,
+  Captions,
+  CaptionsOff,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
@@ -35,11 +36,11 @@ import {
 } from '@/components/ui/popover';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { buildAudioConstraints } from '@/lib/audio-capture';
 import { useTheme } from '@/context/theme-context';
 import { PANELS, type PanelKey } from './meetingPanels';
+import type { CaptionFontSize, CaptionOpacity } from '@/components/ui/live-caption-overlay';
 
 export type { PanelKey };
 
@@ -56,19 +57,6 @@ const getCleanDeviceLabel = (
 
 export interface MeetingControlsProps {
   localStream?: MediaStream | null;
-
-  // Recording & AI Summary
-  isRecording: boolean;
-  onToggleRecording: () => void;
-  /** Records where the AI pipeline is: Recording, Uploading or Processing. */
-  recordingStage?: 'idle' | 'recording' | 'uploading' | 'processing' | 'ready' | 'failed';
-  /** mm:ss of captured audio, shown only while recording. */
-  recordingElapsedMs?: number;
-  showRecordModal: boolean;
-  setShowRecordModal: (open: boolean) => void;
-  aiSummaryEnabled: boolean;
-  setAiSummaryEnabled: (enabled: boolean) => void;
-  canManage: boolean;
 
   // Audio / Mic
   micOn: boolean;
@@ -99,6 +87,20 @@ export interface MeetingControlsProps {
   handRaised: boolean;
   onToggleHandRaise: () => void;
 
+  // Closed Captions / Subtitles
+  captionsEnabled?: boolean;
+  captionsSupported?: boolean;
+  onToggleCaptions?: () => void;
+  captionFontSize?: CaptionFontSize;
+  onSelectCaptionFontSize?: (size: CaptionFontSize) => void;
+  captionOpacity?: CaptionOpacity;
+  onSelectCaptionOpacity?: (opacity: CaptionOpacity) => void;
+
+  // AI Summary Switch (Host-only)
+  isHost?: boolean;
+  aiSummaryEnabled?: boolean;
+  onToggleAiSummary?: () => void;
+
   // Fullscreen & Leave
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
@@ -114,15 +116,6 @@ export interface MeetingControlsProps {
 /** Bottom toolbar controls dock for in-meeting actions */
 export const MeetingControls: React.FC<MeetingControlsProps> = ({
   localStream,
-  isRecording,
-  onToggleRecording,
-  recordingStage = 'idle',
-  recordingElapsedMs = 0,
-  showRecordModal,
-  setShowRecordModal,
-  aiSummaryEnabled,
-  setAiSummaryEnabled,
-  canManage,
   micOn,
   onToggleMic,
   audioInputs,
@@ -142,6 +135,16 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   onToggleScreenShare,
   handRaised,
   onToggleHandRaise,
+  captionsEnabled = true,
+  captionsSupported = true,
+  onToggleCaptions,
+  captionFontSize = 'md',
+  onSelectCaptionFontSize,
+  captionOpacity = 80,
+  onSelectCaptionOpacity,
+  isHost = false,
+  aiSummaryEnabled = false,
+  onToggleAiSummary,
   isFullscreen,
   onToggleFullscreen,
   onLeaveClick,
@@ -167,27 +170,6 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [cameraPreviewError, setCameraPreviewError] = useState<string | null>(null);
-
-  // The recorder button reports pipeline progress, so the user is never left
-  // guessing whether "Stop Recording" actually saved anything.
-  const recordingStageLabel =
-    recordingStage === 'recording'
-      ? 'Recording'
-      : recordingStage === 'uploading'
-        ? 'Uploading'
-        : recordingStage === 'processing'
-          ? 'Processing'
-          : recordingStage === 'failed'
-            ? 'Failed'
-            : 'Record';
-
-  const recordingElapsedLabel = React.useMemo(() => {
-    if (recordingStage !== 'recording' || recordingElapsedMs <= 0) return '';
-    const totalSeconds = Math.floor(recordingElapsedMs / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }, [recordingStage, recordingElapsedMs]);
   const [isCameraLoading, setIsCameraLoading] = useState<boolean>(false);
   const [isTestingCamera, setIsTestingCamera] = useState<boolean>(false);
 
@@ -577,74 +559,27 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
 
   return (
     <footer className="shrink-0 flex items-center justify-between border-t border-border/80 px-6 h-16 bg-card shadow-xs relative z-30">
-      {/* Left: Record Button with Popover */}
-      <div className="flex items-center gap-3 shrink-0">
-        <Popover open={showRecordModal} onOpenChange={setShowRecordModal}>
-          <PopoverTrigger
-            render={
-              <Button
-                variant={isRecording ? 'destructive' : 'outline'}
-                size="sm"
-                className="gap-1.5 font-bold text-xs h-9 cursor-pointer"
-              >
-                <Radio size={14} className={isRecording ? 'animate-pulse' : ''} />
-                <span>{recordingStageLabel}</span>
-              </Button>
-            }
-          />
-          <PopoverContent side="top" sideOffset={12} className="w-72 p-3 space-y-3 border-border bg-card shadow-xl" align="start">
-            <div className="flex items-center justify-between border-b border-border pb-1.5">
-              <h4 className="font-bold text-xs text-foreground flex items-center gap-1.5">
-                <Radio size={14} className="text-red-500" />
-                <span>Recording</span>
-                {recordingElapsedLabel && (
-                  <span className="ml-1 font-normal tabular-nums text-muted-foreground">
-                    {recordingElapsedLabel}
-                  </span>
-                )}
-              </h4>
-              <button
-                type="button"
-                onClick={() => setShowRecordModal(false)}
-                className="size-5 flex items-center justify-center rounded-xs text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors"
-                aria-label="Close"
-              >
-                <X size={13} />
-              </button>
-            </div>
-
-            <Button
-              variant={isRecording ? 'destructive' : 'default'}
-              size="sm"
-              className="w-full text-xs font-semibold cursor-pointer"
-              // Uploading and summarising are not interruptible: stopping
-              // mid-upload would leave an orphaned object in storage.
-              disabled={recordingStage === 'uploading' || recordingStage === 'processing'}
-              onClick={onToggleRecording}
+      {/* Left: AI Summary Switch (Host-Only) and status */}
+      <div className="flex items-center gap-2.5 shrink-0">
+        {isHost && onToggleAiSummary && (
+          <Tooltip
+            content={aiSummaryEnabled ? 'AI Summary Enabled (Meeting end generates summary)' : 'Enable AI Summary'}
+            side="top"
+            align="start"
+          >
+            <button
+              type="button"
+              onClick={onToggleAiSummary}
+              className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-all cursor-pointer ${aiSummaryEnabled
+                ? 'bg-purple-500/20 text-purple-400 border-purple-500/50 shadow-[0_0_12px_rgba(168,85,247,0.35)]'
+                : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
+                }`}
+              aria-label="Toggle AI Summary"
             >
-              {recordingStage === 'uploading'
-                ? 'Uploading…'
-                : recordingStage === 'processing'
-                  ? 'Generating summary…'
-                  : isRecording
-                    ? 'Stop Recording'
-                    : 'Start Recording'}
-            </Button>
-
-            <div className="border-t border-border pt-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Sparkles size={13} className="text-primary" />
-                <span>AI Summary</span>
-              </span>
-              <Switch
-                checked={aiSummaryEnabled}
-                onCheckedChange={setAiSummaryEnabled}
-                disabled={!canManage}
-                aria-label="AI Summary"
-              />
-            </div>
-          </PopoverContent>
-        </Popover>
+              <Sparkles size={18} className={aiSummaryEnabled ? 'animate-pulse' : ''} />
+            </button>
+          </Tooltip>
+        )}
       </div>
 
       {/* Center: Controls Container (Mic to Leave) with Attached Matching-Width Shelf Above */}
@@ -666,15 +601,15 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                             className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-medium cursor-pointer transition-colors max-w-48 sm:max-w-52 shrink-0"
                           >
                             <span className="flex items-center gap-2 truncate">
-                              <Mic size={14} className="text-emerald-500 shrink-0" />
+                              <Mic size={14} className="text-primary shrink-0" />
                               <span className="truncate">{currentMicLabel}</span>
                             </span>
                             <ChevronDown size={13} className="text-muted-foreground shrink-0 ml-1" />
                           </button>
                         }
                       />
-                      <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-card shadow-xl rounded-xs" align="start">
-                        <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border mb-1">
+                      <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-popover text-popover-foreground shadow-xl rounded-xs" align="start">
+                        <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border/80 mb-1">
                           Select Microphone
                         </div>
                         <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -693,12 +628,12 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                                   className={cn(
                                     "w-full flex items-center justify-between px-2 py-1.5 rounded-xs text-xs transition-colors text-left cursor-pointer",
                                     isSelected
-                                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
-                                      : "text-foreground hover:bg-muted"
+                                      ? "bg-primary/10 text-primary font-semibold"
+                                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
                                   )}
                                 >
                                   <span className="truncate flex-1 mr-2">{lbl}</span>
-                                  {isSelected && <Check size={14} className="text-emerald-500 shrink-0" />}
+                                  {isSelected && <Check size={14} className="text-primary shrink-0" />}
                                 </button>
                               );
                             })
@@ -811,11 +746,11 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                           >
                             <span className="flex items-center gap-2 truncate">
                               {!speakerOn || speakerVolume === 0 ? (
-                                <VolumeX size={14} className="text-emerald-500 shrink-0" />
+                                <VolumeX size={14} className="text-primary shrink-0" />
                               ) : speakerVolume <= 50 ? (
-                                <Volume1 size={14} className="text-emerald-500 shrink-0" />
+                                <Volume1 size={14} className="text-primary shrink-0" />
                               ) : (
-                                <Volume2 size={14} className="text-emerald-500 shrink-0" />
+                                <Volume2 size={14} className="text-primary shrink-0" />
                               )}
                               <span className="truncate">{currentSpeakerLabel}</span>
                             </span>
@@ -823,8 +758,8 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                           </button>
                         }
                       />
-                      <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-card shadow-xl rounded-xs" align="start">
-                        <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border mb-1">
+                      <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-popover text-popover-foreground shadow-xl rounded-xs" align="start">
+                        <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border/80 mb-1">
                           Select Speaker
                         </div>
                         <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -843,12 +778,12 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                                   className={cn(
                                     "w-full flex items-center justify-between px-2 py-1.5 rounded-xs text-xs transition-colors text-left cursor-pointer",
                                     isSelected
-                                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
-                                      : "text-foreground hover:bg-muted"
+                                      ? "bg-primary/10 text-primary font-semibold"
+                                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
                                   )}
                                 >
                                   <span className="truncate flex-1 mr-2">{lbl}</span>
-                                  {isSelected && <Check size={14} className="text-emerald-500 shrink-0" />}
+                                  {isSelected && <Check size={14} className="text-primary shrink-0" />}
                                 </button>
                               );
                             })
@@ -954,15 +889,15 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                               className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-medium cursor-pointer transition-colors max-w-56"
                             >
                               <span className="flex items-center gap-2 truncate">
-                                <Video size={14} className="text-emerald-500 shrink-0" />
+                                <Video size={14} className="text-primary shrink-0" />
                                 <span className="truncate">{currentCameraLabel}</span>
                               </span>
                               <ChevronDown size={13} className="text-muted-foreground shrink-0 ml-1" />
                             </button>
                           }
                         />
-                        <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-card shadow-xl rounded-xs" align="start">
-                          <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border mb-1">
+                        <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-popover text-popover-foreground shadow-xl rounded-xs" align="start">
+                          <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border/80 mb-1">
                             Select Camera
                           </div>
                           <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -981,12 +916,12 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                                     className={cn(
                                       "w-full flex items-center justify-between px-2 py-1.5 rounded-xs text-xs transition-colors text-left cursor-pointer",
                                       isSelected
-                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
-                                        : "text-foreground hover:bg-muted"
+                                        ? "bg-primary/10 text-primary font-semibold"
+                                        : "text-foreground hover:bg-accent hover:text-accent-foreground"
                                     )}
                                   >
                                     <span className="truncate flex-1 mr-2">{lbl}</span>
-                                    {isSelected && <Check size={14} className="text-emerald-500 shrink-0" />}
+                                    {isSelected && <Check size={14} className="text-primary shrink-0" />}
                                   </button>
                                 );
                               })
@@ -1136,6 +1071,36 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               </button>
             </Tooltip>
 
+            {/* Live Captions (Subtitles) Button */}
+            {onToggleCaptions && (
+              <Tooltip
+                content={
+                  !captionsSupported
+                    ? 'Captions not supported or blocked in this browser (Use Chrome/Edge)'
+                    : captionsEnabled
+                    ? 'Turn off captions'
+                    : 'Turn on captions'
+                }
+                side="top"
+              >
+                <button
+                  type="button"
+                  onClick={captionsSupported ? onToggleCaptions : undefined}
+                  disabled={!captionsSupported}
+                  className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-all ${
+                    !captionsSupported
+                      ? 'border-border/40 bg-muted/40 text-muted-foreground/50 cursor-not-allowed opacity-60'
+                      : captionsEnabled
+                      ? 'bg-primary/15 text-primary border-primary/40 font-bold cursor-pointer'
+                      : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground cursor-pointer'
+                  }`}
+                  aria-label="Toggle Live Captions"
+                >
+                  {captionsEnabled && captionsSupported ? <Captions size={18} /> : <CaptionsOff size={18} />}
+                </button>
+              </Tooltip>
+            )}
+
             {/* Leave Button */}
             <Button
               variant="destructive"
@@ -1157,7 +1122,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               type="button"
               onClick={() => onSelectPanel(panel === item.key ? null : item.key)}
               className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-colors cursor-pointer ${panel === item.key
-                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
+                ? 'bg-primary/15 text-primary border-primary/40 font-bold'
                 : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
             >
@@ -1207,7 +1172,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                   className={cn(
                     "flex items-center justify-center gap-1.5 py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer",
                     theme === 'light'
-                      ? "bg-card text-emerald-500 shadow-xs font-semibold"
+                      ? "bg-card text-primary shadow-xs font-semibold"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -1220,7 +1185,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                   className={cn(
                     "flex items-center justify-center gap-1.5 py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer",
                     theme === 'dark'
-                      ? "bg-card text-emerald-500 shadow-xs font-semibold"
+                      ? "bg-card text-primary shadow-xs font-semibold"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -1233,7 +1198,7 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                   className={cn(
                     "flex items-center justify-center gap-1.5 py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer",
                     theme === 'system'
-                      ? "bg-card text-emerald-500 shadow-xs font-semibold"
+                      ? "bg-card text-primary shadow-xs font-semibold"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -1243,7 +1208,59 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
               </div>
             </div>
 
-            {/* 2. Keybinds: List all keybinds + new keybind Alt + N */}
+            {/* 2. Captions Settings: Font Size & Background Opacity Presets */}
+            <div className="space-y-2 border-t border-border/60 pt-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                <Captions size={13} className="text-primary" />
+                <span>Captions Appearance</span>
+              </div>
+
+              {/* Font Size Presets */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-muted-foreground font-medium">Font Size</span>
+                <div className="grid grid-cols-3 gap-1 bg-muted/40 p-1 rounded-xs border border-border/50">
+                  {(['sm', 'md', 'lg'] as CaptionFontSize[]).map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => onSelectCaptionFontSize?.(size)}
+                      className={cn(
+                        "flex items-center justify-center py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer capitalize",
+                        captionFontSize === size
+                          ? "bg-card text-primary shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {size === 'sm' ? 'Small' : size === 'md' ? 'Medium' : 'Large'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Background Opacity Presets */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-muted-foreground font-medium">Background Opacity</span>
+                <div className="grid grid-cols-5 gap-1 bg-muted/40 p-1 rounded-xs border border-border/50">
+                  {([20, 40, 60, 80, 100] as CaptionOpacity[]).map((op) => (
+                    <button
+                      key={op}
+                      type="button"
+                      onClick={() => onSelectCaptionOpacity?.(op)}
+                      className={cn(
+                        "flex items-center justify-center py-1 px-1 rounded-xs text-[11px] font-medium transition-colors cursor-pointer",
+                        captionOpacity === op
+                          ? "bg-card text-primary shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {op}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Keybinds: List all keybinds + new keybind Alt + N */}
             <div className="space-y-1.5 border-t border-border/60 pt-2.5">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
                 <Keyboard size={13} className="text-primary" />

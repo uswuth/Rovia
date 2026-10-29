@@ -578,7 +578,8 @@ export const endMeetingService = async (
   meetingId: string,
   organizationId: string,
   userId: string,
-  userRole?: string
+  userRole?: string,
+  aiSummaryEnabled = false
 ) => {
   requireOrganizationId(organizationId, 'end a meeting');
   assertObjectId(meetingId, 'meetingId');
@@ -588,5 +589,14 @@ export const endMeetingService = async (
   meeting.meeting_status = 'ENDED';
   meeting.meeting_ended_at = new Date();
   await meeting.save();
+
+  // Asynchronously compile real-time captions into Transcript and optionally AI Summary
+  import('./meeting-caption-summary.service.js')
+    .then((m) => m.processMeetingEndCaptions(meetingId, organizationId, userId, aiSummaryEnabled))
+    .catch((err) => {
+      // Never let post-processing fail the meeting end response
+      console.error('Failed to trigger post-meeting caption summary:', err);
+    });
+
   return meeting;
 };

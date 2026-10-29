@@ -5,7 +5,8 @@ import {
   refreshAccessToken,
   logoutUser,
   getCurrentUser,
-  changePassword
+  changePassword,
+  syncClerkUser
 } from '../controllers/auth.controller.js';
 import { authenticateUser } from '../middlewares/auth.middleware.js';
 import { authRateLimiter } from '../middlewares/rateLimiter.js';
@@ -179,5 +180,24 @@ router.get('/me', authenticateUser, asyncHandler(getCurrentUser));
  *         description: User not found
  */
 router.post('/change-password', authenticateUser, asyncHandler(changePassword));
+
+/**
+ * @openapi
+ * /api/v1/auth/clerk-sync:
+ *   post:
+ *     summary: Verify Clerk Authenticated User and Synchronize Organization Session
+ *     description: >
+ *       Accepts the Clerk session token (and user email), confirms that the verified
+ *       email belongs to a valid, registered user in the organization, and issues
+ *       the platform's access and refresh tokens. If not registered, returns 403 Forbidden.
+ *     tags:
+ *       - Authentication
+ *     responses:
+ *       200:
+ *         description: Successfully synchronized and returned application session
+ *       403:
+ *         description: User email is not registered in an organization
+ */
+router.post('/clerk-sync', asyncHandler(syncClerkUser));
 
 export default router;

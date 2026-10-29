@@ -1,7 +1,6 @@
 import { prop, getModelForClass, DocumentType, modelOptions, Severity, Ref } from '@typegoose/typegoose';
 import { UserClass } from './user.model.js';
 import { OrganizationClass } from './organization.model.js';
-import { cleanTranscriptText } from '../utils/transcriptClean.js';
 
 export type TranscriptStatus = 'PENDING' | 'PROCESSING' | 'READY' | 'FAILED';
 
@@ -51,15 +50,13 @@ export class TranscriptSpeakerClass {
           transcriptId: (ret._id as { toString(): string })?.toString(),
           transcriptStatus: ret.transcript_status as string,
           transcriptText: ret.transcript_text as string,
-          // Derived on read, never stored: the raw text remains the source of
-          // truth, so the readable copy cannot drift out of sync with it.
-          transcriptCleanText: cleanTranscriptText(ret.transcript_text as string),
+          transcriptCleanText: ret.transcript_text as string,
           transcriptLanguage: ret.transcript_language ?? null,
           transcriptDurationMs: ret.transcript_duration_ms ?? 0,
           transcriptSegmentCount: ((ret.transcript_segments as unknown[]) ?? []).length,
           transcriptSpeakers: speakers.map((speaker) => ({
             ...speaker,
-            speakerCleanText: cleanTranscriptText(speaker.speakerText as string | undefined)
+            speakerCleanText: speaker.speakerText as string | undefined
           })),
           organizationId: ret.organization_id,
           recordingId: ret.recording_id,
