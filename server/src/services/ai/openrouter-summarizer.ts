@@ -108,7 +108,7 @@ export class OpenRouterSummarizer implements Summarizer {
             model,
             messages: [{ role: 'user', content: groundedPrompt(input.transcript, input.recordingTitle) }],
             temperature: 0.1,
-            max_tokens: 1024,
+            max_tokens: 4096,
             response_format: { type: 'json_object' }
           }),
           signal: timeoutSignal(env.OPENROUTER_TIMEOUT_MS ?? 180000)

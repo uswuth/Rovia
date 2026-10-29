@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/popover';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { buildAudioConstraints } from '@/lib/audio-capture';
 import { useTheme } from '@/context/theme-context';
@@ -635,12 +636,11 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
                 <Sparkles size={13} className="text-primary" />
                 <span>AI Summary</span>
               </span>
-              <input
-                type="checkbox"
-                disabled={!canManage}
+              <Switch
                 checked={aiSummaryEnabled}
-                onChange={(e) => setAiSummaryEnabled(e.target.checked)}
-                className="h-4 w-4 rounded border-border text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:opacity-50"
+                onCheckedChange={setAiSummaryEnabled}
+                disabled={!canManage}
+                aria-label="AI Summary"
               />
             </div>
           </PopoverContent>

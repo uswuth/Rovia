@@ -65,7 +65,7 @@ export const getRecordingUploadUrl = async (
 
 export const completeRecording = async (
   recordingId: string,
-  payload?: { durationMs?: number }
+  payload?: { durationMs?: number; aiSummaryEnabled?: boolean }
 ): Promise<RecordingWithAiStatus> => {
   const { data } = await client.post<{ data: RecordingWithAiStatus }>(
     `/recordings/${recordingId}/complete`,

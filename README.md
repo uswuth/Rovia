@@ -59,18 +59,11 @@ pnpm lint
 
 Environment configuration: `server/.env.example`
 
-## Docker (Local Services Only)
+## Cloud Deployment
 
-```bash
-pnpm secrets:generate   # writes server/secrets/*.txt (git-ignored)
-pnpm docker:up          # starts MongoDB + S3 emulator
-pnpm docker:down
-```
+Client: **Vercel** · API: **Render** (native Node; Socket.io keeps a long-lived connection) · Database: **MongoDB Atlas** · Object storage: **Backblaze B2** (S3-compatible, presigned URLs; CORS rule applied by `server/scripts/_tmp_apply_cors.mjs`). See `render.yaml` and `vercel.json`.
 
-| URL | Service |
-| --- | --- |
-| http://localhost:3000 | Web client (nginx, proxies `/api`) |
-| http://localhost:5000 | API + Swagger UI (`/api/docs`) |
+Environment config: `server/.env.example` · secrets: `server/.env.local` (git-ignored)
 
 ## API
 

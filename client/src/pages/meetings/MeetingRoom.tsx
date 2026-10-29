@@ -244,7 +244,7 @@ export const MeetingRoom: React.FC = () => {
     },
   });
 
-  const recorder = useMeetingRecorder({ meetingId: id, onError: showToast });
+  const recorder = useMeetingRecorder({ meetingId: id, onError: showToast, aiSummaryEnabled });
 
   // Read once so the callback below depends on plain values, not the `user`
   // object: the React Compiler cannot verify `user?.userId` as a dependency.

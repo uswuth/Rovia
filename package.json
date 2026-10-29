@@ -17,10 +17,6 @@
     "build:client": "pnpm -r --filter client build",
     "openapi": "pnpm -r --filter server openapi",
     "secrets:generate": "node server/scripts/generate-secrets.mjs",
-    "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down",
-    "docker:tools": "docker compose --profile tools up -d",
-    "docker:logs": "docker compose logs -f",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report"

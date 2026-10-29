@@ -10,7 +10,7 @@ commands from the repository root.
 | `pnpm install` | Installs dependencies for all workspace packages |
 | `cp .env.example .env` | Creates the root env file from the template |
 | `cp server/.env.example server/.env` | Creates the server env file from the template |
-| `pnpm docker:up` | Starts local MongoDB and the S3 store (see Docker below) |
+| `cp server/.env.example server/.env.local` | Creates the server env file (secrets only, git-ignored) |
 
 ## Development
 
@@ -67,38 +67,7 @@ The app key can upload and read files but cannot change bucket configuration,
 so the first command is the only one that needs the master key. It is read with
 echo off and never written to disk.
 
-## Docker
 
-Docker is **not used for deployment.** Production builds from source: Vercel
-builds the client, Render runs the API with its native Node runtime. Docker runs
-the third-party services you need locally so you do not have to stand up a real
-database or a real S3 account.
-
-| Command | What it does |
-| --- | --- |
-| `pnpm docker:up` | Starts local MongoDB and the S3-compatible store |
-| `pnpm docker:down` | Stops and removes those containers |
-| `pnpm docker:logs` | Follows container logs |
-| `pnpm docker:tools` | Also starts the optional MongoDB and S3 web UIs |
-| `docker compose --profile tools up -d` | Same as `pnpm docker:tools` |
-| `docker compose down -v` | Stops everything and deletes the database volume |
-
-| Service | URL |
-| --- | --- |
-| Web client (pnpm dev) | http://localhost:5173 |
-| API + Swagger (pnpm dev) | http://localhost:5000 |
-| MongoDB (container) | mongodb://localhost:27017 |
-| S3 store (container) | http://localhost:4566 |
-| S3 web UI (optional) | http://localhost:9000 |
-
-The client and API always run on the host with `pnpm dev`, never in a
-container, so a broken container is never mistaken for a broken application.
-
-There is no AI profile: transcription and summarisation are hosted (Groq and
-OpenRouter), so nothing is downloaded or built for them.
-
-`ffmpeg` must be on the server's PATH (or set `FFMPEG_PATH`). It prepares each
-speaker's audio before transcription.
 
 ## Per-package
 

@@ -36,7 +36,12 @@ export class RecordingPostProcessingService {
     private readonly summarizer: Summarizer = new OpenRouterSummarizer()
   ) {}
 
-  async runPostProcessing(recordingId: string, organizationId: string, userId: string): Promise<void> {
+  async runPostProcessing(
+    recordingId: string,
+    organizationId: string,
+    userId: string,
+    aiSummaryEnabled = false
+  ): Promise<void> {
     requireOrganizationId(organizationId, 'process a recording');
     assertObjectId(recordingId, 'recordingId');
 
@@ -49,8 +54,12 @@ export class RecordingPostProcessingService {
     const transcript = await this.transcribe(recording, organizationId);
     if (!transcript) return;
 
-    // A meeting where nobody spoke has nothing to summarise. Sending an empty
-    // transcript to the model is how a summary invents an entire meeting.
+    // Transcription (speech-to-text) always runs — it is the raw record of what
+    // was said. Summarisation is only produced when the caller explicitly asked
+    // for it (the "AI Summary" checkbox in the record modal).
+    if (!aiSummaryEnabled) return;
+
+    // A meeting where nobody spoke has nothing to summarise.
     if (!transcript.hasText) {
       logger.info(`Skipping summarisation for recording ${recordingId}: transcript has no speech`);
       return;
@@ -258,9 +267,20 @@ export class RecordingPostProcessingService {
         throw new Error('Transcript disappeared before summarisation');
       }
 
+      const text = (transcript.transcript_text ?? '').trim();
+      if (!text) {
+        await completeSummaryService(summary.summaryId, organizationId, {
+          summary: 'No speech was detected in this recording.',
+          keyPoints: [],
+          actionItems: []
+        });
+        logger.info(`Summary READY (empty) for recording ${recordingId}`);
+        return;
+      }
+
       // The flat text already carries "Name: ..." per turn, so the model can see who
       // committed to what and attribute action items without inventing owners.
-      const result = await this.summarizer.summarize({ transcript: transcript.transcript_text });
+      const result = await this.summarizer.summarize({ transcript: text });
       await completeSummaryService(summary.summaryId, organizationId, result);
       logger.info(`Summary READY for recording ${recordingId}`);
     } catch (error) {

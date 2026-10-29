@@ -37,15 +37,21 @@ services:
         sync: false
       - key: AWS_REGION
         value: us-east-005
+      # Backblaze B2 (S3-compatible) — values are set in the Render dashboard.
       - key: AWS_S3_BUCKET
+        description: Backblaze B2 bucket name
         sync: false
       - key: AWS_ENDPOINT_URL
+        description: Backblaze B2 S3 host (API calls + presigned URLs)
         sync: false
       - key: AWS_PUBLIC_ENDPOINT_URL
+        description: Backblaze B2 S3 host (browser-facing, presigned download URLs)
         sync: false
       - key: AWS_ACCESS_KEY_ID
+        description: Backblaze B2 app key ID (scoped to the bucket)
         sync: false
       - key: AWS_SECRET_ACCESS_KEY
+        description: Backblaze B2 app key password
         sync: false
       - key: OPENROUTER_SUMMARY_MODEL
         value: nvidia/nemotron-3-super-120b-a12b:free

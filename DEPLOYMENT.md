@@ -5,7 +5,7 @@
 | Client (React) | **Vercel** | Static build, free, global CDN |
 | API (Express + Socket.io) | **Render** | Needs one long-lived connection |
 | Database | **MongoDB Atlas** | Free 512 MB cluster |
-| Recordings | **Cloudflare R2** | Free 10 GB, free downloads |
+- Recordings | **Backblaze B2** | Free 10 GB, free downloads |
 | Transcription | **Groq** | `whisper-large-v3`, free tier |
 | Summary | **OpenRouter** | Free text models |
 
@@ -38,7 +38,7 @@ Push the repo, then in Render: **New → Blueprint**, point at this repository.
 - `CLIENT_URL` → your Vercel URL
 - `CORS_ORIGIN` → your Vercel URL (no wildcard in production)
 - `GROQ_API_KEY`, `OPENROUTER_API_KEY`
-- `AWS_*` → your R2 bucket details
+- `AWS_*` → your Backblaze B2 bucket details
 
 Render gives you a URL like `https://intellmeet-api.onrender.com`.
 

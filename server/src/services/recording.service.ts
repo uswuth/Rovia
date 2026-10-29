@@ -137,7 +137,8 @@ export const completeRecordingService = async (
   recordingId: string,
   organizationId: string,
   durationMs: number,
-  userId: string
+  userId: string,
+  aiSummaryEnabled = false
 ): Promise<RecordingDocument> => {
   requireOrganizationId(organizationId, 'complete a recording');
   assertObjectId(recordingId, 'recordingId');
@@ -206,7 +207,7 @@ export const completeRecordingService = async (
   recording.recording_expires_at = recordingExpiresAt();
   await recording.save();
 
-  await runPostProcessing(recording, organizationId, userId);
+  await runPostProcessing(recording, organizationId, userId, aiSummaryEnabled);
 
   return recording;
 };
@@ -221,12 +222,18 @@ export const completeRecordingService = async (
 const runPostProcessing = async (
   recording: RecordingDocument,
   organizationId: string,
-  userId: string
+  userId: string,
+  aiSummaryEnabled = false
 ): Promise<void> => {
   try {
     // Awaited so failures are recorded rather than lost, but never allowed to
     // fail the upload: the recording is already valid and stored.
-    await recordingPostProcessingService.runPostProcessing(recording.recordingId, organizationId, userId);
+    await recordingPostProcessingService.runPostProcessing(
+      recording.recordingId,
+      organizationId,
+      userId,
+      aiSummaryEnabled
+    );
   } catch (error) {
     logger.error(`Post-processing failed for recording: ${(error as Error).message}`);
   }

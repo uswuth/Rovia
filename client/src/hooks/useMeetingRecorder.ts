@@ -35,6 +35,8 @@ export const useMeetingRecorder = (options?: {
   /** Called the moment a failure is recorded, so the caller can react in its own
    * event path instead of watching `error` from an effect (which would render twice). */
   onError?: (message: string) => void;
+  /** If true, an AI summary is produced when the recording is completed. */
+  aiSummaryEnabled?: boolean;
 }) => {
   const queryClient = useQueryClient();
 
@@ -197,7 +199,10 @@ export const useMeetingRecorder = (options?: {
       for (const [index, speaker] of speakers.entries()) {
         await uploadRecordingBlob(recording.recordingId, speaker.blob, mimeType, index);
       }
-      await completeRecording(recording.recordingId, { durationMs });
+      await completeRecording(recording.recordingId, {
+        durationMs,
+        aiSummaryEnabled: optionsRef.current?.aiSummaryEnabled ?? false,
+      });
 
       setRecordingId(recording.recordingId);
       setStage('processing');

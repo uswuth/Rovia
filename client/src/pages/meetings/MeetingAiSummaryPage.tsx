@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import {
   Sparkles,
   ArrowLeft,
@@ -35,7 +35,6 @@ import { getProjectId, getProjectName, getProjectCode } from '@/types/project.ty
 import { formatDurationHuman } from '@/utils/duration';
 import { MemberRoster } from '@/components/members/MemberRoster';
 import { MeetingAiSummaryCard } from '@/components/meetings/MeetingAiSummaryCard';
-import { MeetingTranscriptPanel } from '@/components/meetings/MeetingTranscriptPanel';
 import type { RecorderStage } from '@/hooks/useMeetingRecorder';
 
 export const MeetingAiSummaryPage: React.FC = () => {
@@ -88,7 +87,16 @@ export const MeetingAiSummaryPage: React.FC = () => {
     return undefined;
   }, [id, allRecordingsData, allMeetingsList]);
 
-  // 3. Fetch Specific Meeting Details
+  // Whether the URL carries an explicit meeting id (detail view) or this is the
+  // all-summaries list.
+  const showingDetail = Boolean(id);
+
+  // Recordings that reached READY — the list of all generated summaries.
+  const readyRecordings = allRecordingsData?.filter(
+    (r) => r.summaryStatus === 'READY' && r.meetingId && r.recordingId
+  ) ?? [];
+
+  // Fetch Specific Meeting Details
   const {
     data: meetingData,
     isLoading: isMeetingLoading,
@@ -136,7 +144,7 @@ export const MeetingAiSummaryPage: React.FC = () => {
       if (!activeRecording?.recordingId) return null;
       return await getRecordingSummary(activeRecording.recordingId);
     },
-    enabled: Boolean(activeRecording?.recordingId),
+    enabled: showingDetail && Boolean(activeRecording?.recordingId),
     retry: 1,
     refetchInterval: (query) => {
       const status = query.state.data?.summaryStatus;
@@ -155,12 +163,37 @@ export const MeetingAiSummaryPage: React.FC = () => {
       if (!activeRecording?.recordingId) return null;
       return await getRecordingTranscript(activeRecording.recordingId);
     },
-    enabled: Boolean(activeRecording?.recordingId),
+    enabled: showingDetail && Boolean(activeRecording?.recordingId),
     retry: 1,
     refetchInterval: (query) => {
       const status = query.state.data?.transcriptStatus;
       if (status === 'READY' || status === 'FAILED') return false;
       return 5_000;
+    },
+  });
+
+  // Parallel per-recording summaries for the list view (only recordings that
+  // reached READY have a summary to display).
+  useQueries({
+    queries: readyRecordings
+      .filter((r) => r.recordingId)
+      .map((recording) => ({
+        queryKey: ['recording-summary', recording.recordingId as string],
+        queryFn: () => getRecordingSummary(recording.recordingId as string),
+        staleTime: 5 * 60_000,
+      })),
+    // Combine results into a per-recording map so the list can look up each
+    // summary by recording id without indexing an array of queries.
+    combine: (results) => {
+      const data = new Map<string, MeetingSummary | null>();
+      let isLoading = false;
+      for (const result of results) {
+        if (result.isLoading) isLoading = true;
+        if (result.data) {
+          data.set(result.data.recordingId ?? '', result.data);
+        }
+      }
+      return { data, isLoading };
     },
   });
 
@@ -213,12 +246,12 @@ export const MeetingAiSummaryPage: React.FC = () => {
           matchedOrgMember?.userName && !matchedOrgMember.userName.toLowerCase().startsWith('user')
             ? matchedOrgMember.userName
             : rawName && !rawName.toLowerCase().startsWith('user')
-            ? rawName
-            : matchedOrgMember?.userEmail
-            ? matchedOrgMember.userEmail.split('@')[0]
-            : rawEmail
-            ? rawEmail.split('@')[0]
-            : `Participant ${idx + 1}`;
+              ? rawName
+              : matchedOrgMember?.userEmail
+                ? matchedOrgMember.userEmail.split('@')[0]
+                : rawEmail
+                  ? rawEmail.split('@')[0]
+                  : `Participant ${idx + 1}`;
 
         const finalEmail = matchedOrgMember?.userEmail || rawEmail || 'No email registered';
         const finalAvatar = matchedOrgMember?.avatarUrl || rawAvatar;
@@ -294,10 +327,10 @@ export const MeetingAiSummaryPage: React.FC = () => {
   const summaryErrorMessage = summaryError
     ? 'Unable to load summary for this recording.'
     : transcriptData?.transcriptStatus === 'FAILED'
-    ? 'Transcription did not complete for this recording, so no summary was generated. Check the server logs for the AI provider error.'
-    : hasNoAiOutput
-    ? 'No transcript or summary was generated for this recording. Check the server logs for the AI provider error.'
-    : null;
+      ? 'Transcription did not complete for this recording, so no summary was generated. Check the server logs for the AI provider error.'
+      : hasNoAiOutput
+        ? 'No transcript or summary was generated for this recording. Check the server logs for the AI provider error.'
+        : null;
 
   return (
     <div className="w-full bg-background text-foreground min-h-screen p-4 sm:p-6 lg:p-8 space-y-6">
@@ -421,40 +454,36 @@ export const MeetingAiSummaryPage: React.FC = () => {
           </Button>
         </div>
       ) : (
-        <div className="space-y-6">
-          {/* Page / Section Header info */}
-          <div className="print:hidden space-y-1">
-            <div className="flex items-center gap-2">
-              <Badge tone="neutral" className="gap-1 text-[11px] font-mono">
-                <Hash size={11} className="text-primary" />
-                <span>{meeting.meetingJoinCode}</span>
-              </Badge>
-              {meeting.meetingStatus && (
-                <Badge tone={getMeetingStatusTone(meeting.meetingStatus)} className="text-[10px]">
-                  {meeting.meetingStatus}
+        /* Main Two-Column Layout */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* LEFT COLUMN: Meeting AI Summary (Prebuilt MeetingAiSummaryCard) */}
+          <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+            {/* Page / Section Header info */}
+            <div className="print:hidden space-y-1">
+              <div className="flex items-center gap-2">
+                <Badge tone="neutral" className="gap-1 text-[11px] font-mono">
+                  <Hash size={11} className="text-primary" />
+                  <span>{meeting.meetingJoinCode}</span>
                 </Badge>
+                {meeting.meetingStatus && (
+                  <Badge tone={getMeetingStatusTone(meeting.meetingStatus)} className="text-[10px]">
+                    {meeting.meetingStatus}
+                  </Badge>
+                )}
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+                {meeting.meetingTitle}
+              </h2>
+              {meeting.meetingDescription && (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {meeting.meetingDescription}
+                </p>
               )}
             </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
-              {meeting.meetingTitle}
-            </h2>
-            {meeting.meetingDescription && (
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {meeting.meetingDescription}
-              </p>
-            )}
-          </div>
 
-          {/* Raw speech-to-text beside the executive summary. */}
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-            <MeetingTranscriptPanel
-              transcript={transcriptData}
-              isLoading={isTranscriptLoading}
-              className="order-2 lg:order-1"
-            />
-
+            {/* Prebuilt AI Summary Card */}
             {!activeRecording ? (
-              <Card className="order-1 w-full rounded-sm border-dashed border-border/80 bg-muted/20 shadow-none lg:order-2">
+              <Card className="w-full rounded-sm border-dashed border-border/80 bg-muted/20 shadow-none">
                 <CardContent className="p-8 text-center space-y-3">
                   <div className="size-10 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center">
                     <Sparkles size={20} />
@@ -474,9 +503,8 @@ export const MeetingAiSummaryPage: React.FC = () => {
                 error={summaryErrorMessage}
                 summary={summaryData}
                 transcript={transcriptData}
-                showTranscript={false}
                 title="AI Meeting Executive Summary"
-                className="order-1 w-full rounded-sm border-border bg-card shadow-xs lg:order-2"
+                className="w-full rounded-sm border-border bg-card shadow-xs"
               />
             )}
           </div>
@@ -560,7 +588,7 @@ export const MeetingAiSummaryPage: React.FC = () => {
               <MemberRoster
                 members={participantMembers}
                 value={rosterRoleValues}
-                onChange={() => {}}
+                onChange={() => { }}
                 title="Meeting Member Roster"
                 entityName="meeting"
                 canManage={false}

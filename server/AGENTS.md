@@ -114,12 +114,7 @@ Every socket handler authenticates the connection and validates its payload.
 `SIGINT` / `SIGTERM` close the HTTP server, then the DB connection, with a 10s
 forced-exit guard. Keep that intact when adding background work.
 
-## 11. Docker
 
-Secrets arrive as files under `/run/secrets`, never as build args or image
-layers. The image runs as the non-root `node` user and must keep its healthcheck
-on `/api/v1/health`. If you add an outbound dependency, add it as a health-gated
-service in Compose.
 
 ## 12. Before You Finish
 
