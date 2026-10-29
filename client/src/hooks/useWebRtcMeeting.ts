@@ -3,7 +3,12 @@ import { getMeetingSocket, disconnectMeetingSocket, type MeetingSocket } from '@
 import type { MeetingSignalPayload } from '@/api/meeting/webrtc.types';
 import { buildAudioConstraints } from '@/lib/audio-capture';
 
-const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+];
 
 const CAMERA_MAX_BITRATE = 3_000_000;
 
