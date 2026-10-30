@@ -82,7 +82,7 @@ export const VideoTile: React.FC<VideoTileProps> = ({
     stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
   );
 
-  const isVideoShowing = Boolean(isScreenShare || (cameraOn && (hasLiveTrack || !isYou) && stream));
+  const isVideoShowing = Boolean(isScreenShare || (cameraOn && hasLiveTrack && stream));
 
   useEffect(() => {
     if (videoRef.current && stream) {
