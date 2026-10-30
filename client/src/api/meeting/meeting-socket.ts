@@ -24,7 +24,7 @@ export const getMeetingSocket = (visitorId?: string): MeetingSocket => {
 
   socket = io(socketUrl || window.location.origin, {
     auth: token ? { token } : { visitorId },
-    transports: ['polling', 'websocket'],
+    transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: 10,
     reconnectionDelay: 1000,
