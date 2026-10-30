@@ -37,7 +37,8 @@ const getCleanDeviceLabel = (
 };
 
 export const MeetingLobby: React.FC = () => {
-  const { code = '' } = useParams<{ code: string }>();
+  const { code = '', id = '' } = useParams<{ code?: string; id?: string }>();
+  const meetingIdentifier = code || id;
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { formatDateTimeStr } = useTimeFormat();
@@ -108,25 +109,25 @@ export const MeetingLobby: React.FC = () => {
 
   // Auto-redirect unauthenticated users to login page with saved return URL
   useEffect(() => {
-    if (!isAuthenticated && code) {
-      const returnPath = `/meetings/join/${code}`;
+    if (!isAuthenticated && meetingIdentifier) {
+      const returnPath = code ? `/meetings/join/${code}` : `/meetings/${id}/lobby`;
       sessionStorage.setItem('intellmeet_redirect_url', returnPath);
       navigate('/login', { state: { from: returnPath }, replace: true });
     }
-  }, [isAuthenticated, code, navigate]);
+  }, [isAuthenticated, meetingIdentifier, code, id, navigate]);
 
   useEffect(() => {
     let mounted = true;
     const fetchPreview = async () => {
-      if (!code) {
-        setError('No join code provided');
+      if (!meetingIdentifier) {
+        setError('No join code or meeting ID provided');
         setLoading(false);
         return;
       }
       try {
         setLoading(true);
         setError(null);
-        const res = await previewMeetingByJoinCode(code);
+        const res = await previewMeetingByJoinCode(meetingIdentifier);
         if (mounted) {
           setPreview(res.data.data);
         }
@@ -143,7 +144,7 @@ export const MeetingLobby: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [code]);
+  }, [meetingIdentifier]);
 
   // Start media stream
   const startMedia = async (micId?: string, camId?: string) => {
@@ -272,7 +273,8 @@ export const MeetingLobby: React.FC = () => {
     if (!preview) return;
 
     if (!isAuthenticated) {
-      navigate('/login', { state: { from: `/meetings/join/${code}` } });
+      const returnPath = code ? `/meetings/join/${code}` : `/meetings/${id}/lobby`;
+      navigate('/login', { state: { from: returnPath } });
       return;
     }
 

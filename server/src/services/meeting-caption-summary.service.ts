@@ -34,12 +34,39 @@ export const processMeetingEndCaptions = async (
     const fullDialogue: string[] = [];
 
     for (const turn of turns) {
+      const text = turn.text?.trim();
+      if (!text) continue;
+
       const name = turn.speakerName || 'Participant';
       if (!speakerMap.has(turn.speakerId)) {
         speakerMap.set(turn.speakerId, { speakerName: name, texts: [] });
       }
-      speakerMap.get(turn.speakerId)!.texts.push(turn.text);
-      fullDialogue.push(`${name}: ${turn.text}`);
+
+      const speakerEntry = speakerMap.get(turn.speakerId)!;
+      const lastText = speakerEntry.texts[speakerEntry.texts.length - 1];
+
+      // Deduplicate identical or overlapping consecutive entries
+      if (lastText) {
+        const lastNorm = lastText.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+        const currNorm = text.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+
+        if (lastNorm === currNorm) {
+          continue;
+        }
+        if (currNorm.startsWith(lastNorm)) {
+          speakerEntry.texts[speakerEntry.texts.length - 1] = text;
+          if (fullDialogue.length > 0 && fullDialogue[fullDialogue.length - 1].startsWith(`${name}: `)) {
+            fullDialogue[fullDialogue.length - 1] = `${name}: ${text}`;
+          }
+          continue;
+        }
+        if (lastNorm.startsWith(currNorm)) {
+          continue;
+        }
+      }
+
+      speakerEntry.texts.push(text);
+      fullDialogue.push(`${name}: ${text}`);
     }
 
     const transcriptText = fullDialogue.join('\n\n').trim();
@@ -76,13 +103,25 @@ export const processMeetingEndCaptions = async (
     const recObjectId = new Types.ObjectId(recordingId);
 
     // 2. Create or update Transcript record
-    const speakersPayload = Array.from(speakerMap.entries()).map(([speakerId, info]) => ({
-      speakerId,
-      speakerName: info.speakerName,
-      speakerText: info.texts.join(' '),
-      speakerDurationMs: 0,
-      spoke: info.texts.length > 0
-    }));
+    const speakersPayload = Array.from(speakerMap.entries()).map(([speakerId, info]) => {
+      const cleanTexts: string[] = [];
+      for (const t of info.texts) {
+        const norm = t.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+        const prevNorm = cleanTexts.length > 0
+          ? cleanTexts[cleanTexts.length - 1].toLowerCase().replace(/[^a-z0-9 ]/g, '').trim()
+          : '';
+        if (norm && norm !== prevNorm) {
+          cleanTexts.push(t);
+        }
+      }
+      return {
+        speakerId,
+        speakerName: info.speakerName,
+        speakerText: cleanTexts.join(' '),
+        speakerDurationMs: 0,
+        spoke: cleanTexts.length > 0
+      };
+    });
 
     let transcriptDoc = await Transcript.findOne({
       recording_id: { $in: [recordingId, recObjectId] },

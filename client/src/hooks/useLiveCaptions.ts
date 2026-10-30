@@ -136,7 +136,22 @@ export const useLiveCaptions = ({
 
           // If same speaker within 4 seconds, append to the same paragraph instead of creating a new line
           if (last && last.speakerId === caption.speakerId && (caption.timestamp - last.timestamp) < 4000) {
-            const mergedText = `${last.text.replace(/[.,!?]+$/, '')}. ${caption.text}`;
+            const cleanLast = last.text.trim();
+            const cleanNew = caption.text.trim();
+            const lastNorm = cleanLast.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+            const newNorm = cleanNew.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+
+            // Ignore exact duplicates or already-included sentences
+            if (lastNorm === newNorm || lastNorm.endsWith(newNorm)) {
+              return prev;
+            }
+            if (newNorm.startsWith(lastNorm)) {
+              const updated = [...prev];
+              updated[lastIndex] = { ...last, id: caption.id, text: cleanNew, timestamp: caption.timestamp };
+              return updated;
+            }
+
+            const mergedText = `${cleanLast.replace(/[.,!?]+$/, '')}. ${cleanNew}`;
             const merged: LiveCaptionItem = {
               ...last,
               id: caption.id,
@@ -254,10 +269,19 @@ export const useLiveCaptions = ({
 
       // If new parts finalized and differs from what we already committed:
       if (hasFinal && sessionFinal && sessionFinal !== lastCommittedFinalRef.current) {
-        // Calculate the fresh new text piece that hasn't been saved yet
+        const normSession = sessionFinal.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+        const normLast = lastCommittedFinalRef.current.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+
+        if (normSession === normLast) {
+          lastCommittedFinalRef.current = sessionFinal;
+          return;
+        }
+
         let newPiece = sessionFinal;
-        if (lastCommittedFinalRef.current && sessionFinal.startsWith(lastCommittedFinalRef.current)) {
-          newPiece = sessionFinal.slice(lastCommittedFinalRef.current.length).trim();
+        if (normLast && normSession.startsWith(normLast)) {
+          const lastWords = normLast.split(/\s+/).filter(Boolean);
+          const sessionWords = sessionFinal.split(/\s+/).filter(Boolean);
+          newPiece = sessionWords.slice(lastWords.length).join(' ').trim();
         }
         lastCommittedFinalRef.current = sessionFinal;
 
@@ -351,6 +375,7 @@ export const useLiveCaptions = ({
     };
 
     recognition.onend = () => {
+      lastCommittedFinalRef.current = '';
       // Clear any pending restart timer
       if (restartTimerRef.current) {
         window.clearTimeout(restartTimerRef.current);

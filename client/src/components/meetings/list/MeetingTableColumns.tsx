@@ -197,7 +197,15 @@ export function getMeetingTableColumns({
               size="sm"
               disabled={!canJoin}
               className="h-7 px-2.5 text-xs font-semibold gap-1"
-              onClick={() => onNavigate(`/meetings/${m.meetingId}`)}
+              onClick={() => {
+                const code = m.meetingJoinCode || (m as unknown as Record<string, string>)?.meeting_join_code;
+                const id = m.meetingId || (m as unknown as Record<string, string>)?._id;
+                if (code) {
+                  onNavigate(`/meetings/join/${code}`);
+                } else if (id) {
+                  onNavigate(`/meetings/${id}/lobby`);
+                }
+              }}
             >
               {buttonIcon}
               <span>{buttonText}</span>

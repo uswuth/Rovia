@@ -45,7 +45,10 @@ export const findScopedMeetingByJoinCode = async (
   joinCode: string,
   organizationId?: string
 ): Promise<MeetingDocument> => {
-  const query: Record<string, unknown> = { meeting_join_code: joinCode };
+  const isMongoId = Types.ObjectId.isValid(joinCode);
+  const query: Record<string, unknown> = isMongoId
+    ? { $or: [{ meeting_join_code: joinCode }, { _id: joinCode }] }
+    : { meeting_join_code: joinCode };
   if (organizationId) {
     query.organization_id = organizationId;
   }
@@ -369,7 +372,7 @@ export const previewMeetingByJoinCodeService = async (joinCode: string, organiza
   }
   const meeting = await findScopedMeetingByJoinCode(joinCode, organizationId);
   return {
-    meetingId: meeting.meetingId,
+    meetingId: meeting._id?.toString() || meeting.meetingId || '',
     meetingTitle: meeting.meeting_title,
     meetingDescription: meeting.meeting_description || '',
     meetingStatus: meeting.meeting_status,

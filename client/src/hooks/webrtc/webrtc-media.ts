@@ -1,9 +1,31 @@
-export const ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun.cloudflare.com:3478' },
-];
+const getIceServers = (): RTCIceServer[] => {
+  const servers: RTCIceServer[] = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+  ];
+
+  const turnUrl = (import.meta.env?.VITE_TURN_URL as string | undefined)?.trim();
+  const turnUsername = (import.meta.env?.VITE_TURN_USERNAME as string | undefined)?.trim();
+  const turnCredential = ((import.meta.env?.VITE_TURN_CREDENTIAL || import.meta.env?.VITE_TURN_PASSWORD) as string | undefined)?.trim();
+
+  if (turnUrl) {
+    const urls = turnUrl.split(',').map((u) => u.trim()).filter(Boolean);
+    if (urls.length > 0) {
+      const turnEntry: RTCIceServer = { urls };
+      if (turnUsername) turnEntry.username = turnUsername;
+      if (turnCredential) turnEntry.credential = turnCredential;
+      servers.push(turnEntry);
+    }
+  }
+
+  return servers;
+};
+
+export const ICE_SERVERS: RTCIceServer[] = getIceServers();
 
 export const CAMERA_MAX_BITRATE = 3_000_000;
 

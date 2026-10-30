@@ -83,6 +83,7 @@ export const MeetingRoom: React.FC = () => {
   const [meetingEndedByHost, setMeetingEndedByHost] = useState(false);
   const [speakerOn, setSpeakerOn] = useState<boolean>(true);
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState<boolean>(false);
+  const isLeavingRef = React.useRef(false);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -194,21 +195,35 @@ export const MeetingRoom: React.FC = () => {
   }, [captions.recognitionError, showToast]);
 
   useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (meetingEndedByHost || isLeavingRef.current) return;
+      e.preventDefault();
+      e.returnValue = 'Leaving or refreshing this page will make you leave this meeting and you will need to rejoin.';
+      return e.returnValue;
+    };
+
     const handleUnload = () => {
-      if (id) {
+      if (id && !meetingEndedByHost && !isLeavingRef.current) {
         if (rtc.isScreenSharing) {
           void rtc.stopScreenShare();
         }
-        import('@/api/meeting/meeting-socket').then((m) => {
-          const s = m.getMeetingSocket();
+        try {
+          const s = getMeetingSocket();
           s.emit('meeting:state', { meetingId: id, state: { isScreenSharing: false } });
           s.emit('meeting:leave', id);
-        }).catch(() => { });
+        } catch {
+          // Socket might already be closed
+        }
       }
     };
-    window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
-  }, [id, rtc]);
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('unload', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('unload', handleUnload);
+    };
+  }, [id, meetingEndedByHost, rtc]);
 
   const {
     questions,
@@ -234,7 +249,10 @@ export const MeetingRoom: React.FC = () => {
     userId: user?.userId,
     refetchMeeting: () => { void refetch(); },
     refetchQuestions: () => { void questions.refetch(); },
-    onMeetingEnded: () => setMeetingEndedByHost(true),
+    onMeetingEnded: () => {
+      isLeavingRef.current = true;
+      setMeetingEndedByHost(true);
+    },
     onParticipantMutedByHost: () => {
       setMicOn(false);
       rtc.setAudioEnabled(false);
@@ -437,6 +455,7 @@ export const MeetingRoom: React.FC = () => {
   });
 
   const confirmLeave = async () => {
+    isLeavingRef.current = true;
     setShowLeaveModal(false);
     if (rtc.isScreenSharing) {
       void rtc.stopScreenShare();
@@ -465,6 +484,7 @@ export const MeetingRoom: React.FC = () => {
   });
 
   const confirmEndMeeting = () => {
+    isLeavingRef.current = true;
     if (rtc.isScreenSharing) {
       void rtc.stopScreenShare();
     }

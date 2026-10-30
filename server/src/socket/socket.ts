@@ -454,35 +454,61 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       const targetId = socket.data.meetingId || payload?.meetingId;
       if (!targetId || !payload?.text) return;
 
+      const text = payload.text.trim();
+      if (!text) return;
+
+      const speakerId = payload.speakerId || socket.data.userId || 'participant';
+      const speakerName = payload.speakerName || 'Participant';
+      const isFinal = Boolean(payload.isFinal);
+
       // Broadcast real-time closed captions to all other participants in the meeting room
       socket.to(`meeting:${targetId}`).emit('meeting:caption', {
         id: payload.id,
-        speakerId: payload.speakerId || socket.data.userId || 'participant',
-        speakerName: payload.speakerName || 'Participant',
-        text: payload.text,
-        isFinal: Boolean(payload.isFinal),
+        speakerId,
+        speakerName,
+        text,
+        isFinal,
         timestamp: payload.timestamp || Date.now()
       });
 
-      // Maintain live transcript buffer: update the in-flight utterance turn or append new turn
+      // Maintain live transcript buffer: update in-flight utterance turn or append new turn without duplicating
       const turns = meetingLiveTranscripts.get(targetId) || [];
-      const speakerId = payload.speakerId || socket.data.userId || 'participant';
-      const speakerName = payload.speakerName || 'Participant';
       const lastTurn = turns[turns.length - 1];
 
-      if (lastTurn && lastTurn.speakerId === speakerId && !payload.isFinal) {
-        // Update in-progress turn text
-        lastTurn.text = payload.text.trim();
-        lastTurn.timestamp = payload.timestamp || Date.now();
-      } else {
-        // Utterance finalized or new speaker started
-        turns.push({
-          speakerId,
-          speakerName,
-          text: payload.text.trim(),
-          timestamp: payload.timestamp || Date.now()
-        });
+      if (lastTurn && lastTurn.speakerId === speakerId) {
+        const lastNorm = lastTurn.text.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+        const currNorm = text.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+
+        // Exact match: ignore redundant emission
+        if (lastNorm === currNorm) {
+          lastTurn.timestamp = payload.timestamp || Date.now();
+          return;
+        }
+
+        // Current turn extends or refines previous turn (progressive speech or interim-to-final transition)
+        if (currNorm.startsWith(lastNorm) || lastNorm.startsWith(currNorm)) {
+          lastTurn.text = text.length >= lastTurn.text.length ? text : lastTurn.text;
+          lastTurn.timestamp = payload.timestamp || Date.now();
+          meetingLiveTranscripts.set(targetId, turns);
+          return;
+        }
+
+        // If incoming is interim and speaker hasn't paused, update in-progress text
+        if (!isFinal) {
+          lastTurn.text = text;
+          lastTurn.timestamp = payload.timestamp || Date.now();
+          meetingLiveTranscripts.set(targetId, turns);
+          return;
+        }
       }
+
+      // Utterance finalized or new speaker started
+      turns.push({
+        speakerId,
+        speakerName,
+        text,
+        timestamp: payload.timestamp || Date.now()
+      });
       meetingLiveTranscripts.set(targetId, turns);
     });
 
@@ -496,17 +522,49 @@ export const initSocket = (httpServer: HTTPServer): TypedSocketServer => {
       });
     });
 
-    socket.on('disconnect', (reason: string) => {
+    socket.on('disconnect', async (reason: string) => {
       logger.info(`Socket client disconnected: ${socket.id} (reason: ${reason})`);
       const meetingId = socket.data.meetingId;
       const userId = socket.data.userId;
       if (meetingId && userId) {
-        socket.to(`meeting:${meetingId}`).emit('meeting:peer-left', { userId });
-        const hands = meetingRaisedHands.get(meetingId);
-        if (hands && hands.some((h) => h.userId === userId)) {
-          const updated = hands.filter((h) => h.userId !== userId);
-          meetingRaisedHands.set(meetingId, updated);
-          io?.to(`meeting:${meetingId}`).emit('meeting:hands-updated', { hands: updated });
+        const room = io?.sockets.adapter.rooms.get(`meeting:${meetingId}`);
+        let stillInRoom = false;
+        if (room) {
+          for (const socketId of room) {
+            if (socketId !== socket.id) {
+              const peerSocket = io?.sockets.sockets.get(socketId);
+              if (peerSocket?.data.userId === userId) {
+                stillInRoom = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (!stillInRoom) {
+          socket.to(`meeting:${meetingId}`).emit('meeting:peer-left', { userId });
+          const hands = meetingRaisedHands.get(meetingId);
+          if (hands && hands.some((h) => h.userId === userId)) {
+            const updated = hands.filter((h) => h.userId !== userId);
+            meetingRaisedHands.set(meetingId, updated);
+            io?.to(`meeting:${meetingId}`).emit('meeting:hands-updated', { hands: updated });
+          }
+
+          try {
+            const meeting = meetingId.match(/^[0-9a-fA-F]{24}$/)
+              ? await Meeting.findById(meetingId)
+              : await Meeting.findOne({ meeting_join_code: meetingId });
+            if (meeting) {
+              const participantRecord = meeting.meeting_participants.find((p) => String(p.userId) === userId);
+              if (participantRecord && participantRecord.participant_status !== 'LEFT') {
+                participantRecord.participant_status = 'LEFT';
+                participantRecord.left_at = new Date();
+                await meeting.save();
+              }
+            }
+          } catch (err) {
+            logger.warn(`Failed to update participant left status on disconnect: ${(err as Error).message}`);
+          }
         }
       }
     });

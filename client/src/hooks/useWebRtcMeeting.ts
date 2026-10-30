@@ -113,7 +113,7 @@ export const useWebRtcMeeting = (
         delete connections.current[userId];
       }
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS, iceCandidatePoolSize: 10 });
       connections.current[userId] = pc;
       if (!iceCandidatesQueue.current[userId]) {
         iceCandidatesQueue.current[userId] = [];
@@ -243,7 +243,7 @@ export const useWebRtcMeeting = (
           setStatus('connected');
           applyBitratesToConnection(pc);
         }
-        if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
+        if (['failed', 'closed'].includes(pc.connectionState)) {
           connections.current[userId]?.close();
           delete connections.current[userId];
           delete iceCandidatesQueue.current[userId];

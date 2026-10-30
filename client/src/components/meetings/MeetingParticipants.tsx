@@ -223,6 +223,10 @@ export const MeetingParticipants: React.FC<MeetingParticipantsProps> = ({
                       {displayName} {isYou ? '(You)' : ''}
                     </p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-500 font-medium">
+                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                        active
+                      </span>
                       {role !== 'MEMBER' && (
                         <Badge tone="accent" className="text-[10px] py-0 px-1.5">
                           <Shield size={9} />

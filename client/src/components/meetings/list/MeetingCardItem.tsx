@@ -344,7 +344,15 @@ export const MeetingCardItem: React.FC<MeetingCardItemProps> = ({
             size="sm"
             className="h-8 text-xs font-semibold gap-1.5"
             disabled={!canJoin}
-            onClick={() => navigate(`/meetings/${m.meetingId}`)}
+            onClick={() => {
+              const code = m.meetingJoinCode || (m as unknown as Record<string, string>)?.meeting_join_code;
+              const meetingId = m.meetingId || (m as unknown as Record<string, string>)?._id;
+              if (code) {
+                navigate(`/meetings/join/${code}`);
+              } else if (meetingId) {
+                navigate(`/meetings/${meetingId}/lobby`);
+              }
+            }}
           >
             {buttonIcon}
             <span>{buttonText}</span>

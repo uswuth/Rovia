@@ -132,6 +132,8 @@ const App = () => {
                       <Route path="/unauthorized" element={<UnauthorizedAccess />} />
 
                       <Route path="/meetings/join/:code" element={<MeetingLobby />} />
+                      <Route path="/meetings/:id/lobby" element={<MeetingLobby />} />
+                      <Route path="/meetings/:id" element={<MeetingLobby />} />
 
                       <Route element={<MeetingRoomRoute />}>
                         <Route path="/meetings/:id/room" element={<MeetingRoom />} />
