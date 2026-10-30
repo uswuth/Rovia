@@ -109,6 +109,8 @@ export const useWebRtcMeeting = (
   }, []);
 
   const makingOfferRef = useRef<Record<string, boolean>>({});
+  const screenSenderRef = useRef<Record<string, RTCRtpSender>>({});
+  const screenTransceiverRef = useRef<Record<string, RTCRtpTransceiver>>({});
   const sendOfferRef = useRef<((userId: string, pc: RTCPeerConnection) => Promise<void>) | null>(null);
 
   const sendOffer = useCallback(async (userId: string, pc: RTCPeerConnection) => {
@@ -156,54 +158,77 @@ export const useWebRtcMeeting = (
         iceCandidatesQueue.current[userId] = [];
       }
 
-      if (localRef.current) {
-        localRef.current.getTracks().forEach((track) => pc.addTrack(track, localRef.current as MediaStream));
-      }
-      if (screenRef.current) {
-        screenRef.current.getTracks().forEach((track) => pc.addTrack(track, screenRef.current as MediaStream));
-      }
-
-      const senders = pc.getSenders();
-      if (!senders.some((s) => s.track?.kind === 'audio')) {
-        try { pc.addTransceiver('audio', { direction: 'sendrecv' }); } catch {
-          // Transceiver might already exist or not supported
-        }
-      }
-      // Ensure at least 2 video transceivers exist (Slot 1: Camera, Slot 2: Screen share)
-      const videoTransceivers = pc.getTransceivers().filter((t) => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video');
-      const requiredVideoTransceivers = 2;
-      for (let i = videoTransceivers.length; i < requiredVideoTransceivers; i++) {
-        try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch {
-          // Transceiver might already exist or not supported
-        }
-      }
-      applyBitratesToConnection(pc);
-
+      // Dedicated MediaStream references per peer
       const remoteCamera = new MediaStream();
       const remoteScreen = new MediaStream();
       upsertPeer(userId, { stream: remoteCamera, screenStream: remoteScreen });
+
+      // Add local audio and video (camera) tracks
+      if (localRef.current) {
+        localRef.current.getTracks().forEach((track) => pc.addTrack(track, localRef.current as MediaStream));
+      }
+
+      // Add camera transceivers if needed
+      const senders = pc.getSenders();
+      if (!senders.some((s) => s.track?.kind === 'audio')) {
+        try {
+          pc.addTransceiver('audio', { direction: 'sendrecv' });
+        } catch {
+          // Transceiver might already exist
+        }
+      }
+      if (!senders.some((s) => s.track?.kind === 'video')) {
+        try {
+          pc.addTransceiver('video', { direction: 'sendrecv' });
+        } catch {
+          // Transceiver might already exist
+        }
+      }
+
+      // Separate dedicated transceiver for screen share (sendrecv so both peers can send/receive screen)
+      try {
+        const screenTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
+        screenTransceiverRef.current[userId] = screenTransceiver;
+        if (screenRef.current) {
+          const screenTrack = screenRef.current.getVideoTracks()[0];
+          if (screenTrack) {
+            void screenTransceiver.sender.replaceTrack(screenTrack);
+            screenSenderRef.current[userId] = screenTransceiver.sender;
+          }
+        }
+      } catch {
+        // Transceiver setup fallback
+      }
+
+      applyBitratesToConnection(pc);
 
       pc.ontrack = (event) => {
         const track = event.track;
         if (!track) return;
 
         if (track.kind === 'video') {
-          // If remoteCamera already has a video track and a second video track arrives, that second track is the screen share
-          const hasCameraVideo = remoteCamera.getVideoTracks().length > 0;
+          // Explicit stream identification (e.g. stream ID contains 'screen' or track label contains 'screen')
           const isExplicitScreen =
             track.label?.toLowerCase().includes('screen') ||
             event.streams?.some((s) => s.id?.toLowerCase().includes('screen'));
 
-          if (hasCameraVideo || isExplicitScreen) {
-            // Belongs to screenStream
+          // Slot determination: If remoteCamera already has a video track and a second video track arrives, that second is the screen share
+          const hasCameraVideo = remoteCamera.getVideoTracks().length > 0;
+
+          if (isExplicitScreen || (hasCameraVideo && !remoteCamera.getTracks().some((t) => t.id === track.id))) {
+            // Dedicated Screen Stream
             if (!remoteScreen.getTracks().some((t) => t.id === track.id)) {
               remoteScreen.addTrack(track);
             }
             track.onended = () => {
-              remoteScreen.removeTrack(track);
+              try {
+                remoteScreen.removeTrack(track);
+              } catch {
+                // Ignore removal error
+              }
               upsertPeer(userId, {
                 screenStream: new MediaStream(remoteScreen.getTracks()),
-                isScreenSharing: remoteScreen.getVideoTracks().length > 0,
+                isScreenSharing: false,
               });
             };
             upsertPeer(userId, {
@@ -211,12 +236,16 @@ export const useWebRtcMeeting = (
               isScreenSharing: true,
             });
           } else {
-            // Belongs to remoteCamera
+            // Dedicated Camera Stream
             if (!remoteCamera.getTracks().some((t) => t.id === track.id)) {
               remoteCamera.addTrack(track);
             }
             track.onended = () => {
-              remoteCamera.removeTrack(track);
+              try {
+                remoteCamera.removeTrack(track);
+              } catch {
+                // Ignore removal error
+              }
               upsertPeer(userId, { stream: new MediaStream(remoteCamera.getTracks()) });
             };
             upsertPeer(userId, { stream: new MediaStream(remoteCamera.getTracks()) });
@@ -227,7 +256,11 @@ export const useWebRtcMeeting = (
             remoteCamera.addTrack(track);
           }
           track.onended = () => {
-            remoteCamera.removeTrack(track);
+            try {
+              remoteCamera.removeTrack(track);
+            } catch {
+              // Ignore removal error
+            }
             upsertPeer(userId, { stream: new MediaStream(remoteCamera.getTracks()) });
           };
           upsertPeer(userId, { stream: new MediaStream(remoteCamera.getTracks()) });
@@ -350,14 +383,16 @@ export const useWebRtcMeeting = (
       socketRef.current = socket;
 
       socket.on('meeting:peer-joined', ({ userId }) => {
-        const pc = createConnection(userId, false);
+        createConnection(userId, false);
         upsertPeer(userId, {});
         onPeerJoinedRef.current?.(userId);
 
         if (screenRef.current) {
           const screenVideoTrack = screenRef.current.getVideoTracks()[0];
-          if (screenVideoTrack && !pc.getSenders().some((s) => s.track === screenVideoTrack)) {
-            pc.addTrack(screenVideoTrack, screenRef.current);
+          const transceiver = screenTransceiverRef.current[userId];
+          if (screenVideoTrack && transceiver?.sender) {
+            void transceiver.sender.replaceTrack(screenVideoTrack);
+            screenSenderRef.current[userId] = transceiver.sender;
           }
         }
 
@@ -377,6 +412,8 @@ export const useWebRtcMeeting = (
       socket.on('meeting:peer-left', ({ userId }) => {
         connections.current[userId]?.close();
         delete connections.current[userId];
+        delete screenTransceiverRef.current[userId];
+        delete screenSenderRef.current[userId];
         delete iceCandidatesQueue.current[userId];
         setPeers((prev) => {
           const next = { ...prev };
@@ -387,11 +424,14 @@ export const useWebRtcMeeting = (
       });
 
       socket.on('meeting:state', ({ userId, state }) => {
-        const patch: { audioEnabled?: boolean; videoEnabled?: boolean; isScreenSharing?: boolean; stream?: MediaStream | null; screenStream?: MediaStream } = {};
+        const patch: { audioEnabled?: boolean; videoEnabled?: boolean; isScreenSharing?: boolean; stream?: MediaStream | null; screenStream?: MediaStream | null } = {};
         if (typeof state.audioEnabled === 'boolean') patch.audioEnabled = state.audioEnabled;
         if (typeof state.videoEnabled === 'boolean') patch.videoEnabled = state.videoEnabled;
         if (typeof state.isScreenSharing === 'boolean') {
           patch.isScreenSharing = state.isScreenSharing;
+          if (!state.isScreenSharing) {
+            patch.screenStream = null;
+          }
         }
         if (Object.keys(patch).length > 0) upsertPeer(userId, patch);
       });
@@ -473,7 +513,23 @@ export const useWebRtcMeeting = (
           setStatus('failed');
           return;
         }
-        (result.peers ?? []).forEach((userId) => createConnection(userId, true));
+        (result.peers ?? []).forEach((userId) => {
+          upsertPeer(userId, {});
+          createConnection(userId, true);
+        });
+
+        // Broadcast current audio/video state so newly joined room peers immediately know whether our mic and camera are active
+        const currentMic = localRef.current?.getAudioTracks().some((t) => t.enabled) ?? true;
+        const currentCam = localRef.current?.getVideoTracks().some((t) => t.enabled) ?? true;
+        const isSharing = Boolean(screenRef.current);
+        socket.emit('meeting:state', {
+          meetingId,
+          state: {
+            audioEnabled: currentMic,
+            videoEnabled: currentCam,
+            isScreenSharing: isSharing
+          }
+        });
       });
     };
 
@@ -482,14 +538,22 @@ export const useWebRtcMeeting = (
     return () => {
       cancelled = true;
       if (joinTimer !== undefined) window.clearTimeout(joinTimer);
+      if (screenRef.current) {
+        screenRef.current.getTracks().forEach((track) => track.stop());
+        screenRef.current = null;
+      }
+      socketRef.current?.emit('meeting:state', {
+        meetingId,
+        state: { isScreenSharing: false }
+      });
       socketRef.current?.emit('meeting:leave', meetingId);
       Object.values(connections.current).forEach((pc) => pc.close());
       connections.current = {};
+      screenTransceiverRef.current = {};
+      screenSenderRef.current = {};
       iceCandidatesQueue.current = {};
       localRef.current?.getTracks().forEach((track) => track.stop());
       localRef.current = null;
-      screenRef.current?.getTracks().forEach((track) => track.stop());
-      screenRef.current = null;
       setLocalStream(null);
       setScreenStream(null);
       setIsScreenSharing(false);
@@ -575,27 +639,25 @@ export const useWebRtcMeeting = (
     setScreenStream(null);
     setIsScreenSharing(false);
 
-    const cameraTrack = localRef.current?.getVideoTracks()[0] ?? null;
-    for (const [userId, pc] of Object.entries(connections.current)) {
-      const senders = pc.getSenders();
-      const screenSender = senders.find((s) => screenTracks.includes(s.track!));
-      if (screenSender) {
-        pc.removeTrack(screenSender);
-        await sendOffer(userId, pc);
-      } else {
-        const videoSender = senders.find((s) => s.track?.kind === 'video');
-        if (videoSender && cameraTrack) {
-          await videoSender.replaceTrack(cameraTrack);
+    // Google Meet / Zoom pattern: Stop screen tracks on transceivers without affecting camera transceivers
+    for (const [userId, transceiver] of Object.entries(screenTransceiverRef.current)) {
+      try {
+        if (transceiver.sender) {
+          await transceiver.sender.replaceTrack(null);
         }
+      } catch {
+        // Fallback silently if transceiver is already closed
       }
+      delete screenSenderRef.current[userId];
     }
 
+    const cameraTrack = localRef.current?.getVideoTracks()[0] ?? null;
     const cameraOn = Boolean(cameraTrack && cameraTrack.enabled);
     socketRef.current?.emit('meeting:state', {
       meetingId,
       state: { isScreenSharing: false, videoEnabled: cameraOn }
     });
-  }, [meetingId, sendOffer]);
+  }, [meetingId]);
 
   const startScreenShare = useCallback(async () => {
     try {
@@ -614,21 +676,22 @@ export const useWebRtcMeeting = (
           void stopScreenShare();
         };
 
+        // Attach screen track to each peer's dedicated screen transceiver
         for (const [userId, pc] of Object.entries(connections.current)) {
-          // If local camera track already exists, add screen as an additional track so both stream concurrently
-          const existingSenders = pc.getSenders();
-          const cameraSender = existingSenders.find((s) => s.track === localRef.current?.getVideoTracks()[0]);
-          if (cameraSender) {
-            pc.addTrack(videoTrack, displayStream);
-            await sendOffer(userId, pc);
-          } else {
-            const videoSender = existingSenders.find((s) => s.track?.kind === 'video');
-            if (videoSender) {
-              await videoSender.replaceTrack(videoTrack);
-            } else {
-              pc.addTrack(videoTrack, displayStream);
-              await sendOffer(userId, pc);
+          let transceiver = screenTransceiverRef.current[userId];
+          if (!transceiver || transceiver.direction === 'stopped') {
+            try {
+              transceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
+              screenTransceiverRef.current[userId] = transceiver;
+            } catch {
+              // Transceiver addition fallback
             }
+          }
+          if (transceiver?.sender) {
+            await transceiver.sender.replaceTrack(videoTrack);
+            screenSenderRef.current[userId] = transceiver.sender;
+            // Renegotiate cleanly so the remote peer receives the screen track event
+            await sendOffer(userId, pc);
           }
         }
       }
