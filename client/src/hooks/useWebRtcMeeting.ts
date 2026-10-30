@@ -558,9 +558,10 @@ export const useWebRtcMeeting = (
       tracks.forEach((t) => {
         t.enabled = on;
       });
+      const isSharing = Boolean(screenRef.current);
       socketRef.current?.emit('meeting:state', {
         meetingId,
-        state: { [`${kind}Enabled`]: on }
+        state: { [`${kind}Enabled`]: on, isScreenSharing: isSharing }
       });
     },
     [meetingId, renegotiateAll]

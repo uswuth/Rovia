@@ -260,7 +260,7 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
     const peerHasVideoTrack = Boolean(peerState?.stream?.getVideoTracks().some((t) => t.enabled));
     const isCameraActive = isYou
       ? (localCameraOn ?? true)
-      : (peerState?.videoEnabled !== false || peerHasVideoTrack);
+      : (peerState?.videoEnabled === true && peerHasVideoTrack);
 
     const isMicMuted = isYou
       ? !(localMicOn ?? true)
