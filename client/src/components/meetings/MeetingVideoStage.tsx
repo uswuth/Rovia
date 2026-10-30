@@ -260,7 +260,7 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
     const peerHasVideoTrack = Boolean(peerState?.stream?.getVideoTracks().some((t) => t.enabled));
     const isCameraActive = isYou
       ? (localCameraOn ?? true)
-      : (peerState?.videoEnabled !== false || peerHasVideoTrack);
+      : (peerState?.videoEnabled === true && peerHasVideoTrack);
 
     const isMicMuted = isYou
       ? !(localMicOn ?? true)
@@ -298,9 +298,12 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
   // Detect if any user (you or a remote peer) is sharing screen with an active video track
   const peerSharing = Object.entries(peers).find(
     ([, p]) =>
-      (p.isScreenSharing && ((p.screenStream && p.screenStream.getVideoTracks().length > 0) || (p.stream && p.stream.getVideoTracks().length > 0))) ||
-      (p.screenStream && p.screenStream.getVideoTracks().length > 0) ||
-      p.stream?.getVideoTracks().some((t) => t.label?.toLowerCase().includes('screen'))
+      (p.isScreenSharing && (
+        (p.screenStream && p.screenStream.getVideoTracks().some((t) => t.readyState === 'live')) ||
+        (p.stream && p.stream.getVideoTracks().some((t) => t.readyState === 'live' && t.label?.toLowerCase().includes('screen')))
+      )) ||
+      (p.screenStream && p.screenStream.getVideoTracks().some((t) => t.readyState === 'live')) ||
+      p.stream?.getVideoTracks().some((t) => t.readyState === 'live' && t.label?.toLowerCase().includes('screen'))
   );
 
   const activePresenter = isScreenSharing
@@ -315,7 +318,7 @@ export const MeetingVideoStage: React.FC<MeetingVideoStageProps> = ({
         userId: peerSharing[0],
         name: getParticipantDisplayName({ userId: peerSharing[0] }),
         stream:
-          peerSharing[1].screenStream && peerSharing[1].screenStream.getVideoTracks().length > 0
+          peerSharing[1].screenStream && peerSharing[1].screenStream.getVideoTracks().some((t) => t.readyState === 'live')
             ? peerSharing[1].screenStream
             : peerSharing[1].screenStream || null,
         isYou: false,

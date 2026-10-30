@@ -196,14 +196,19 @@ export const MeetingRoom: React.FC = () => {
   useEffect(() => {
     const handleUnload = () => {
       if (id) {
+        if (rtc.isScreenSharing) {
+          void rtc.stopScreenShare();
+        }
         import('@/api/meeting/meeting-socket').then((m) => {
-          m.getMeetingSocket().emit('meeting:leave', id);
+          const s = m.getMeetingSocket();
+          s.emit('meeting:state', { meetingId: id, state: { isScreenSharing: false } });
+          s.emit('meeting:leave', id);
         }).catch(() => { });
       }
     };
     window.addEventListener('beforeunload', handleUnload);
     return () => window.removeEventListener('beforeunload', handleUnload);
-  }, [id]);
+  }, [id, rtc]);
 
   const {
     questions,
@@ -353,6 +358,18 @@ export const MeetingRoom: React.FC = () => {
     });
   }, [id]);
 
+  const isSomeoneElseSharing = useMemo(() => {
+    return Object.values(rtc.peers).some((p) => p.isScreenSharing);
+  }, [rtc.peers]);
+
+  const handleToggleScreenShare = useCallback(() => {
+    if (!rtc.isScreenSharing && isSomeoneElseSharing) {
+      showToast('Someone else is already sharing their screen');
+      return;
+    }
+    rtc.toggleScreenShare();
+  }, [rtc, isSomeoneElseSharing, showToast]);
+
   const toggleParticipantsPanel = useCallback(() => {
     setPanel((current) => {
       const next = current === 'people' ? null : 'people';
@@ -421,6 +438,9 @@ export const MeetingRoom: React.FC = () => {
 
   const confirmLeave = async () => {
     setShowLeaveModal(false);
+    if (rtc.isScreenSharing) {
+      void rtc.stopScreenShare();
+    }
     leaving.mutate();
   };
 
@@ -445,6 +465,9 @@ export const MeetingRoom: React.FC = () => {
   });
 
   const confirmEndMeeting = () => {
+    if (rtc.isScreenSharing) {
+      void rtc.stopScreenShare();
+    }
     endingMeeting.mutate();
   };
 
@@ -686,7 +709,7 @@ export const MeetingRoom: React.FC = () => {
           void rtc.switchCamera(deviceId);
         }}
         isScreenSharing={rtc.isScreenSharing}
-        onToggleScreenShare={rtc.toggleScreenShare}
+        onToggleScreenShare={handleToggleScreenShare}
         handRaised={isMyHandRaised}
         onToggleHandRaise={handleToggleHandRaise}
         captionsEnabled={captions.captionsEnabled}

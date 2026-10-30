@@ -4,11 +4,10 @@ interface ChromeAudioConstraints extends MediaTrackConstraints {
   googNoiseSuppression?: boolean;
   googHighpassFilter?: boolean;
   googAutoGainControl?: boolean;
+  channelCount?: number;
 }
 
 interface MeetingAudioConstraints extends ChromeAudioConstraints {
-  // Legacy Firefox-only hints. Removed in current Firefox, ignored everywhere
-  // else — harmless to keep for older Firefox forks (Waterfox, LibreWolf).
   mozEchoCancellation?: boolean;
   mozNoiseSuppression?: boolean;
   mozAutoGainControl?: boolean;
@@ -17,10 +16,11 @@ interface MeetingAudioConstraints extends ChromeAudioConstraints {
 export const buildAudioConstraints = (deviceId?: string | null): MeetingAudioConstraints => ({
   ...(deviceId && deviceId !== 'default' ? { deviceId: { exact: deviceId } } : {}),
   // Standard — honored by Chromium and Firefox.
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
-  // Chromium-only: same three, applied even when the device driver reports off.
+  echoCancellation: { ideal: true },
+  noiseSuppression: { ideal: true },
+  autoGainControl: { ideal: true },
+  channelCount: 1,
+  // Chromium-only: applied at the WebRTC audio processing layer
   googEchoCancellation: true,
   googNoiseSuppression: true,
   googHighpassFilter: true,
@@ -30,3 +30,23 @@ export const buildAudioConstraints = (deviceId?: string | null): MeetingAudioCon
   mozNoiseSuppression: true,
   mozAutoGainControl: true,
 });
+
+/**
+ * Ensures optimal track audio settings on active audio tracks.
+ * Applies ideal autoGainControl, noiseSuppression and echoCancellation directly to the track.
+ */
+export const enhanceAudioTrack = (track?: MediaStreamTrack | null): void => {
+  if (!track || track.kind !== 'audio') return;
+  try {
+    void track.applyConstraints({
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: 1,
+    }).catch(() => {
+      // Fallback silently if browser does not support on-the-fly constraint adjustment
+    });
+  } catch {
+    // Ignore unsupported environments
+  }
+};
