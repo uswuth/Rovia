@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getMeetingSocket, disconnectMeetingSocket, type MeetingSocket } from '@/api/meeting/meeting-socket';
 import type { MeetingSignalPayload } from '@/api/meeting/webrtc.types';
-import { buildAudioConstraints } from '@/lib/audio-capture';
+import { buildAudioConstraints, enhanceAudioTrack } from '@/lib/audio-capture';
 
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -292,6 +292,7 @@ export const useWebRtcMeeting = (
           return;
         }
         localRef.current = stream;
+        stream.getAudioTracks().forEach(enhanceAudioTrack);
         setLocalStream(stream);
       } catch {
         try {
@@ -301,6 +302,7 @@ export const useWebRtcMeeting = (
             return;
           }
           localRef.current = stream;
+          stream.getAudioTracks().forEach(enhanceAudioTrack);
           setLocalStream(stream);
         } catch {
           try {
@@ -310,6 +312,7 @@ export const useWebRtcMeeting = (
               return;
             }
             localRef.current = audioStream;
+            audioStream.getAudioTracks().forEach(enhanceAudioTrack);
             setLocalStream(audioStream);
           } catch {
             const emptyStream = new MediaStream();
@@ -504,6 +507,7 @@ export const useWebRtcMeeting = (
           const audioStream = await navigator.mediaDevices.getUserMedia({ audio: buildAudioConstraints() });
           const newAudioTrack = audioStream.getAudioTracks()[0];
           if (newAudioTrack) {
+            enhanceAudioTrack(newAudioTrack);
             if (!localRef.current) {
               localRef.current = new MediaStream();
             }
@@ -675,6 +679,9 @@ export const useWebRtcMeeting = (
 
         const newTrack = kind === 'video' ? newStream.getVideoTracks()[0] : newStream.getAudioTracks()[0];
         if (!newTrack) return;
+        if (kind === 'audio') {
+          enhanceAudioTrack(newTrack);
+        }
 
         if (!localRef.current) {
           localRef.current = new MediaStream();
