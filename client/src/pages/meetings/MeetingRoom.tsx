@@ -7,8 +7,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useQuery, useMutation } from '@/hooks/useApi';
 import { queryKeys } from '@/api/queryClient';
 import { useAuth } from '@/context/AuthContext';
-import { useOrganization } from '@/context/OrganizationContext';
-import { getMemberId } from '@/components/members/member-utils';
 import { parseApiError } from '@/utils/apiError';
 import {
   getMeetingById,
@@ -18,20 +16,6 @@ import {
   previewMeetingByJoinCode,
 } from '@/api/meeting/meeting.api';
 import { getMeetingSocket } from '@/api/meeting/meeting-socket';
-import {
-  getMeetingQuestions,
-  askQuestion,
-  answerQuestion,
-  dismissQuestion,
-  type MeetingQuestion,
-} from '@/api/meeting/meeting-qa.api';
-import {
-  getMeetingPolls,
-  createPoll,
-  votePoll,
-  closePoll,
-  type MeetingPoll,
-} from '@/api/meeting/meeting-poll.api';
 import { useWebRtcMeeting } from '@/hooks/useWebRtcMeeting';
 import { useLiveCaptions } from '@/hooks/useLiveCaptions';
 import type { Meeting, MeetingParticipant, MeetingParticipantRaw, MeetingPreview } from '@/api/meeting/meeting.types';
@@ -47,6 +31,12 @@ import { MeetingEndedModal } from '@/components/meetings/MeetingEndedModal';
 import { ParticipantSettingsModal, type ParticipantPermissions } from '@/components/meetings/ParticipantSettingsModal';
 import { shareOrCopy } from '@/lib/share';
 import { cn } from '@/lib/utils';
+
+import { useMeetingParticipantResolver } from '@/components/meetings/room/useMeetingParticipantResolver';
+import { useMeetingMediaDevices } from '@/components/meetings/room/useMeetingMediaDevices';
+import { useMeetingQaAndPolls } from '@/components/meetings/room/useMeetingQaAndPolls';
+import { useMeetingShortcuts } from '@/components/meetings/room/useMeetingShortcuts';
+import { useMeetingSocketEvents } from '@/components/meetings/room/useMeetingSocketEvents';
 
 export const MeetingRoom: React.FC = () => {
   const { id = '' } = useParams();
@@ -64,6 +54,7 @@ export const MeetingRoom: React.FC = () => {
       setRenderedPanel(p);
     }
   }, []);
+
   const [editing, setEditing] = useState<MeetingParticipant | null>(null);
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -90,13 +81,6 @@ export const MeetingRoom: React.FC = () => {
   const [captionFontSize, setCaptionFontSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [captionOpacity, setCaptionOpacity] = useState<20 | 40 | 60 | 80 | 100>(80);
   const [meetingEndedByHost, setMeetingEndedByHost] = useState(false);
-
-  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
-  const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
-  const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
-  const [selectedMic, setSelectedMic] = useState<string>(() => locationState?.selectedMic || '');
-  const [selectedSpeaker, setSelectedSpeaker] = useState<string>(() => locationState?.selectedSpeaker || '');
-  const [selectedCamera, setSelectedCamera] = useState<string>(() => locationState?.selectedCamera || '');
   const [speakerOn, setSpeakerOn] = useState<boolean>(true);
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState<boolean>(false);
 
@@ -104,89 +88,6 @@ export const MeetingRoom: React.FC = () => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
-
-  const { members: orgMembers } = useOrganization();
-
-  const getParticipantDisplayName = useCallback((participant: { userId?: string; userName?: string; name?: string } | MeetingParticipant) => {
-    const pId = participant.userId || '';
-    if (pId === user?.userId) return user?.userName || 'You';
-
-    const matchedMember = (orgMembers || []).find((m) => {
-      const mId = getMemberId(m);
-      return mId === pId || (m as unknown as Record<string, string>).id === pId || (m as unknown as Record<string, string>)._id === pId;
-    });
-
-    if (matchedMember) {
-      const mRaw = matchedMember as unknown as Record<string, string>;
-      return mRaw.name || matchedMember.userName || mRaw.email || matchedMember.userEmail || 'Member';
-    }
-
-    const raw = participant as unknown as Record<string, string>;
-    if (raw.userName || raw.name) {
-      return raw.userName || raw.name;
-    }
-
-    return pId.length > 20 ? `Participant (${pId.slice(-4)})` : pId;
-  }, [orgMembers, user?.userId, user?.userName]);
-
-  const getParticipantAvatar = (participant: { userId?: string } | MeetingParticipant): string | undefined => {
-    const pId = participant.userId || '';
-    if (pId === user?.userId) return user?.avatarUrl;
-
-    const raw = participant as unknown as Record<string, string>;
-    if (raw.avatarUrl || raw.avatar) return raw.avatarUrl || raw.avatar;
-
-    const matchedMember = (orgMembers || []).find((m) => {
-      const mId = getMemberId(m);
-      return mId === pId || (m as unknown as Record<string, string>).id === pId || (m as unknown as Record<string, string>)._id === pId;
-    });
-
-    if (matchedMember) {
-      const mRaw = matchedMember as unknown as Record<string, string>;
-      return mRaw.avatarUrl || mRaw.avatar;
-    }
-
-    return undefined;
-  };
-
-  const getParticipantEmail = (participant: { userId?: string }): string | undefined => {
-    const pId = participant.userId || '';
-    if (pId === user?.userId) return user?.userEmail || (user as unknown as Record<string, string>)?.email;
-
-    const matchedMember = (orgMembers || []).find((m) => {
-      const mId = getMemberId(m);
-      return mId === pId || (m as unknown as Record<string, string>).id === pId || (m as unknown as Record<string, string>)._id === pId;
-    });
-
-    if (matchedMember) {
-      const mRaw = matchedMember as unknown as Record<string, string>;
-      return mRaw.email || mRaw.userEmail || (matchedMember as unknown as Record<string, string>).email;
-    }
-
-    const meetingPart = meeting?.participants?.find((mp) => mp.userId === pId || (mp as unknown as MeetingParticipantRaw).user_id === pId);
-    if (meetingPart) {
-      const mpRaw = meetingPart as unknown as MeetingParticipantRaw & { email?: string; userEmail?: string; user?: { email?: string; userEmail?: string } };
-      return (
-        mpRaw.userEmail ||
-        mpRaw.email ||
-        mpRaw.user?.email ||
-        mpRaw.user?.userEmail
-      );
-    }
-
-    return undefined;
-  };
-
-  const getParticipantMeetingRole = (participant: { userId?: string }): 'Host' | 'Moderator' | 'Member' => {
-    const pId = participant.userId || '';
-    const isCreator = meeting?.createdBy && meeting.createdBy === pId;
-    const meetingPart = meeting?.participants?.find((mp) => mp.userId === pId || (mp as unknown as MeetingParticipantRaw).user_id === pId);
-    const role = (meetingPart?.participantRole || (meetingPart as unknown as MeetingParticipantRaw)?.participant_role || '').toString().toUpperCase();
-
-    if (isCreator || role === 'HOST') return 'Host';
-    if (role === 'MODERATOR') return 'Moderator';
-    return 'Member';
-  };
 
   const { data: meeting, loading, error, refetch } = useQuery<Meeting>(
     queryKeys.meetings.detail(id),
@@ -221,6 +122,19 @@ export const MeetingRoom: React.FC = () => {
     { enabled: Boolean(id) && isAuthenticated }
   );
 
+  const {
+    getParticipantDisplayName,
+    getParticipantAvatar,
+    getParticipantEmail,
+    getParticipantMeetingRole,
+  } = useMeetingParticipantResolver({
+    meeting,
+    userId: user?.userId,
+    userName: user?.userName,
+    userEmail: user?.userEmail,
+    userAvatarUrl: user?.avatarUrl,
+  });
+
   useEffect(() => {
     if (id && isAuthenticated) {
       joinMeeting(id).then(() => {
@@ -244,7 +158,23 @@ export const MeetingRoom: React.FC = () => {
     },
   });
 
-  // Real-time live speech-to-text and captions
+  const {
+    audioInputs,
+    audioOutputs,
+    videoInputs,
+    selectedMic,
+    setSelectedMic,
+    selectedSpeaker,
+    setSelectedSpeaker,
+    selectedCamera,
+    setSelectedCamera,
+  } = useMeetingMediaDevices({
+    initialMicDeviceId: locationState?.selectedMic,
+    initialCameraDeviceId: locationState?.selectedCamera,
+    initialSpeakerDeviceId: locationState?.selectedSpeaker,
+    localStream: rtc.localStream,
+  });
+
   const captions = useLiveCaptions({
     meetingId: id,
     currentUserId: user?.userId,
@@ -252,7 +182,6 @@ export const MeetingRoom: React.FC = () => {
     micOn,
   });
 
-  // Surface SpeechRecognition errors to the user (e.g. network issues, blocked by ad blocker)
   useEffect(() => {
     if (captions.recognitionError) {
       const isRecoverable = captions.recognitionError === 'network';
@@ -276,73 +205,46 @@ export const MeetingRoom: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [id]);
 
-  const questions = useQuery<MeetingQuestion[]>(
-    queryKeys.meetings.questions(id),
-    () => getMeetingQuestions(id),
-    { enabled: Boolean(id) && panel === 'qa', list: true, refetchInterval: panel === 'qa' ? 3000 : false }
-  );
+  const {
+    questions,
+    polls,
+    qaPending,
+    pollPending,
+    handleAskQuestion,
+    handleAnswerQuestion,
+    handleDismissQuestion,
+    handleCreatePoll,
+    handleVotePoll,
+    handleClosePoll,
+  } = useMeetingQaAndPolls({
+    meetingId: id,
+    isQaPanelOpen: panel === 'qa',
+    showToast,
+  });
 
-  const polls = useQuery<MeetingPoll[]>(
-    queryKeys.meetings.polls(id),
-    () => getMeetingPolls(id),
-    { enabled: Boolean(id), list: true }
-  );
-
-  useEffect(() => {
-    if (!id || !isAuthenticated) return;
-    const s = getMeetingSocket();
-
-    const handleEnded = () => {
-      setMeetingEndedByHost(true);
-    };
-    const handlePollUpdated = () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.meetings.polls(id) });
-    };
-    const handleQuestionUpdated = () => {
-      void questions.refetch();
-      void queryClient.invalidateQueries({ queryKey: queryKeys.meetings.questions(id) });
-    };
-    const handleParticipantUpdated = (data: { meetingId: string; participantId: string; permissions?: Record<string, boolean> }) => {
-      void refetch();
-      if (data.participantId === user?.userId) {
-        if (data.permissions?.canSendAudio === false) {
-          setMicOn(false);
-          rtc.setAudioEnabled(false);
-          showToast('You were muted by the host');
-        }
-        if (data.permissions?.canSendVideo === false) {
-          setCameraOn(false);
-          rtc.setVideoEnabled(false);
-          showToast('Your camera was turned off by the host');
-        }
-      }
-    };
-    const handleMessage = (message: MeetingChatMessage) => {
-      setChatMessages((prev) => {
-        if (prev.some((m) => m.messageId === message.messageId)) return prev;
-        return [...prev, message];
-      });
-    };
-    const handleHandsUpdated = (data: { hands: RaisedHand[] }) => {
-      setRaisedHands(data?.hands || []);
-    };
-
-    s.on('meeting:ended', handleEnded);
-    s.on('meeting:poll-updated', handlePollUpdated);
-    s.on('meeting:question-updated', handleQuestionUpdated);
-    s.on('meeting:participant-updated', handleParticipantUpdated);
-    s.on('meeting:message', handleMessage);
-    s.on('meeting:hands-updated', handleHandsUpdated);
-
-    return () => {
-      s.off('meeting:ended', handleEnded);
-      s.off('meeting:poll-updated', handlePollUpdated);
-      s.off('meeting:question-updated', handleQuestionUpdated);
-      s.off('meeting:participant-updated', handleParticipantUpdated);
-      s.off('meeting:message', handleMessage);
-      s.off('meeting:hands-updated', handleHandsUpdated);
-    };
-  }, [id, isAuthenticated, queryClient, questions, refetch, rtc, showToast, user?.userId]);
+  useMeetingSocketEvents({
+    meetingId: id,
+    isAuthenticated,
+    queryClient,
+    userId: user?.userId,
+    refetchMeeting: () => { void refetch(); },
+    refetchQuestions: () => { void questions.refetch(); },
+    onMeetingEnded: () => setMeetingEndedByHost(true),
+    onParticipantMutedByHost: () => {
+      setMicOn(false);
+      rtc.setAudioEnabled(false);
+      showToast('You were muted by the host');
+    },
+    onParticipantCameraOffByHost: () => {
+      setCameraOn(false);
+      rtc.setVideoEnabled(false);
+      showToast('Your camera was turned off by the host');
+    },
+    onChatMessageReceived: (message) => {
+      setChatMessages((prev) => (prev.some((m) => m.messageId === message.messageId) ? prev : [...prev, message]));
+    },
+    onHandsUpdated: (hands) => setRaisedHands(hands),
+  });
 
   useEffect(() => {
     const handleFsChange = () => {
@@ -426,6 +328,13 @@ export const MeetingRoom: React.FC = () => {
     }
   }, [micOn, cameraOn, speakerOn, rtc, showToast]);
 
+  useMeetingShortcuts({
+    onToggleMic: handleToggleMic,
+    onToggleCamera: handleToggleCamera,
+    onToggleSpeaker: handleToggleSpeaker,
+    onMuteAllThree: handleMuteAllThree,
+  });
+
   const handleToggleHandRaise = useCallback(() => {
     const isRaised = raisedHands.some((h) => h.userId === user?.userId);
     const next = !isRaised;
@@ -453,163 +362,6 @@ export const MeetingRoom: React.FC = () => {
       return next;
     });
   }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-
-      if (event.altKey && !event.ctrlKey && !event.metaKey) {
-        const isKeyC = event.code === 'KeyC' || event.key.toLowerCase() === 'c';
-        const isKeyV = event.code === 'KeyV' || event.key.toLowerCase() === 'v';
-        const isKeyB = event.code === 'KeyB' || event.key.toLowerCase() === 'b';
-        const isKeyN = event.code === 'KeyN' || event.key.toLowerCase() === 'n';
-
-        if (isKeyC) {
-          event.preventDefault();
-          handleToggleMic();
-        } else if (isKeyV) {
-          event.preventDefault();
-          handleToggleCamera();
-        } else if (isKeyB) {
-          event.preventDefault();
-          handleToggleSpeaker();
-        } else if (isKeyN) {
-          event.preventDefault();
-          handleMuteAllThree();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleToggleMic, handleToggleCamera, handleToggleSpeaker, handleMuteAllThree]);
-
-  useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const audios = devices.filter((d) => d.kind === 'audioinput');
-        const outputs = devices.filter((d) => d.kind === 'audiooutput');
-        const videos = devices.filter((d) => d.kind === 'videoinput');
-
-        setAudioInputs(audios);
-        setAudioOutputs(outputs);
-        setVideoInputs(videos);
-
-        setSelectedMic((prev) => {
-          if (prev && audios.some((d) => d.deviceId === prev)) return prev;
-          if (locationState?.selectedMic && audios.some((d) => d.deviceId === locationState.selectedMic)) {
-            return locationState.selectedMic;
-          }
-          return audios[0]?.deviceId || 'default';
-        });
-
-        setSelectedCamera((prev) => {
-          if (prev && videos.some((d) => d.deviceId === prev)) return prev;
-          if (locationState?.selectedCamera && videos.some((d) => d.deviceId === locationState.selectedCamera)) {
-            return locationState.selectedCamera;
-          }
-          return videos[0]?.deviceId || 'default';
-        });
-
-        setSelectedSpeaker((prev) => {
-          if (prev && outputs.some((d) => d.deviceId === prev)) return prev;
-          if (locationState?.selectedSpeaker && outputs.some((d) => d.deviceId === locationState.selectedSpeaker)) {
-            return locationState.selectedSpeaker;
-          }
-          return outputs[0]?.deviceId || 'default';
-        });
-      } catch {
-        // Fallback silently if permission prompt pending
-      }
-    };
-    void fetchDevices();
-    navigator.mediaDevices?.addEventListener('devicechange', fetchDevices);
-    return () => navigator.mediaDevices?.removeEventListener('devicechange', fetchDevices);
-  }, [locationState?.selectedMic, locationState?.selectedCamera, locationState?.selectedSpeaker, rtc.localStream]);
-
-  const [qaPending, setQaPending] = useState(false);
-  const [pollPending, setPollPending] = useState(false);
-
-  const handleAskQuestion = async (questionText: string) => {
-    setQaPending(true);
-    try {
-      await askQuestion(id, questionText);
-      await questions.refetch();
-    } catch (err) {
-      showToast(parseApiError(err).message);
-    } finally {
-      setQaPending(false);
-    }
-  };
-
-  const handleAnswerQuestion = async (questionId: string, answerText: string) => {
-    setQaPending(true);
-    try {
-      await answerQuestion(id, questionId, answerText);
-      await questions.refetch();
-    } catch (err) {
-      showToast(parseApiError(err).message);
-    } finally {
-      setQaPending(false);
-    }
-  };
-
-  const handleDismissQuestion = async (questionId: string) => {
-    setQaPending(true);
-    try {
-      await dismissQuestion(id, questionId);
-      await questions.refetch();
-    } catch (err) {
-      showToast(parseApiError(err).message);
-    } finally {
-      setQaPending(false);
-    }
-  };
-
-  const handleCreatePoll = async (pollQuestion: string, options: string[]) => {
-    setPollPending(true);
-    try {
-      await createPoll(id, { pollQuestion, options, multipleChoice: false });
-      await polls.refetch();
-    } catch (err) {
-      showToast(parseApiError(err).message);
-    } finally {
-      setPollPending(false);
-    }
-  };
-
-  const handleVotePoll = async (pollId: string, optionIds: string[]) => {
-    setPollPending(true);
-    try {
-      await votePoll(id, pollId, optionIds);
-      await polls.refetch();
-    } catch (err) {
-      showToast(parseApiError(err).message);
-    } finally {
-      setPollPending(false);
-    }
-  };
-
-  const handleClosePoll = async (pollId: string) => {
-    setPollPending(true);
-    try {
-      await closePoll(id, pollId);
-      await polls.refetch();
-    } catch (err) {
-      showToast(parseApiError(err).message);
-    } finally {
-      setPollPending(false);
-    }
-  };
 
   const participants = useMemo(() => {
     return normalizeParticipants((meeting?.participants ?? []) as unknown as MeetingParticipantRaw[]);
@@ -787,7 +539,7 @@ export const MeetingRoom: React.FC = () => {
         onLowerHand={handleLowerHand}
       />
 
-      <div className="flex min-h-0 flex-1 flex-row overflow-hidden relative">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row overflow-hidden relative">
         <div className="flex-1 min-w-0 min-h-0 flex flex-col transition-all duration-300 ease-in-out bg-background">
           <MeetingVideoStage
             title={meeting.meetingTitle}
@@ -814,14 +566,15 @@ export const MeetingRoom: React.FC = () => {
 
         <div
           className={cn(
-            "overflow-hidden transition-all duration-300 ease-in-out flex flex-col shrink-0 border-l z-20 bg-card shadow-xs",
+            "overflow-hidden flex flex-col shrink-0 border-l z-20 bg-card shadow-xs",
+            "transition-[width,max-width,opacity,transform] duration-300 ease-in-out",
             panel
-              ? "w-80 md:w-96 opacity-100 translate-x-0 border-border/80"
-              : "w-0 opacity-0 translate-x-10 pointer-events-none border-transparent"
+              ? "w-full sm:w-80 md:w-96 max-w-full sm:max-w-80 md:max-w-96 opacity-100 translate-x-0 border-border/80"
+              : "w-0 max-w-0 opacity-0 translate-x-10 pointer-events-none border-transparent"
           )}
         >
           {renderedPanel && (
-            <div className="w-80 md:w-96 h-full min-h-0 flex flex-col shrink-0">
+            <div className="w-full sm:w-80 md:w-96 h-full min-h-0 flex flex-col shrink-0">
               <MeetingSidebar
                 panel={renderedPanel}
                 onSetPanel={handleSetPanel}

@@ -398,7 +398,7 @@ export const MeetingLobby: React.FC = () => {
       </header>
 
       {/* Main body */}
-      <main className="flex flex-1 items-center justify-center p-6 sm:p-10">
+      <main className="flex flex-1 items-center justify-center p-4 sm:p-6">
         {loading ? (
           <div className="flex flex-col items-center gap-3 text-center">
             <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -433,7 +433,7 @@ export const MeetingLobby: React.FC = () => {
             </Button>
           </div>
         ) : (
-          <div className="grid w-full max-w-5xl grid-cols-1 items-start gap-10 lg:grid-cols-12">
+          <div className="grid w-full max-w-5xl grid-cols-1 items-start gap-6 sm:gap-8 lg:grid-cols-12">
             {/* Left 7 cols: Video Preview & Device Controls */}
             <div className="flex flex-col gap-4 lg:col-span-7">
               <div className="group relative aspect-video w-full overflow-hidden rounded-sm border border-slate-800 bg-slate-950 text-white shadow-xl">
@@ -631,7 +631,7 @@ export const MeetingLobby: React.FC = () => {
             </div>
 
             {/* Right 5 cols: Clean Minimal Layout with Balanced Radii */}
-            <div className="flex flex-col gap-5 lg:col-span-5 py-1">
+            <div className="flex flex-col gap-4 lg:col-span-5 py-1 sm:pt-0">
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs font-mono font-bold text-primary">
