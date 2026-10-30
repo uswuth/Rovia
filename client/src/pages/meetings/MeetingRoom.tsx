@@ -686,6 +686,9 @@ export const MeetingRoom: React.FC = () => {
 
   const confirmLeave = async () => {
     setShowLeaveModal(false);
+    if (rtc.isScreenSharing) {
+      void rtc.stopScreenShare();
+    }
     leaving.mutate();
   };
 
@@ -710,6 +713,9 @@ export const MeetingRoom: React.FC = () => {
   });
 
   const confirmEndMeeting = () => {
+    if (rtc.isScreenSharing) {
+      void rtc.stopScreenShare();
+    }
     endingMeeting.mutate();
   };
 
