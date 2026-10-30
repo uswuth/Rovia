@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createQueryClient } from '@/api/queryClient';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ProjectProvider } from '@/context/ProjectContext';
@@ -186,8 +185,6 @@ const App = () => {
           </AuthProvider>
         </TimeFormatProvider>
       </ThemeProvider>
-      {/* Vite strips devtools from the production bundle. */}
-      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
 };

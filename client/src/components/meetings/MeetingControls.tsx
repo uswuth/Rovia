@@ -1,92 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Mic,
-  MicOff,
-  Video,
-  VideoOff,
-  Volume1,
-  Volume2,
-  VolumeX,
-  Check,
-  PhoneOff,
-  Hand,
-  Settings,
-  ChevronUp,
-  ChevronDown,
-  Maximize2,
-  Minimize2,
-  Play,
-  X,
-  Keyboard,
-  Sun,
-  Moon,
-  Monitor,
-  ScreenShare,
-  ScreenShareOff,
-  Captions,
-  CaptionsOff,
-  Sparkles,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Kbd } from '@/components/ui/kbd';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Sparkles } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
-import { Slider } from '@/components/ui/slider';
-import { cn } from '@/lib/utils';
 import { buildAudioConstraints } from '@/lib/audio-capture';
-import { useTheme } from '@/context/theme-context';
-import { PANELS, type PanelKey } from './meetingPanels';
+import type { PanelKey } from './meetingPanels';
 import type { CaptionFontSize, CaptionOpacity } from '@/components/ui/live-caption-overlay';
+import { MeetingDeviceShelf } from './controls/MeetingDeviceShelf';
+import { getCleanDeviceLabel, type ShelfType } from './controls/device-utils';
+import { MeetingActionButtons } from './controls/MeetingActionButtons';
+import { MeetingPanelButtons } from './controls/MeetingPanelButtons';
+import { MeetingViewSettingsModal } from './controls/MeetingViewSettingsModal';
+import { MobileMoreMenu } from './controls/MobileMoreMenu';
 
 export type { PanelKey };
 
-const getCleanDeviceLabel = (
-  device: MediaDeviceInfo | undefined,
-  type: 'Microphone' | 'Camera' | 'Speaker',
-  index: number
-): string => {
-  if (!device) return `Default ${type}`;
-  if (device.label && device.label.trim()) return device.label.trim();
-  if (device.deviceId === 'default') return `Default ${type}`;
-  return `${type} ${index >= 0 ? index + 1 : 1}`;
-};
-
 export interface MeetingControlsProps {
   localStream?: MediaStream | null;
-
   // Audio / Mic
   micOn: boolean;
   onToggleMic: () => void;
   audioInputs: MediaDeviceInfo[];
   selectedMic: string;
   onSelectMic: (deviceId: string) => void;
-
   // Speaker
   speakerOn: boolean;
   onToggleSpeaker: () => void;
   audioOutputs: MediaDeviceInfo[];
   selectedSpeaker: string;
   onSelectSpeaker: (deviceId: string) => void;
-
   // Video / Camera
   cameraOn: boolean;
   onToggleCamera: () => void;
   videoInputs: MediaDeviceInfo[];
   selectedCamera: string;
   onSelectCamera: (deviceId: string) => void;
-
   // Screen Share
   isScreenSharing?: boolean;
   onToggleScreenShare?: () => void;
-
   // Hand
   handRaised: boolean;
   onToggleHandRaise: () => void;
-
   // Closed Captions / Subtitles
   captionsEnabled?: boolean;
   captionsSupported?: boolean;
@@ -95,25 +47,20 @@ export interface MeetingControlsProps {
   onSelectCaptionFontSize?: (size: CaptionFontSize) => void;
   captionOpacity?: CaptionOpacity;
   onSelectCaptionOpacity?: (opacity: CaptionOpacity) => void;
-
   // AI Summary Switch (Host-only)
   isHost?: boolean;
   aiSummaryEnabled?: boolean;
   onToggleAiSummary?: () => void;
-
-  // Fullscreen & Leave
-  isFullscreen: boolean;
-  onToggleFullscreen: () => void;
+  // View Settings & Leave
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   onLeaveClick: () => void;
-
-  // Panels & View settings
-  panel: PanelKey | null;
+  panel?: PanelKey | null;
   onSelectPanel: (panel: PanelKey | null) => void;
-  showSettingsModal: boolean;
-  setShowSettingsModal: (open: boolean) => void;
+  showSettingsModal?: boolean;
+  setShowSettingsModal?: (open: boolean) => void;
 }
 
-/** Bottom toolbar controls dock for in-meeting actions */
 export const MeetingControls: React.FC<MeetingControlsProps> = ({
   localStream,
   micOn,
@@ -131,372 +78,231 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
   videoInputs,
   selectedCamera,
   onSelectCamera,
-  isScreenSharing = false,
+  isScreenSharing,
   onToggleScreenShare,
   handRaised,
   onToggleHandRaise,
-  captionsEnabled = true,
-  captionsSupported = true,
+  captionsEnabled,
+  captionsSupported,
   onToggleCaptions,
-  captionFontSize = 'md',
+  captionFontSize,
   onSelectCaptionFontSize,
-  captionOpacity = 80,
+  captionOpacity,
   onSelectCaptionOpacity,
   isHost = false,
   aiSummaryEnabled = false,
   onToggleAiSummary,
-  isFullscreen,
+  isFullscreen = false,
   onToggleFullscreen,
   onLeaveClick,
   panel,
   onSelectPanel,
-  showSettingsModal,
-  setShowSettingsModal,
+  showSettingsModal: controlledSettingsModal,
+  setShowSettingsModal: controlledSetShowSettingsModal,
 }) => {
-  const { theme, setTheme } = useTheme();
-  const [activeShelf, setActiveShelf] = useState<'mic' | 'camera' | 'speaker' | null>(null);
-  const [deviceDropdownOpen, setDeviceDropdownOpen] = useState<boolean>(false);
+  const [internalSettingsModal, setInternalSettingsModal] = useState(false);
+  const showSettingsModal = controlledSettingsModal ?? internalSettingsModal;
+  const setShowSettingsModal = controlledSetShowSettingsModal ?? setInternalSettingsModal;
+
+  const [activeShelf, setActiveShelf] = useState<ShelfType>(null);
+  const [deviceDropdownOpen, setDeviceDropdownOpen] = useState(false);
   const [micVolume, setMicVolume] = useState<number>(100);
-  const [speakerVolume, setSpeakerVolume] = useState<number>(100);
   const [liveMicLevel, setLiveMicLevel] = useState<number>(0);
+  const [speakerVolume, setSpeakerVolume] = useState<number>(100);
   const [liveSpeakerLevel, setLiveSpeakerLevel] = useState<number>(0);
-  const [isTestingSpeaker, setIsTestingSpeaker] = useState<boolean>(false);
+
   const [micTestStage, setMicTestStage] = useState<'idle' | 'countdown' | 'recording' | 'ready_to_play' | 'playing' | 'done'>('idle');
   const [micCountdown, setMicCountdown] = useState<number>(3);
-  const micCountdownTimerRef = useRef<number | null>(null);
-  const micAudioUrlRef = useRef<string | null>(null);
   const micRecorderRef = useRef<MediaRecorder | null>(null);
+  const micAudioChunksRef = useRef<Blob[]>([]);
   const micAudioRef = useRef<HTMLAudioElement | null>(null);
-  const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
-  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const micAudioUrlRef = useRef<string | null>(null);
+  const micCountdownTimerRef = useRef<number | null>(null);
+
+  const [isTestingSpeaker, setIsTestingSpeaker] = useState(false);
+  const speakerTestTimerRef = useRef<number | null>(null);
+
+  const [isTestingCamera, setIsTestingCamera] = useState(false);
   const [cameraPreviewError, setCameraPreviewError] = useState<string | null>(null);
-  const [isCameraLoading, setIsCameraLoading] = useState<boolean>(false);
-  const [isTestingCamera, setIsTestingCamera] = useState<boolean>(false);
+  const [isCameraLoading, setIsCameraLoading] = useState(false);
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
 
-  const handleToggleShelf = (shelf: 'mic' | 'camera' | 'speaker') => {
-    setActiveShelf((prev) => {
-      const next = prev === shelf ? null : shelf;
-      if (next !== 'camera') {
-        setIsTestingCamera(false);
-      }
-      return next;
-    });
-  };
+  const shelfRef = useRef<HTMLDivElement | null>(null);
 
-  const currentMicIndex = audioInputs.findIndex((d) => d.deviceId === selectedMic);
-  const currentMicDevice = audioInputs.find((d) => d.deviceId === selectedMic || (!selectedMic && d.deviceId === 'default'));
-  const currentMicLabel = getCleanDeviceLabel(currentMicDevice || audioInputs[0], 'Microphone', currentMicIndex >= 0 ? currentMicIndex : 0);
-
-  const currentSpeakerIndex = audioOutputs.findIndex((d) => d.deviceId === selectedSpeaker);
-  const currentSpeakerDevice = audioOutputs.find((d) => d.deviceId === selectedSpeaker || (!selectedSpeaker && d.deviceId === 'default'));
-  const currentSpeakerLabel = getCleanDeviceLabel(currentSpeakerDevice || audioOutputs[0], 'Speaker', currentSpeakerIndex >= 0 ? currentSpeakerIndex : 0);
-
-  const currentCameraIndex = videoInputs.findIndex((d) => d.deviceId === selectedCamera);
-  const currentCameraDevice = videoInputs.find((d) => d.deviceId === selectedCamera || (!selectedCamera && d.deviceId === 'default'));
-  const currentCameraLabel = getCleanDeviceLabel(currentCameraDevice || videoInputs[0], 'Camera', currentCameraIndex >= 0 ? currentCameraIndex : 0);
-
-  // Real-time microphone input metering attached to the selected mic device
+  // Close shelf on outside click
   useEffect(() => {
-    if (activeShelf !== 'mic' || !micOn) {
-      return;
-    }
-
-    let audioCtx: AudioContext | null = null;
-    let stream: MediaStream | null = null;
-    let animId: number | null = null;
-    let isCancelled = false;
-
-    const startMetering = async () => {
-      try {
-        const constraints: MediaStreamConstraints = {
-          audio: buildAudioConstraints(selectedMic),
-          video: false,
-        };
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (isCancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (activeShelf && shelfRef.current && !shelfRef.current.contains(e.target as Node)) {
+        if (!deviceDropdownOpen) {
+          setActiveShelf(null);
         }
-
-        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        audioCtx = new AudioContextClass();
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 64;
-        source.connect(analyser);
-
-        const dataArray = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
-
-        const updateLevel = () => {
-          if (isCancelled) return;
-          analyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
-          }
-          const avg = sum / dataArray.length;
-          const level = Math.min(100, Math.round((avg / 128) * 100 * (micVolume / 100)));
-          setLiveMicLevel(level);
-          animId = requestAnimationFrame(updateLevel);
-        };
-        animId = requestAnimationFrame(updateLevel);
-      } catch {
-        setLiveMicLevel(0);
       }
     };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [activeShelf, deviceDropdownOpen]);
 
-    void startMetering();
-
-    return () => {
-      isCancelled = true;
-      if (animId) cancelAnimationFrame(animId);
-      if (stream) stream.getTracks().forEach((t) => t.stop());
-      if (audioCtx && audioCtx.state !== 'closed') {
-        void audioCtx.close().catch(() => { });
-      }
-    };
-  }, [activeShelf, selectedMic, micOn, micVolume]);
-
-  // Real-time camera preview stream for the video settings shelf:
-  // ONLY runs when user explicitly clicks the "Test Live Preview" button!
+  // Handle camera preview stream
   useEffect(() => {
-    if (activeShelf !== 'camera' || !isTestingCamera) {
-      return;
-    }
-
-    let isCancelled = false;
-    let localTempStream: MediaStream | null = null;
-
-    const startCamera = async () => {
-      // If localStream from WebRTC already has a live video track matching current camera, use it directly
-      const hasLiveLocalVideo =
-        cameraOn &&
-        Boolean(localStream) &&
-        localStream!.getVideoTracks().some((t) => t.readyState === 'live' && t.enabled !== false);
-
-      if (hasLiveLocalVideo && localStream) {
-        if (!isCancelled) {
-          setPreviewStream(localStream);
+    if (!isTestingCamera) {
+      if (previewStream) {
+        previewStream.getTracks().forEach((track) => track.stop());
+        setTimeout(() => {
+          setPreviewStream(null);
+          setCameraPreviewError(null);
           setIsCameraLoading(false);
-        }
-        return;
+        }, 0);
       }
+      return;
+    }
 
-      if (!isCancelled) {
+    let isSubscribed = true;
+    setTimeout(() => {
+      if (isSubscribed) {
         setIsCameraLoading(true);
         setCameraPreviewError(null);
       }
+    }, 0);
 
+    const startCamera = async () => {
       try {
-        const constraints: MediaStreamConstraints = {
-          video:
-            selectedCamera && selectedCamera !== 'default'
-              ? { deviceId: { exact: selectedCamera }, width: { ideal: 640 }, height: { ideal: 360 } }
-              : { width: { ideal: 640 }, height: { ideal: 360 } },
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: selectedCamera && selectedCamera !== 'default' ? { deviceId: { exact: selectedCamera } } : true,
           audio: false,
-        };
-        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (isCancelled) {
-          mediaStream.getTracks().forEach((track) => track.stop());
+        });
+        if (!isSubscribed) {
+          stream.getTracks().forEach((t) => t.stop());
           return;
         }
-        localTempStream = mediaStream;
-        setPreviewStream(mediaStream);
+        setPreviewStream(stream);
         setIsCameraLoading(false);
-      } catch {
-        if (!isCancelled) {
-          setIsCameraLoading(false);
-          setCameraPreviewError('Camera preview unavailable');
-        }
+      } catch (err) {
+        if (!isSubscribed) return;
+        setIsCameraLoading(false);
+        setCameraPreviewError((err as Error)?.message || 'Failed to access camera preview');
       }
     };
 
     void startCamera();
 
     return () => {
-      isCancelled = true;
-      if (localTempStream) {
-        localTempStream.getTracks().forEach((track) => track.stop());
-      }
-      setPreviewStream(null);
-      setIsCameraLoading(false);
-      setCameraPreviewError(null);
+      isSubscribed = false;
     };
-  }, [activeShelf, isTestingCamera, selectedCamera, cameraOn, localStream]);
+  }, [isTestingCamera, previewStream, selectedCamera]);
 
-  // Attach preview stream to video element whenever stream or shelf changes
   useEffect(() => {
-    const videoEl = videoPreviewRef.current;
-    if (!videoEl) return;
-    if (previewStream) {
-      videoEl.srcObject = previewStream;
-      const playPromise = videoEl.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => { });
-      }
-    } else {
-      videoEl.srcObject = null;
+    if (videoPreviewRef.current && previewStream) {
+      videoPreviewRef.current.srcObject = previewStream;
     }
-  }, [previewStream, activeShelf]);
+  }, [previewStream]);
 
-  // Output test audio chime with live meter
-  const handleTestSpeaker = async () => {
-    if (isTestingSpeaker) return;
-    setIsTestingSpeaker(true);
+  // Audio level monitoring
+  useEffect(() => {
+    if (!localStream) return;
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (!audioTrack || !micOn) {
+      const t = setTimeout(() => setLiveMicLevel(0), 0);
+      return () => clearTimeout(t);
+    }
+
+    let isMounted = true;
+    let audioCtx: AudioContext | null = null;
+    let animationId: number | null = null;
 
     try {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const audioCtx = new AudioContextClass();
-
-      if (selectedSpeaker && typeof (audioCtx as unknown as { setSinkId?: (id: string) => Promise<void> }).setSinkId === 'function') {
-        try {
-          await (audioCtx as unknown as { setSinkId: (id: string) => Promise<void> }).setSinkId(selectedSpeaker);
-        } catch {
-          // Ignore setSinkId failure on unsupported browsers
-        }
-      }
-
-      const masterGain = audioCtx.createGain();
-      masterGain.gain.setValueAtTime((speakerVolume / 100) * 0.35, audioCtx.currentTime);
-      masterGain.connect(audioCtx.destination);
-
+      audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 64;
-      masterGain.connect(analyser);
+      const source = audioCtx.createMediaStreamSource(new MediaStream([audioTrack]));
+      source.connect(analyser);
 
-      const notes = [523.25, 659.25, 783.99, 1046.5];
-      const startTime = audioCtx.currentTime;
-
-      notes.forEach((freq, idx) => {
-        const osc = audioCtx.createOscillator();
-        const noteGain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startTime + idx * 0.12);
-
-        noteGain.gain.setValueAtTime(0, startTime + idx * 0.12);
-        noteGain.gain.linearRampToValueAtTime(1, startTime + idx * 0.12 + 0.02);
-        noteGain.gain.exponentialRampToValueAtTime(0.001, startTime + idx * 0.12 + 0.35);
-
-        osc.connect(noteGain);
-        noteGain.connect(masterGain);
-
-        osc.start(startTime + idx * 0.12);
-        osc.stop(startTime + idx * 0.12 + 0.36);
-      });
-
-      const dataArray = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
-      let testAnimId: number | null = null;
-
-      const trackOutput = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const avg = sum / dataArray.length;
-        setLiveSpeakerLevel(Math.min(100, Math.round((avg / 128) * 100 * (speakerVolume / 100))));
-        testAnimId = requestAnimationFrame(trackOutput);
+      const buffer = new Uint8Array(analyser.frequencyBinCount);
+      const updateLevel = () => {
+        if (!isMounted) return;
+        analyser.getByteFrequencyData(buffer);
+        const sum = buffer.reduce((a, b) => a + b, 0);
+        const avg = sum / buffer.length;
+        setLiveMicLevel(Math.min(100, Math.round((avg / 128) * 100)));
+        animationId = requestAnimationFrame(updateLevel);
       };
-      testAnimId = requestAnimationFrame(trackOutput);
+      updateLevel();
+    } catch {
+      // AudioContext fallback
+    }
 
-      setTimeout(() => {
+    return () => {
+      isMounted = false;
+      if (animationId) cancelAnimationFrame(animationId);
+      if (audioCtx) void audioCtx.close();
+    };
+  }, [localStream, micOn]);
+
+  const handleToggleShelf = (type: 'mic' | 'camera' | 'speaker') => {
+    setActiveShelf((curr) => (curr === type ? null : type));
+    setDeviceDropdownOpen(false);
+  };
+
+  const handleTestSpeaker = () => {
+    if (isTestingSpeaker) return;
+    setIsTestingSpeaker(true);
+    setLiveSpeakerLevel(75);
+
+    try {
+      const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+      gain.gain.setValueAtTime(Math.max(0.01, (speakerVolume / 100) * 0.3), audioCtx.currentTime);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + 1);
+
+      speakerTestTimerRef.current = window.setTimeout(() => {
         setIsTestingSpeaker(false);
         setLiveSpeakerLevel(0);
-        if (testAnimId) cancelAnimationFrame(testAnimId);
-        void audioCtx.close().catch(() => { });
-      }, 900);
+        void audioCtx.close();
+      }, 1000);
     } catch {
       setIsTestingSpeaker(false);
       setLiveSpeakerLevel(0);
     }
   };
 
-  // Cleanup mic test timers, recording or playback on unmount or when shelf closes
-  useEffect(() => {
-    return () => {
-      if (micCountdownTimerRef.current) {
-        window.clearInterval(micCountdownTimerRef.current);
-        micCountdownTimerRef.current = null;
-      }
-      if (micRecorderRef.current && micRecorderRef.current.state === 'recording') {
-        try {
-          micRecorderRef.current.stop();
-        } catch {
-          // Ignore recorder stop error
-        }
-      }
-      if (micAudioRef.current) {
-        micAudioRef.current.pause();
-      }
-      if (micAudioUrlRef.current) {
-        URL.revokeObjectURL(micAudioUrlRef.current);
-        micAudioUrlRef.current = null;
-      }
-      setMicTestStage('idle');
-      setMicCountdown(3);
-    };
-  }, [activeShelf]);
-
-  // Test microphone: 3-2-1 countdown, 5 seconds recording with countdown, and manual user click to play
   const handleTestMic = async () => {
+    if (micTestStage === 'playing' || micTestStage === 'recording' || micTestStage === 'countdown') return;
+
     if (micTestStage === 'ready_to_play') {
-      const audio = micAudioRef.current;
-      if (!audio) {
-        setMicTestStage('idle');
-        return;
-      }
+      if (!micAudioRef.current) return;
       setMicTestStage('playing');
-      audio.onended = () => {
+      micAudioRef.current.onended = () => {
         setMicTestStage('done');
-        setTimeout(() => {
-          setMicTestStage((curr) => (curr === 'done' ? 'idle' : curr));
-        }, 2500);
+        window.setTimeout(() => setMicTestStage('idle'), 2000);
       };
-      audio.onerror = () => {
-        setMicTestStage('idle');
-      };
-      void audio.play().catch(() => {
-        setMicTestStage('idle');
-      });
+      void micAudioRef.current.play().catch(() => setMicTestStage('idle'));
       return;
-    }
-
-    if (micTestStage === 'playing') {
-      if (micAudioRef.current) {
-        micAudioRef.current.pause();
-      }
-      setMicTestStage('idle');
-      return;
-    }
-
-    if (micTestStage !== 'idle' && micTestStage !== 'done') {
-      return;
-    }
-
-    if (micCountdownTimerRef.current) {
-      window.clearInterval(micCountdownTimerRef.current);
-      micCountdownTimerRef.current = null;
-    }
-    if (micAudioUrlRef.current) {
-      URL.revokeObjectURL(micAudioUrlRef.current);
-      micAudioUrlRef.current = null;
     }
 
     try {
-      const constraints: MediaStreamConstraints = {
-        audio: buildAudioConstraints(selectedMic),
-        video: false,
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: buildAudioConstraints(selectedMic && selectedMic !== 'default' ? selectedMic : undefined),
+      });
+
       const recorder = new MediaRecorder(stream);
       micRecorderRef.current = recorder;
-      const chunks: Blob[] = [];
+      micAudioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          chunks.push(e.data);
-        }
+        if (e.data.size > 0) micAudioChunksRef.current.push(e.data);
       };
 
       recorder.onstop = () => {
+        const chunks = micAudioChunksRef.current;
         stream.getTracks().forEach((track) => track.stop());
 
         if (chunks.length === 0) {
@@ -557,10 +363,19 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
     }
   };
 
+  const currentMicDevice = audioInputs.find((d) => d.deviceId === selectedMic);
+  const currentMicLabel = getCleanDeviceLabel(currentMicDevice, 'Microphone', 0);
+
+  const currentSpeakerDevice = audioOutputs.find((d) => d.deviceId === selectedSpeaker);
+  const currentSpeakerLabel = getCleanDeviceLabel(currentSpeakerDevice, 'Speaker', 0);
+
+  const currentCameraDevice = videoInputs.find((d) => d.deviceId === selectedCamera);
+  const currentCameraLabel = getCleanDeviceLabel(currentCameraDevice, 'Camera', 0);
+
   return (
-    <footer className="shrink-0 flex items-center justify-between border-t border-border/80 px-6 h-16 bg-card shadow-xs relative z-30">
+    <footer className="shrink-0 flex items-center justify-between border-t border-border/80 px-2 sm:px-6 h-16 bg-card shadow-xs relative z-30">
       {/* Left: AI Summary Switch (Host-Only) and status */}
-      <div className="flex items-center gap-2.5 shrink-0">
+      <div className="hidden sm:flex items-center gap-2 shrink-0">
         {isHost && onToggleAiSummary && (
           <Tooltip
             content={aiSummaryEnabled ? 'AI Summary Enabled (Meeting end generates summary)' : 'Enable AI Summary'}
@@ -582,760 +397,126 @@ export const MeetingControls: React.FC<MeetingControlsProps> = ({
         )}
       </div>
 
-      {/* Center: Controls Container (Mic to Leave) with Attached Matching-Width Shelf Above */}
-      <div className="flex-1 flex justify-center px-4">
-        <div className="relative flex flex-col items-center">
-          {/* Setting Shelf: Attached directly above center controls, uniform width across all settings, xs radius */}
-          {activeShelf && (
-            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-[540px] max-w-[92vw] bg-card/95 backdrop-blur-md border border-border shadow-xl rounded-xs px-3.5 py-2.5 z-40 animate-in slide-in-from-bottom-2 duration-150">
-              <div className="flex items-center justify-between gap-3 w-full">
-                {/* 1. Microphone Shelf */}
-                {activeShelf === 'mic' && (
-                  <>
-                    {/* Left: Microphone device select dropdown */}
-                    <Popover open={deviceDropdownOpen} onOpenChange={setDeviceDropdownOpen}>
-                      <PopoverTrigger
-                        render={
-                          <button
-                            type="button"
-                            className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-medium cursor-pointer transition-colors max-w-48 sm:max-w-52 shrink-0"
-                          >
-                            <span className="flex items-center gap-2 truncate">
-                              <Mic size={14} className="text-primary shrink-0" />
-                              <span className="truncate">{currentMicLabel}</span>
-                            </span>
-                            <ChevronDown size={13} className="text-muted-foreground shrink-0 ml-1" />
-                          </button>
-                        }
-                      />
-                      <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-popover text-popover-foreground shadow-xl rounded-xs" align="start">
-                        <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border/80 mb-1">
-                          Select Microphone
-                        </div>
-                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                          {audioInputs.length > 0 ? (
-                            audioInputs.map((d, idx) => {
-                              const lbl = getCleanDeviceLabel(d, 'Microphone', idx);
-                              const isSelected = selectedMic === d.deviceId || (!selectedMic && d.deviceId === 'default');
-                              return (
-                                <button
-                                  key={d.deviceId || idx}
-                                  type="button"
-                                  onClick={() => {
-                                    onSelectMic(d.deviceId);
-                                    setDeviceDropdownOpen(false);
-                                  }}
-                                  className={cn(
-                                    "w-full flex items-center justify-between px-2 py-1.5 rounded-xs text-xs transition-colors text-left cursor-pointer",
-                                    isSelected
-                                      ? "bg-primary/10 text-primary font-semibold"
-                                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
-                                  )}
-                                >
-                                  <span className="truncate flex-1 mr-2">{lbl}</span>
-                                  {isSelected && <Check size={14} className="text-primary shrink-0" />}
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <div className="text-xs text-muted-foreground p-2">Default Microphone</div>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+      {/* Center on desktop, structured row on mobile */}
+      <div className="flex-1 flex items-center justify-center min-w-0">
+        <div className="flex items-center gap-1 sm:gap-2.5 shrink-0 px-0.5">
+          <div className="relative flex flex-col items-center shrink-0">
+            <MeetingDeviceShelf
+              activeShelf={activeShelf}
+              shelfRef={shelfRef}
+              deviceDropdownOpen={deviceDropdownOpen}
+              setDeviceDropdownOpen={setDeviceDropdownOpen}
+              audioInputs={audioInputs}
+              selectedMic={selectedMic}
+              onSelectMic={onSelectMic}
+              currentMicLabel={currentMicLabel}
+              micOn={micOn}
+              micVolume={micVolume}
+              setMicVolume={setMicVolume}
+              liveMicLevel={liveMicLevel}
+              micTestStage={micTestStage}
+              micCountdown={micCountdown}
+              handleTestMic={handleTestMic}
+              audioOutputs={audioOutputs}
+              selectedSpeaker={selectedSpeaker}
+              onSelectSpeaker={onSelectSpeaker}
+              currentSpeakerLabel={currentSpeakerLabel}
+              speakerOn={speakerOn}
+              speakerVolume={speakerVolume}
+              setSpeakerVolume={setSpeakerVolume}
+              liveSpeakerLevel={liveSpeakerLevel}
+              isTestingSpeaker={isTestingSpeaker}
+              handleTestSpeaker={handleTestSpeaker}
+              videoInputs={videoInputs}
+              selectedCamera={selectedCamera}
+              onSelectCamera={onSelectCamera}
+              currentCameraLabel={currentCameraLabel}
+              isTestingCamera={isTestingCamera}
+              setIsTestingCamera={setIsTestingCamera}
+              videoPreviewRef={videoPreviewRef}
+              isCameraLoading={isCameraLoading}
+              cameraPreviewError={cameraPreviewError}
+              previewStream={previewStream}
+            />
 
-                    {/* Right: Test button, volume slider, and vertical input level */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="xs"
-                        onClick={handleTestMic}
-                        disabled={micTestStage === 'countdown' || micTestStage === 'recording'}
-                        className={cn(
-                          "h-7 w-[104px] justify-center text-xs gap-1 cursor-pointer font-medium rounded-xs px-2 shrink-0 transition-all",
-                          micTestStage === 'countdown' && "border-amber-500/50 bg-amber-500/10 text-amber-500 dark:text-amber-400 cursor-wait",
-                          micTestStage === 'recording' && "border-red-500/50 bg-red-500/10 text-red-500 dark:text-red-400 cursor-wait",
-                          micTestStage === 'ready_to_play' && "border-emerald-500/60 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 font-semibold shadow-xs animate-pulse",
-                          micTestStage === 'playing' && "border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-                          micTestStage === 'done' && "border-emerald-500 bg-emerald-500 text-white dark:text-white font-semibold",
-                          micTestStage === 'idle' && "hover:bg-secondary text-foreground"
-                        )}
-                      >
-                        {micTestStage === 'idle' && (
-                          <>
-                            <Play size={10} className="text-emerald-500 fill-emerald-500 shrink-0" />
-                            <span className="truncate">Test Mic</span>
-                          </>
-                        )}
-                        {micTestStage === 'countdown' && (
-                          <>
-                            <span className="size-2 rounded-full bg-amber-500 animate-ping shrink-0" />
-                            <span className="truncate font-mono">Ready {micCountdown}s</span>
-                          </>
-                        )}
-                        {micTestStage === 'recording' && (
-                          <>
-                            <span className="size-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-                            <span className="truncate font-mono">Rec {micCountdown}s</span>
-                          </>
-                        )}
-                        {micTestStage === 'ready_to_play' && (
-                          <>
-                            <Play size={10} className="text-emerald-500 fill-emerald-500 shrink-0" />
-                            <span className="truncate">Play Test</span>
-                          </>
-                        )}
-                        {micTestStage === 'playing' && (
-                          <>
-                            <Volume2 size={12} className="text-emerald-500 animate-pulse shrink-0" />
-                            <span className="truncate">Playing...</span>
-                          </>
-                        )}
-                        {micTestStage === 'done' && (
-                          <>
-                            <Check size={12} className="shrink-0" />
-                            <span className="truncate">Sounds Good</span>
-                          </>
-                        )}
-                      </Button>
+            <MeetingActionButtons
+              micOn={micOn}
+              onToggleMic={onToggleMic}
+              activeShelf={activeShelf}
+              onToggleShelf={handleToggleShelf}
+              cameraOn={cameraOn}
+              onToggleCamera={onToggleCamera}
+              speakerOn={speakerOn}
+              speakerVolume={speakerVolume}
+              onToggleSpeaker={onToggleSpeaker}
+              isScreenSharing={isScreenSharing}
+              onToggleScreenShare={onToggleScreenShare}
+              handRaised={handRaised}
+              onToggleHandRaise={onToggleHandRaise}
+              captionsEnabled={captionsEnabled}
+              captionsSupported={captionsSupported}
+              onToggleCaptions={onToggleCaptions}
+              onLeaveClick={onLeaveClick}
+            />
+          </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {!micOn || micVolume === 0 ? (
-                          <VolumeX size={13} className="text-muted-foreground shrink-0" />
-                        ) : micVolume <= 50 ? (
-                          <Volume1 size={13} className="text-muted-foreground shrink-0" />
-                        ) : (
-                          <Volume2 size={13} className="text-muted-foreground shrink-0" />
-                        )}
-                        <Slider
-                          value={[micVolume]}
-                          min={0}
-                          max={100}
-                          step={1}
-                          onValueChange={([val]) => setMicVolume(val)}
-                          className="w-24"
-                        />
-                        <span className="text-[10px] font-mono text-muted-foreground w-8 text-right shrink-0">{micVolume}%</span>
-                      </div>
+          {/* Right Panel buttons (Chat, Q&A) and Mobile More Menu on mobile */}
+          <div className="flex sm:hidden items-center gap-1 shrink-0 pl-1 border-l border-border/60">
+            <MeetingPanelButtons
+              panel={panel}
+              onSelectPanel={onSelectPanel}
+            />
 
-                      {/* Vertical input level with color indicators (green -> yellow -> red) */}
-                      <div
-                        className="relative h-7 w-2 bg-muted dark:bg-zinc-800 rounded-xs overflow-hidden flex flex-col-reverse border border-border dark:border-zinc-700/80 shrink-0"
-                        title={`Live Input Level: ${liveMicLevel}%`}
-                      >
-                        <div
-                          className="w-full bg-gradient-to-t from-emerald-500 via-amber-400 to-red-500 transition-all duration-75"
-                          style={{ height: `${micOn ? liveMicLevel : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
+            <MobileMoreMenu
+              isHost={isHost}
+              aiSummaryEnabled={aiSummaryEnabled}
+              onToggleAiSummary={onToggleAiSummary}
+              isScreenSharing={isScreenSharing}
+              onToggleScreenShare={onToggleScreenShare}
+              captionsEnabled={captionsEnabled}
+              captionsSupported={captionsSupported}
+              onToggleCaptions={onToggleCaptions}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={onToggleFullscreen}
+              onOpenSettings={() => setShowSettingsModal(true)}
+              panel={panel}
+              onSelectPanel={onSelectPanel}
+            />
 
-                {/* 2. Speaker Shelf */}
-                {activeShelf === 'speaker' && (
-                  <>
-                    {/* Left: Speaker device select dropdown */}
-                    <Popover open={deviceDropdownOpen} onOpenChange={setDeviceDropdownOpen}>
-                      <PopoverTrigger
-                        render={
-                          <button
-                            type="button"
-                            className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-medium cursor-pointer transition-colors max-w-48 sm:max-w-52 shrink-0"
-                          >
-                            <span className="flex items-center gap-2 truncate">
-                              {!speakerOn || speakerVolume === 0 ? (
-                                <VolumeX size={14} className="text-primary shrink-0" />
-                              ) : speakerVolume <= 50 ? (
-                                <Volume1 size={14} className="text-primary shrink-0" />
-                              ) : (
-                                <Volume2 size={14} className="text-primary shrink-0" />
-                              )}
-                              <span className="truncate">{currentSpeakerLabel}</span>
-                            </span>
-                            <ChevronDown size={13} className="text-muted-foreground shrink-0 ml-1" />
-                          </button>
-                        }
-                      />
-                      <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-popover text-popover-foreground shadow-xl rounded-xs" align="start">
-                        <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border/80 mb-1">
-                          Select Speaker
-                        </div>
-                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                          {audioOutputs.length > 0 ? (
-                            audioOutputs.map((d, idx) => {
-                              const lbl = getCleanDeviceLabel(d, 'Speaker', idx);
-                              const isSelected = selectedSpeaker === d.deviceId || (!selectedSpeaker && d.deviceId === 'default');
-                              return (
-                                <button
-                                  key={d.deviceId || idx}
-                                  type="button"
-                                  onClick={() => {
-                                    onSelectSpeaker(d.deviceId);
-                                    setDeviceDropdownOpen(false);
-                                  }}
-                                  className={cn(
-                                    "w-full flex items-center justify-between px-2 py-1.5 rounded-xs text-xs transition-colors text-left cursor-pointer",
-                                    isSelected
-                                      ? "bg-primary/10 text-primary font-semibold"
-                                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
-                                  )}
-                                >
-                                  <span className="truncate flex-1 mr-2">{lbl}</span>
-                                  {isSelected && <Check size={14} className="text-primary shrink-0" />}
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <div className="text-xs text-muted-foreground p-2">Default Speaker</div>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-
-                    {/* Right: Speaker volume slider, test button, and vertical output level */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="xs"
-                        onClick={handleTestSpeaker}
-                        disabled={isTestingSpeaker}
-                        className="h-7 w-20 justify-center text-xs gap-1 cursor-pointer font-medium hover:bg-secondary rounded-xs px-2 shrink-0"
-                      >
-                        <Play size={10} className={cn("text-emerald-500 fill-emerald-500 shrink-0", isTestingSpeaker && "animate-pulse")} />
-                        <span className="truncate">{isTestingSpeaker ? 'Testing...' : 'Test'}</span>
-                      </Button>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {!speakerOn || speakerVolume === 0 ? (
-                          <VolumeX size={13} className="text-muted-foreground shrink-0" />
-                        ) : speakerVolume <= 50 ? (
-                          <Volume1 size={13} className="text-muted-foreground shrink-0" />
-                        ) : (
-                          <Volume2 size={13} className="text-muted-foreground shrink-0" />
-                        )}
-                        <Slider
-                          value={[speakerVolume]}
-                          min={0}
-                          max={100}
-                          step={1}
-                          onValueChange={([val]) => setSpeakerVolume(val)}
-                          className="w-24"
-                        />
-                        <span className="text-[10px] font-mono text-muted-foreground w-8 text-right shrink-0">{speakerVolume}%</span>
-                      </div>
-
-                      {/* Vertical output level with color indicators */}
-                      <div
-                        className="relative h-7 w-2 bg-muted dark:bg-zinc-800 rounded-xs overflow-hidden flex flex-col-reverse border border-border dark:border-zinc-700/80 shrink-0"
-                        title={`Live Output Level: ${liveSpeakerLevel}%`}
-                      >
-                        <div
-                          className="w-full bg-gradient-to-t from-emerald-500 via-amber-400 to-red-500 transition-all duration-75"
-                          style={{ height: `${liveSpeakerLevel}%` }}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* 3. Camera Shelf */}
-                {activeShelf === 'camera' && (
-                  <div className="flex flex-col gap-2.5 w-full">
-                    {/* Live camera video preview box (shown ONLY when user clicks Test Live Preview) */}
-                    {isTestingCamera && (
-                      <div className="relative w-full h-44 bg-zinc-950 rounded-xs overflow-hidden border border-border shadow-xs flex items-center justify-center animate-in fade-in duration-200">
-                        <video
-                          ref={videoPreviewRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className={cn(
-                            "w-full h-full object-contain scale-x-[-1]",
-                            (isCameraLoading || cameraPreviewError || !previewStream) && "opacity-0"
-                          )}
-                        />
-
-                        {isCameraLoading && (
-                          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground gap-2 bg-zinc-950">
-                            <span className="size-2 rounded-full bg-emerald-500 animate-ping" />
-                            <span>Starting camera preview...</span>
-                          </div>
-                        )}
-
-                        {!isCameraLoading && cameraPreviewError && (
-                          <div className="absolute inset-0 flex items-center justify-center text-xs text-red-400 p-2 text-center bg-zinc-950">
-                            {cameraPreviewError}
-                          </div>
-                        )}
-
-                        <div className="absolute bottom-1.5 right-1.5 bg-black/80 backdrop-blur-xs text-[9px] text-white px-1.5 py-0.5 rounded-xs font-medium flex items-center gap-1 pointer-events-none">
-                          <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>Live Preview</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Controls Row: [Select Camera dropdown] and [Test live preview button] */}
-                    <div className="flex items-center justify-between gap-3 w-full">
-                      {/* Left: Camera device select dropdown */}
-                      <Popover open={deviceDropdownOpen} onOpenChange={setDeviceDropdownOpen}>
-                        <PopoverTrigger
-                          render={
-                            <button
-                              type="button"
-                              className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xs bg-secondary/80 hover:bg-secondary border border-border text-foreground text-xs font-medium cursor-pointer transition-colors max-w-56"
-                            >
-                              <span className="flex items-center gap-2 truncate">
-                                <Video size={14} className="text-primary shrink-0" />
-                                <span className="truncate">{currentCameraLabel}</span>
-                              </span>
-                              <ChevronDown size={13} className="text-muted-foreground shrink-0 ml-1" />
-                            </button>
-                          }
-                        />
-                        <PopoverContent side="top" sideOffset={8} className="w-64 p-2 space-y-1 border-border bg-popover text-popover-foreground shadow-xl rounded-xs" align="start">
-                          <div className="text-[11px] font-semibold text-muted-foreground px-2 py-1 border-b border-border/80 mb-1">
-                            Select Camera
-                          </div>
-                          <div className="space-y-1 max-h-48 overflow-y-auto">
-                            {videoInputs.length > 0 ? (
-                              videoInputs.map((d, idx) => {
-                                const lbl = getCleanDeviceLabel(d, 'Camera', idx);
-                                const isSelected = selectedCamera === d.deviceId || (!selectedCamera && d.deviceId === 'default');
-                                return (
-                                  <button
-                                    key={d.deviceId || idx}
-                                    type="button"
-                                    onClick={() => {
-                                      onSelectCamera(d.deviceId);
-                                      setDeviceDropdownOpen(false);
-                                    }}
-                                    className={cn(
-                                      "w-full flex items-center justify-between px-2 py-1.5 rounded-xs text-xs transition-colors text-left cursor-pointer",
-                                      isSelected
-                                        ? "bg-primary/10 text-primary font-semibold"
-                                        : "text-foreground hover:bg-accent hover:text-accent-foreground"
-                                    )}
-                                  >
-                                    <span className="truncate flex-1 mr-2">{lbl}</span>
-                                    {isSelected && <Check size={14} className="text-primary shrink-0" />}
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <div className="text-xs text-muted-foreground p-2">Default Camera</div>
-                            )}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-
-                      {/* Right: Test live preview button */}
-                      <Button
-                        type="button"
-                        variant={isTestingCamera ? "destructive" : "outline"}
-                        size="sm"
-                        onClick={() => setIsTestingCamera((prev) => !prev)}
-                        className="h-8 text-xs gap-1.5 font-medium px-3 cursor-pointer shrink-0"
-                      >
-                        {isTestingCamera ? (
-                          <>
-                            <VideoOff size={13} className="shrink-0" />
-                            <span>Stop Preview</span>
-                          </>
-                        ) : (
-                          <>
-                            <Play size={11} className="text-emerald-500 fill-emerald-500 shrink-0" />
-                            <span>Test Live Preview</span>
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {/* Hidden settings modal trigger for mobile controlled via onOpenSettings */}
+            <div className="hidden">
+              <MeetingViewSettingsModal
+                open={showSettingsModal}
+                onOpenChange={setShowSettingsModal}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={onToggleFullscreen}
+                captionFontSize={captionFontSize}
+                onSelectCaptionFontSize={onSelectCaptionFontSize}
+                captionOpacity={captionOpacity}
+                onSelectCaptionOpacity={onSelectCaptionOpacity}
+              />
             </div>
-          )}
-
-          {/* Centered Controls: Mic, Camera, Speaker, Screen Share, Hand, Leave */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            {/* Mic Split Button: Icon on Left, Chevron on Right */}
-            <div className="flex items-center rounded-full border border-border bg-card p-0.5 shadow-xs shrink-0">
-              <Tooltip content={micOn ? 'Mute Mic (Alt+C)' : 'Unmute Mic (Alt+C)'} side="top">
-                <button
-                  type="button"
-                  onClick={onToggleMic}
-                  className={`flex size-9 w-9 h-9 min-w-9 min-h-9 shrink-0 aspect-square items-center justify-center rounded-full transition-colors cursor-pointer ${micOn ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
-                    }`}
-                >
-                  {micOn ? <Mic size={16} /> : <MicOff size={16} />}
-                </button>
-              </Tooltip>
-              <Tooltip content={activeShelf === 'mic' ? 'Close Mic Settings' : 'Microphone Settings'} side="top">
-                <button
-                  type="button"
-                  onClick={() => handleToggleShelf('mic')}
-                  className="flex size-7 w-7 h-7 shrink-0 aspect-square items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                  aria-label="Microphone Settings"
-                >
-                  {activeShelf === 'mic' ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </button>
-              </Tooltip>
-            </div>
-
-            {/* Camera Split Button: Icon on Left, Chevron on Right */}
-            <div className="flex items-center rounded-full border border-border bg-card p-0.5 shadow-xs shrink-0">
-              <Tooltip content={cameraOn ? 'Turn Camera Off (Alt+V)' : 'Turn Camera On (Alt+V)'} side="top">
-                <button
-                  type="button"
-                  onClick={onToggleCamera}
-                  className={`flex size-9 w-9 h-9 min-w-9 min-h-9 shrink-0 aspect-square items-center justify-center rounded-full transition-colors cursor-pointer ${cameraOn ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
-                    }`}
-                >
-                  {cameraOn ? <Video size={16} /> : <VideoOff size={16} />}
-                </button>
-              </Tooltip>
-              <Tooltip content={activeShelf === 'camera' ? 'Close Camera Settings' : 'Camera Settings'} side="top">
-                <button
-                  type="button"
-                  onClick={() => handleToggleShelf('camera')}
-                  className="flex size-7 w-7 h-7 shrink-0 aspect-square items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                  aria-label="Camera Settings"
-                >
-                  {activeShelf === 'camera' ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </button>
-              </Tooltip>
-            </div>
-
-            {/* Speaker Split Button: Icon on Left, Chevron on Right */}
-            <div className="flex items-center rounded-full border border-border bg-card p-0.5 shadow-xs shrink-0">
-              <Tooltip content={speakerOn && speakerVolume > 0 ? 'Deafen / Mute Speaker (Alt+B)' : 'Undeafen Speaker (Alt+B)'} side="top">
-                <button
-                  type="button"
-                  onClick={onToggleSpeaker}
-                  className={`flex size-9 w-9 h-9 min-w-9 min-h-9 shrink-0 aspect-square items-center justify-center rounded-full transition-colors cursor-pointer ${speakerOn && speakerVolume > 0 ? 'bg-secondary text-foreground hover:bg-muted' : 'bg-red-600 text-white hover:bg-red-700'
-                    }`}
-                >
-                  {!speakerOn || speakerVolume === 0 ? (
-                    <VolumeX size={16} />
-                  ) : speakerVolume <= 50 ? (
-                    <Volume1 size={16} />
-                  ) : (
-                    <Volume2 size={16} />
-                  )}
-                </button>
-              </Tooltip>
-              <Tooltip content={activeShelf === 'speaker' ? 'Close Speaker Settings' : 'Speaker Settings'} side="top">
-                <button
-                  type="button"
-                  onClick={() => handleToggleShelf('speaker')}
-                  className="flex size-7 w-7 h-7 shrink-0 aspect-square items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                  aria-label="Speaker Settings"
-                >
-                  {activeShelf === 'speaker' ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </button>
-              </Tooltip>
-            </div>
-
-            {/* Screen Share Button */}
-            {onToggleScreenShare && (
-              <Tooltip content={isScreenSharing ? 'Stop Presenting Screen' : 'Share Screen'} side="top">
-                <button
-                  type="button"
-                  onClick={onToggleScreenShare}
-                  className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-all cursor-pointer ${
-                    isScreenSharing
-                      ? 'bg-accent text-accent-foreground border-accent shadow-md scale-105'
-                      : 'border-border bg-card text-foreground hover:bg-secondary'
-                  }`}
-                  aria-label={isScreenSharing ? 'Stop Presenting Screen' : 'Share Screen'}
-                >
-                  {isScreenSharing ? <ScreenShareOff size={18} /> : <ScreenShare size={18} />}
-                </button>
-              </Tooltip>
-            )}
-
-            {/* Hand Raise Button */}
-            <Tooltip content={handRaised ? 'Lower Hand' : 'Raise Hand'} side="top">
-              <button
-                type="button"
-                onClick={onToggleHandRaise}
-                className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-all cursor-pointer ${handRaised
-                  ? 'bg-accent text-accent-foreground border-accent shadow-md scale-105'
-                  : 'border-border bg-card text-foreground hover:bg-secondary'
-                  }`}
-              >
-                <Hand size={18} />
-              </button>
-            </Tooltip>
-
-            {/* Live Captions (Subtitles) Button */}
-            {onToggleCaptions && (
-              <Tooltip
-                content={
-                  !captionsSupported
-                    ? 'Captions not supported or blocked in this browser (Use Chrome/Edge)'
-                    : captionsEnabled
-                    ? 'Turn off captions'
-                    : 'Turn on captions'
-                }
-                side="top"
-              >
-                <button
-                  type="button"
-                  onClick={captionsSupported ? onToggleCaptions : undefined}
-                  disabled={!captionsSupported}
-                  className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-all ${
-                    !captionsSupported
-                      ? 'border-border/40 bg-muted/40 text-muted-foreground/50 cursor-not-allowed opacity-60'
-                      : captionsEnabled
-                      ? 'bg-primary/15 text-primary border-primary/40 font-bold cursor-pointer'
-                      : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground cursor-pointer'
-                  }`}
-                  aria-label="Toggle Live Captions"
-                >
-                  {captionsEnabled && captionsSupported ? <Captions size={18} /> : <CaptionsOff size={18} />}
-                </button>
-              </Tooltip>
-            )}
-
-            {/* Leave Button */}
-            <Button
-              variant="destructive"
-              className="rounded-full px-4 h-10 shrink-0 font-bold gap-1.5 shadow-md cursor-pointer"
-              onClick={onLeaveClick}
-            >
-              <PhoneOff size={16} />
-              <span>Leave</span>
-            </Button>
           </div>
         </div>
       </div>
 
-      {/* Right: Panels Navigation Buttons (Chat, Q&A) & View Settings */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        {PANELS.filter((item) => item.key !== 'people').map((item) => (
-          <Tooltip key={item.key} content={item.label} side="top">
-            <button
-              type="button"
-              onClick={() => onSelectPanel(panel === item.key ? null : item.key)}
-              className={`flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border transition-colors cursor-pointer ${panel === item.key
-                ? 'bg-primary/15 text-primary border-primary/40 font-bold'
-                : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
-                }`}
-            >
-              <item.icon size={18} />
-            </button>
-          </Tooltip>
-        ))}
+      {/* Right on desktop: Panels Navigation Buttons (Chat, Q&A) & View Settings */}
+      <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+        <MeetingPanelButtons
+          panel={panel}
+          onSelectPanel={onSelectPanel}
+        />
 
-        {/* Appearance / View Mode Settings (now includes Fullscreen) */}
-        <Popover open={showSettingsModal} onOpenChange={setShowSettingsModal}>
-          <Tooltip content={showSettingsModal ? undefined : "Meeting View Settings"} side="top" disabled={showSettingsModal}>
-            <PopoverTrigger
-              render={
-                <button
-                  type="button"
-                  className="flex size-10 w-10 h-10 min-w-10 min-h-10 shrink-0 aspect-square items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground cursor-pointer"
-                  aria-label="Meeting View Settings"
-                >
-                  <Settings size={18} />
-                </button>
-              }
-            />
-          </Tooltip>
-          <PopoverContent side="top" sideOffset={12} className="w-68 p-3 space-y-3 border-border bg-card shadow-xl rounded-xs" align="end">
-            <div className="font-bold text-xs text-foreground border-b border-border pb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Settings size={14} className="text-primary" />
-                <span>Settings</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowSettingsModal(false)}
-                className="size-5 flex items-center justify-center rounded-xs text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors"
-                aria-label="Close"
-              >
-                <X size={13} />
-              </button>
-            </div>
-
-            {/* 1. Appearance: Light / Dark / System */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-foreground">Appearance</span>
-              <div className="grid grid-cols-3 gap-1 bg-muted/40 p-1 rounded-xs border border-border/50">
-                <button
-                  type="button"
-                  onClick={() => setTheme('light')}
-                  className={cn(
-                    "flex items-center justify-center gap-1.5 py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer",
-                    theme === 'light'
-                      ? "bg-card text-primary shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Sun size={12} />
-                  <span>Light</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme('dark')}
-                  className={cn(
-                    "flex items-center justify-center gap-1.5 py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer",
-                    theme === 'dark'
-                      ? "bg-card text-primary shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Moon size={12} />
-                  <span>Dark</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme('system')}
-                  className={cn(
-                    "flex items-center justify-center gap-1.5 py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer",
-                    theme === 'system'
-                      ? "bg-card text-primary shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Monitor size={12} />
-                  <span>System</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Captions Settings: Font Size & Background Opacity Presets */}
-            <div className="space-y-2 border-t border-border/60 pt-2.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
-                <Captions size={13} className="text-primary" />
-                <span>Captions Appearance</span>
-              </div>
-
-              {/* Font Size Presets */}
-              <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground font-medium">Font Size</span>
-                <div className="grid grid-cols-3 gap-1 bg-muted/40 p-1 rounded-xs border border-border/50">
-                  {(['sm', 'md', 'lg'] as CaptionFontSize[]).map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => onSelectCaptionFontSize?.(size)}
-                      className={cn(
-                        "flex items-center justify-center py-1 px-2 rounded-xs text-xs font-medium transition-colors cursor-pointer capitalize",
-                        captionFontSize === size
-                          ? "bg-card text-primary shadow-xs font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {size === 'sm' ? 'Small' : size === 'md' ? 'Medium' : 'Large'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Background Opacity Presets */}
-              <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground font-medium">Background Opacity</span>
-                <div className="grid grid-cols-5 gap-1 bg-muted/40 p-1 rounded-xs border border-border/50">
-                  {([20, 40, 60, 80, 100] as CaptionOpacity[]).map((op) => (
-                    <button
-                      key={op}
-                      type="button"
-                      onClick={() => onSelectCaptionOpacity?.(op)}
-                      className={cn(
-                        "flex items-center justify-center py-1 px-1 rounded-xs text-[11px] font-medium transition-colors cursor-pointer",
-                        captionOpacity === op
-                          ? "bg-card text-primary shadow-xs font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {op}%
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Keybinds: List all keybinds + new keybind Alt + N */}
-            <div className="space-y-1.5 border-t border-border/60 pt-2.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
-                <Keyboard size={13} className="text-primary" />
-                <span>Keybinds</span>
-              </div>
-
-              <div className="space-y-1 text-xs">
-                {/* Alt + C: Mic */}
-                <div className="flex items-center justify-between rounded-xs px-2 py-1 bg-muted/30 hover:bg-muted/60 transition-colors">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Mic size={12} className="text-primary shrink-0" />
-                    <span className="text-xs font-medium text-foreground truncate">Mute / Unmute</span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Kbd>Alt</Kbd>
-                    <span className="text-muted-foreground text-[10px]">+</span>
-                    <Kbd>C</Kbd>
-                  </div>
-                </div>
-
-                {/* Alt + V: Camera */}
-                <div className="flex items-center justify-between rounded-xs px-2 py-1 bg-muted/30 hover:bg-muted/60 transition-colors">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Video size={12} className="text-primary shrink-0" />
-                    <span className="text-xs font-medium text-foreground truncate">Camera On / Off</span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Kbd>Alt</Kbd>
-                    <span className="text-muted-foreground text-[10px]">+</span>
-                    <Kbd>V</Kbd>
-                  </div>
-                </div>
-
-                {/* Alt + B: Deafen */}
-                <div className="flex items-center justify-between rounded-xs px-2 py-1 bg-muted/30 hover:bg-muted/60 transition-colors">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <VolumeX size={12} className="text-primary shrink-0" />
-                    <span className="text-xs font-medium text-foreground truncate">Deafen / Undeafen</span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Kbd>Alt</Kbd>
-                    <span className="text-muted-foreground text-[10px]">+</span>
-                    <Kbd>B</Kbd>
-                  </div>
-                </div>
-
-                {/* Alt + N: Mute All Three */}
-                <div className="flex items-center justify-between rounded-xs px-2 py-1 bg-muted/30 hover:bg-muted/60 transition-colors">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <MicOff size={12} className="text-rose-400 shrink-0" />
-                    <span className="text-xs font-medium text-foreground truncate">Mute All Three</span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Kbd>Alt</Kbd>
-                    <span className="text-muted-foreground text-[10px]">+</span>
-                    <Kbd>N</Kbd>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Fullscreen toggle button */}
-            <div className="border-t border-border/60 pt-2.5">
-              <Button
-                variant={isFullscreen ? 'default' : 'outline'}
-                size="sm"
-                className="w-full justify-start text-xs font-medium gap-2 h-8 rounded-xs cursor-pointer"
-                onClick={onToggleFullscreen}
-              >
-                {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-                <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
+        <MeetingViewSettingsModal
+          open={showSettingsModal}
+          onOpenChange={setShowSettingsModal}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={onToggleFullscreen}
+          captionFontSize={captionFontSize}
+          onSelectCaptionFontSize={onSelectCaptionFontSize}
+          captionOpacity={captionOpacity}
+          onSelectCaptionOpacity={onSelectCaptionOpacity}
+        />
       </div>
     </footer>
   );

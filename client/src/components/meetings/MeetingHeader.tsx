@@ -124,26 +124,26 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
   const net = getNetworkBadge();
 
   return (
-    <header className="shrink-0 flex items-center justify-between border-b border-border/80 px-6 h-14 bg-card shadow-xs">
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="text-xs font-bold text-foreground font-mono shrink-0">
+    <header className="shrink-0 flex items-center justify-between border-b border-border/80 px-3 sm:px-6 h-14 bg-card shadow-xs">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+        <span className="text-[11px] sm:text-xs font-bold text-foreground font-mono shrink-0">
           {formatTimeStr(currentTime)}
         </span>
-        <h1 className="truncate text-base font-bold text-foreground">{title}</h1>
+        <h1 className="truncate text-sm sm:text-base font-bold text-foreground max-w-[90px] xs:max-w-[140px] sm:max-w-none">{title}</h1>
         <Tooltip content={copied ? 'Link Shared / Copied!' : 'Share Meeting Link'} side="bottom">
           <Button
             variant="outline"
             size="sm"
             onClick={onShareLink || onCopyLink}
-            className="gap-1.5 text-xs h-8 px-3 rounded-sm border-border/80 bg-secondary/50 hover:bg-secondary text-foreground cursor-pointer shrink-0 transition-colors shadow-xs"
+            className="gap-1 sm:gap-1.5 text-xs h-7 sm:h-8 px-2 sm:px-3 rounded-sm border-border/80 bg-secondary/50 hover:bg-secondary text-foreground cursor-pointer shrink-0 transition-colors shadow-xs"
           >
             {copied ? <Check size={14} className="text-primary" /> : <Share2 size={14} className="text-foreground" />}
-            <span>{copied ? 'Shared!' : 'Share Link'}</span>
+            <span className="hidden xs:inline">{copied ? 'Shared!' : 'Share Link'}</span>
           </Button>
         </Tooltip>
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-muted-foreground shrink-0">
         {raisedHands && raisedHands.length > 0 && (
           <div className="relative" ref={popoverRef}>
             <Tooltip content={`${raisedHands.length} ${raisedHands.length === 1 ? 'hand' : 'hands'} raised in call`} side="bottom">
