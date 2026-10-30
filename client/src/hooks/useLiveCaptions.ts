@@ -83,6 +83,7 @@ export const useLiveCaptions = ({
 
   const activeUtteranceIdRef = useRef<string>('turn-initial');
   const restartTimerRef = useRef<number | null>(null);
+  const lastCommittedFinalRef = useRef<string>('');
 
   const currentUserIdRef = useRef(currentUserId);
   const currentUserNameRef = useRef(currentUserName);
@@ -206,7 +207,7 @@ export const useLiveCaptions = ({
     const rec = recognition;
 
     rec.onresult = (event: SpeechRecognitionEvent) => {
-      let finalTranscript = '';
+      let sessionFinal = '';
       let interimTranscript = '';
       let hasFinal = false;
 
@@ -215,69 +216,86 @@ export const useLiveCaptions = ({
         const result = event.results[i];
         const piece = result[0]?.transcript || '';
         if (result.isFinal) {
-          finalTranscript += (finalTranscript ? ' ' : '') + piece.trim();
+          sessionFinal += (sessionFinal ? ' ' : '') + piece.trim();
           hasFinal = true;
         } else {
           interimTranscript += piece;
         }
       }
 
+      // Only display the currently speaking utterance
       const activeText = (
-        finalTranscript + (interimTranscript ? ` ${interimTranscript}` : '')
+        (hasFinal ? '' : sessionFinal) + (interimTranscript ? ` ${interimTranscript}` : '')
       ).trim();
-
-      if (!activeText) return;
 
       const speakerId = currentUserIdRef.current || 'me';
       const speakerName = currentUserNameRef.current || 'You';
 
-      const captionItem: LiveCaptionItem = {
-        id: activeUtteranceIdRef.current,
-        speakerId,
-        speakerName,
-        text: activeText,
-        isFinal: hasFinal,
-        timestamp: Date.now(),
-      };
-
-      // Update active caption overlay immediately for real-time responsiveness
-      setActiveCaption(captionItem);
-
-      // If a full phrase was finalized, push to history and reset utterance id
-      if (hasFinal && finalTranscript) {
-        const finalizedCaption: LiveCaptionItem = {
-          ...captionItem,
-          text: finalTranscript,
-          isFinal: true,
+      if (activeText) {
+        const captionItem: LiveCaptionItem = {
+          id: activeUtteranceIdRef.current,
+          speakerId,
+          speakerName,
+          text: activeText,
+          isFinal: false,
+          timestamp: Date.now(),
         };
 
-        setCaptionHistory((prev) => {
-          const updated = [...prev, finalizedCaption];
-          try {
-            sessionStorage.setItem(`intellmeet_transcript_${meetingId}`, JSON.stringify(updated));
-          } catch {
-            // Ignore quota errors
-          }
-          return updated;
-        });
+        // Update active caption overlay immediately for real-time responsiveness
+        setActiveCaption(captionItem);
 
-        // Rotate turn id for next sentence
-        activeUtteranceIdRef.current = `turn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        // Broadcast active interim caption to room
+        const socket = getMeetingSocket();
+        socket.emit('meeting:caption', {
+          meetingId,
+          ...captionItem,
+        });
       }
 
-      // Broadcast caption to all room participants via socket
-      const socket = getMeetingSocket();
-      socket.emit('meeting:caption', {
-        meetingId,
-        ...captionItem,
-      });
+      // If new parts finalized and differs from what we already committed:
+      if (hasFinal && sessionFinal && sessionFinal !== lastCommittedFinalRef.current) {
+        // Calculate the fresh new text piece that hasn't been saved yet
+        let newPiece = sessionFinal;
+        if (lastCommittedFinalRef.current && sessionFinal.startsWith(lastCommittedFinalRef.current)) {
+          newPiece = sessionFinal.slice(lastCommittedFinalRef.current.length).trim();
+        }
+        lastCommittedFinalRef.current = sessionFinal;
+
+        if (newPiece) {
+          const finalizedCaption: LiveCaptionItem = {
+            id: `turn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            speakerId,
+            speakerName,
+            text: newPiece,
+            isFinal: true,
+            timestamp: Date.now(),
+          };
+
+          setCaptionHistory((prev) => {
+            const updated = [...prev, finalizedCaption];
+            try {
+              sessionStorage.setItem(`intellmeet_transcript_${meetingId}`, JSON.stringify(updated));
+            } catch {
+              // Ignore quota errors
+            }
+            return updated;
+          });
+
+          // Broadcast finalized piece
+          const socket = getMeetingSocket();
+          socket.emit('meeting:caption', {
+            meetingId,
+            ...finalizedCaption,
+          });
+        }
+      }
 
       if (clearTimerRef.current) {
         window.clearTimeout(clearTimerRef.current);
       }
       clearTimerRef.current = window.setTimeout(() => {
-        setActiveCaption((prev) => (prev?.id === captionItem.id ? null : prev));
-      }, hasFinal ? 4000 : 7000);
+        setActiveCaption(null);
+      }, 3500);
     };
 
     rec.onerror = (event: SpeechRecognitionErrorEvent) => {

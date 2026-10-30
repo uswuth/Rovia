@@ -108,23 +108,18 @@ export const LiveCaptionOverlay: React.FC<LiveCaptionOverlayProps> = ({
     }
 
     if (activeCaption?.text?.trim()) {
+      const activeText = activeCaption.text.trim();
       const lastBlock = blocks[blocks.length - 1];
       if (lastBlock && lastBlock.speakerName === activeCaption.speakerName) {
-        const lastPara = lastBlock.paragraphs[lastBlock.paragraphs.length - 1];
-        if (lastPara && lastPara.text.length < 140) {
-          lastPara.text = `${lastPara.text} ${activeCaption.text}`;
-          lastPara.isActive = true;
-        } else {
-          lastBlock.paragraphs.push({
-            id: activeCaption.id,
-            text: activeCaption.text,
-            isActive: true,
-          });
-        }
+        lastBlock.paragraphs.push({
+          id: activeCaption.id,
+          text: activeText,
+          isActive: true,
+        });
       } else {
         blocks.push({
           speakerName: activeCaption.speakerName,
-          paragraphs: [{ id: activeCaption.id, text: activeCaption.text, isActive: true }],
+          paragraphs: [{ id: activeCaption.id, text: activeText, isActive: true }],
         });
       }
     }
