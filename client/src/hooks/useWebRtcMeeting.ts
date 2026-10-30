@@ -150,7 +150,15 @@ export const useWebRtcMeeting = (
   const createConnection = useCallback(
     (userId: string, initiator: boolean): RTCPeerConnection => {
       const existing = connections.current[userId];
-      if (existing) return existing;
+      if (existing && existing.connectionState !== 'closed' && existing.signalingState !== 'closed') {
+        return existing;
+      }
+      if (existing) {
+        try {
+          existing.close();
+        } catch {}
+        delete connections.current[userId];
+      }
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       connections.current[userId] = pc;
@@ -383,6 +391,13 @@ export const useWebRtcMeeting = (
       socketRef.current = socket;
 
       socket.on('meeting:peer-joined', ({ userId }) => {
+        // Clean up any lingering previous connection for this peer before recreating
+        if (connections.current[userId]) {
+          try {
+            connections.current[userId].close();
+          } catch {}
+          delete connections.current[userId];
+        }
         createConnection(userId, false);
         upsertPeer(userId, {});
         onPeerJoinedRef.current?.(userId);
@@ -437,6 +452,14 @@ export const useWebRtcMeeting = (
       });
 
       socket.on('webrtc:offer', async (data: MeetingSignalPayload) => {
+        // If an offer arrives and the existing connection is closed or in a bad state, clean it up
+        const existingPc = connections.current[data.from];
+        if (existingPc && (existingPc.connectionState === 'closed' || existingPc.signalingState === 'closed')) {
+          try {
+            existingPc.close();
+          } catch {}
+          delete connections.current[data.from];
+        }
         const pc = createConnection(data.from, false);
         if (data.description) {
           // If in have-local-offer (both peers offered simultaneously), rollback to accept the remote offer
@@ -516,6 +539,7 @@ export const useWebRtcMeeting = (
         (result.peers ?? []).forEach((userId) => {
           upsertPeer(userId, {});
           createConnection(userId, true);
+          onPeerJoinedRef.current?.(userId);
         });
 
         // Broadcast current audio/video state so newly joined room peers immediately know whether our mic and camera are active
